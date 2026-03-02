@@ -1,0 +1,35 @@
+{
+    "format": "mp4",
+    "globalBranding": {
+        "accentColor": "#6366f1",
+        "handle": "@test.ai",
+        "effects": [
+            "vignette",
+            "chromatic",
+            "halftone"
+        ]
+    },
+    "carousel": [
+        {
+            "templateId": "CONTENT_LISTICLE",
+            "data": {
+                "title": "Top 3 AI Trends in 2026",
+                "items": [
+                    "1. Autonomous Agents Building Autonomous Agents",
+                    "2. Real-Time Video and Audio Generation",
+                    "3. Hyper-Personalized Experiences"
+                ],
+                "footer": "Swipe for more tech news"
+            }
+        },
+        {
+            "templateId": "CONTENT_VIDEO",
+            "data": {
+                "title": "Robotics Breakthrough!",
+                "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                "caption": "Watch this new robot perform a backflip.",
+                "source": "TechCrunch"
+            }
+        }
+    ]
+}
