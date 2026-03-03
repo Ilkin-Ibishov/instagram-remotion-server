@@ -106,6 +106,8 @@ app.post('/api/render', async (req, res) => {
                     // Remotion uses its own Chromium; no need for external Puppeteer.
                     chromiumOptions: {
                         disableWebSecurity: true,
+                        gl: 'angle',
+                        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
                     },
                     onProgress: ({ progress }) => {
                         if (Math.round(progress * 100) % 25 === 0) {
@@ -126,6 +128,8 @@ app.post('/api/render', async (req, res) => {
                     frame: composition.durationInFrames - 1,
                     chromiumOptions: {
                         disableWebSecurity: true,
+                        gl: 'angle',
+                        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
                     },
                     // 2x scale for crisp 2160×2160 output.
                     scale: 2,
