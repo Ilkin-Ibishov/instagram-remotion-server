@@ -61,7 +61,7 @@ export async function startServer() {
 
 app.post('/api/render', async (req, res) => {
     try {
-        const { globalBranding, carousel, format = 'png' } = req.body;
+        const { globalBranding, carousel, format = 'png', webhookUrl } = req.body;
 
         if (!globalBranding || !carousel || !Array.isArray(carousel)) {
             return res.status(400).json({ error: 'Invalid manifest format' });
@@ -70,70 +70,108 @@ app.post('/api/render', async (req, res) => {
         const serveUrl = await ensureBundle();
         const batchId = crypto.randomBytes(4).toString('hex');
 
-        const renderPromises = carousel.map(async (slide, i) => {
-            console.log(
-                `[render] slide ${i + 1}/${carousel.length} (${slide.templateId}, ${format})`
-            );
+        const processRenders = async () => {
+            const renderPromises = carousel.map(async (slide, i) => {
+                console.log(
+                    `[render] slide ${i + 1}/${carousel.length} (${slide.templateId}, ${format})`
+                );
 
-            const inputProps = {
-                templateId: slide.templateId,
-                data: slide.data,
-                branding: globalBranding,
-            };
+                const inputProps = {
+                    templateId: slide.templateId,
+                    data: slide.data,
+                    branding: globalBranding,
+                };
 
-            const filename = `render-${batchId}-${i}.${format === 'mp4' ? 'mp4' : 'png'}`;
-            const filepath = path.join(RENDER_DIR, filename);
+                const filename = `render-${batchId}-${i}.${format === 'mp4' ? 'mp4' : 'png'}`;
+                const filepath = path.join(RENDER_DIR, filename);
 
-            const composition = await selectComposition({
-                serveUrl,
-                id: COMPOSITION_ID,
-                inputProps,
+                const composition = await selectComposition({
+                    serveUrl,
+                    id: COMPOSITION_ID,
+                    inputProps,
+                });
+
+                if (format === 'mp4') {
+                    await renderMedia({
+                        composition,
+                        serveUrl,
+                        codec: 'h264',
+                        outputLocation: filepath,
+                        inputProps,
+                        // Hardcode concurrency to use 8GB efficiently per slide
+                        concurrency: 4,
+                        chromiumOptions: {
+                            disableWebSecurity: true,
+                            gl: 'angle',
+                            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                        },
+                        onProgress: ({ progress }) => {
+                            if (Math.round(progress * 100) % 25 === 0) {
+                                console.log(
+                                    `  [video ${i + 1}] ${Math.round(progress * 100)}%`
+                                );
+                            }
+                        },
+                    });
+                } else {
+                    await renderStill({
+                        composition,
+                        serveUrl,
+                        output: filepath,
+                        inputProps,
+                        frame: composition.durationInFrames - 1,
+                        chromiumOptions: {
+                            disableWebSecurity: true,
+                            gl: 'angle',
+                            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                        },
+                        scale: 2,
+                    });
+                }
+
+                console.log(`[render] ✓ ${filename}`);
+                return `/api/renders/${filename}`;
             });
 
-            if (format === 'mp4') {
-                await renderMedia({
-                    composition,
-                    serveUrl,
-                    codec: 'h264',
-                    outputLocation: filepath,
-                    inputProps,
-                    // Hardcode concurrency to use 8GB efficiently per slide
-                    concurrency: 4,
-                    chromiumOptions: {
-                        disableWebSecurity: true,
-                        gl: 'angle',
-                        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-                    },
-                    onProgress: ({ progress }) => {
-                        if (Math.round(progress * 100) % 25 === 0) {
-                            console.log(
-                                `  [video ${i + 1}] ${Math.round(progress * 100)}%`
-                            );
-                        }
-                    },
-                });
-            } else {
-                await renderStill({
-                    composition,
-                    serveUrl,
-                    output: filepath,
-                    inputProps,
-                    frame: composition.durationInFrames - 1,
-                    chromiumOptions: {
-                        disableWebSecurity: true,
-                        gl: 'angle',
-                        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-                    },
-                    scale: 2,
-                });
-            }
+            return Promise.all(renderPromises);
+        };
 
-            console.log(`[render] ✓ ${filename}`);
-            return `/api/renders/${filename}`;
-        });
+        if (webhookUrl) {
+            // Respond immediately for n8n to avoid 503 timeouts
+            res.status(202).json({ success: true, status: 'processing', batchId });
 
-        const outputUrls = await Promise.all(renderPromises);
+            // Process in the background
+            processRenders().then(async (outputUrls) => {
+                try {
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ success: true, batchId, images: outputUrls })
+                    });
+                    console.log(`[webhook] ✓ Delivered to ${webhookUrl}`);
+                } catch (e) {
+                    console.error('[webhook] Failed to send success ping:', e);
+                }
+            }).catch(async (error) => {
+                console.error('[webhook] Background render error:', error);
+                try {
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            success: false,
+                            batchId,
+                            error: error instanceof Error ? error.message : String(error)
+                        })
+                    });
+                } catch (e) {
+                    console.error('[webhook] Failed to send error ping:', e);
+                }
+            });
+            return;
+        }
 
+        const outputUrls = await processRenders();
         res.json({ success: true, images: outputUrls });
     } catch (error) {
         console.error('Render error:', error);
