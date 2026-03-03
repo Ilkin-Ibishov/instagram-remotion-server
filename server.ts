@@ -68,12 +68,9 @@ app.post('/api/render', async (req, res) => {
         }
 
         const serveUrl = await ensureBundle();
-
-        const outputUrls: string[] = [];
         const batchId = crypto.randomBytes(4).toString('hex');
 
-        for (let i = 0; i < carousel.length; i++) {
-            const slide = carousel[i];
+        const renderPromises = carousel.map(async (slide, i) => {
             console.log(
                 `[render] slide ${i + 1}/${carousel.length} (${slide.templateId}, ${format})`
             );
@@ -87,8 +84,6 @@ app.post('/api/render', async (req, res) => {
             const filename = `render-${batchId}-${i}.${format === 'mp4' ? 'mp4' : 'png'}`;
             const filepath = path.join(RENDER_DIR, filename);
 
-            // Select the composition with input props.
-            // This allows dynamic metadata (duration, etc.) if needed later.
             const composition = await selectComposition({
                 serveUrl,
                 id: COMPOSITION_ID,
@@ -96,14 +91,14 @@ app.post('/api/render', async (req, res) => {
             });
 
             if (format === 'mp4') {
-                // ── Video: deterministic frame-perfect rendering ──
                 await renderMedia({
                     composition,
                     serveUrl,
                     codec: 'h264',
                     outputLocation: filepath,
                     inputProps,
-                    // Remotion uses its own Chromium; no need for external Puppeteer.
+                    // Hardcode concurrency to use 8GB efficiently per slide
+                    concurrency: 4,
                     chromiumOptions: {
                         disableWebSecurity: true,
                         gl: 'angle',
@@ -112,33 +107,32 @@ app.post('/api/render', async (req, res) => {
                     onProgress: ({ progress }) => {
                         if (Math.round(progress * 100) % 25 === 0) {
                             console.log(
-                                `  [video] ${Math.round(progress * 100)}%`
+                                `  [video ${i + 1}] ${Math.round(progress * 100)}%`
                             );
                         }
                     },
                 });
             } else {
-                // ── PNG: render a still at the final frame ──
                 await renderStill({
                     composition,
                     serveUrl,
                     output: filepath,
                     inputProps,
-                    // Render at the last frame (after all animations complete).
                     frame: composition.durationInFrames - 1,
                     chromiumOptions: {
                         disableWebSecurity: true,
                         gl: 'angle',
                         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
                     },
-                    // 2x scale for crisp 2160×2160 output.
                     scale: 2,
                 });
             }
 
-            outputUrls.push(`/api/renders/${filename}`);
             console.log(`[render] ✓ ${filename}`);
-        }
+            return `/api/renders/${filename}`;
+        });
+
+        const outputUrls = await Promise.all(renderPromises);
 
         res.json({ success: true, images: outputUrls });
     } catch (error) {
