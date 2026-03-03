@@ -1,0 +1,575 @@
+{
+  "name": "GNews to Remotion (Fixed) Instagram Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (30m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        208,
+        304
+      ],
+      "id": "e4a32817-ef33-4ff2-bb0a-b8758b50bf49"
+    },
+    {
+      "parameters": {
+        "url": "=https://gnews.io/api/v4/top-headlines?category=technology&lang=en&max=5&apikey=7d806cbfdf291d5456d14baad02ac98e",
+        "options": {}
+      },
+      "name": "Fetch GNews (Recent 5)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        500,
+        304
+      ],
+      "id": "e9e85683-404a-464a-a924-375376b9070f"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Act as an expert Instagram creator. Take the news article provided from the previous GNews node and rewrite it into a snappy, engaging carousel script using the strict JSON output schema provided. Ensure the first slide always uses templateId HOOK_A and the last uses CTA_FINAL.\n\nArticle Title: {{ $('Find First Unposted').item.json.title }}\n\nDescription: {{ $('Find First Unposted').item.json.description }}\n\nContent: {{ $('Find First Unposted').item.json.content }}\n\nImage URL: {{ $('Find First Unposted').item.json.image }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert Instagram content creator. You must extract the news, write an Instagram carousel JSON, write an engaging Instagram post caption, and generate 4-5 relevant hashtags.\n\nCRITICAL ARCHITECTURE INSTRUCTIONS: You must output a JSON object strictly matching the connected output parser schema. It must have 3 root keys:\n\ninstagramCaption -> A highly engaging Instagram post caption including emojis.\ninstagramHashtags -> A string of 5 relevant hashtags separated by spaces (e.g. \"#news #tech\").\nremotionManifest -> A JSON object containing the slide data.\nThe remotionManifest object MUST contain these 3 Exact Keys:\n\nformat: MUST be exactly the string \"mp4\".\nglobalBranding: An object with \"accentColor\" (e.g. \"#ef4444\"), \"handle\" (e.g. \"@breaking_news\"), and an \"effects\" array.\ncarousel: An array of slide objects.\nCRITICAL SLIDE RULES (carousel array): Every slide object must have a templateId and a data object.\n\nThe FIRST slide's templateId MUST be exactly \"HOOK_A\".\nThe MIDDLE slides' templateIds MUST be exactly \"CONTENT_LISTICLE\", \"CONTENT_GENERIC\", or \"CONTENT_VIDEO\".\nThe LAST slide's templateId MUST be exactly \"CTA_FINAL\". NEVER invent template names like \"carousel_slide_1\". Use ONLY the ALL-CAPS names listed above."
+        }
+      },
+      "id": "fb62ed1c-16a9-41d6-95c1-0930cdffa1f3",
+      "name": "AI Agent - Instagram Creator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1300,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "bb8c5736-718e-443f-98f5-176c6b14d941",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        528
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Eyc8HfzICtgOgRox",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"remotionManifest\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"format\": { \"type\": \"string\" },\n        \"globalBranding\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"accentColor\": { \"type\": \"string\" },\n            \"handle\": { \"type\": \"string\" },\n            \"effects\": {\n              \"type\": \"array\",\n              \"items\": { \"type\": \"string\" }\n            }\n          }\n        },\n        \"carousel\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"templateId\": {\n                \"type\": \"string\",\n                \"enum\": [\"HOOK_A\", \"CONTENT_LISTICLE\", \"CONTENT_GENERIC\", \"CONTENT_VIDEO\", \"CTA_FINAL\"]\n              },\n              \"data\": {\n                \"type\": \"object\"\n              }\n            }\n          }\n        }\n      }\n    },\n    \"instagramCaption\": { \"type\": \"string\" },\n    \"instagramHashtags\": { \"type\": \"string\" }\n  }\n}\n"
+      },
+      "id": "74b3d501-ff79-4c83-bae9-14df4732e564",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ .item.json.BASE_RENDER_URL }}/api/render",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Bypass-Tunnel-Reminder",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.output.remotionManifest }}",
+        "options": {}
+      },
+      "id": "c94cd5c4-57bf-460c-b98f-f7fbe7954ca5",
+      "name": "POST to Remotion API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1600,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1CW134leY9k0VLHj2Y3BL6X_W_z1yDYlzEXbUQiEx7IQ",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CW134leY9k0VLHj2Y3BL6X_W_z1yDYlzEXbUQiEx7IQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CW134leY9k0VLHj2Y3BL6X_W_z1yDYlzEXbUQiEx7IQ/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "article_url",
+              "lookupValue": "={{ $('Fetch GNews (Top tech article)').item.json.articles[0].url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bdab9d08-e9c1-4a5a-8201-8a147c92b6af",
+      "name": "Check if Already Posted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        656,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "kdyJ9nQoqhfmd4VI",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ .url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7857c20e-1568-49b1-b17f-aa01747c5860",
+      "name": "Any Unposted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1100,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://new-pets-repair.loca.lt' + $('POST to Remotion API').item.json.images[0] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "9b40256b-1425-42b9-9b5f-efa4ee502f8b",
+      "name": "Download Video File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v21.0",
+        "node": "17841448495864104",
+        "edge": "media",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "media_type",
+                "value": "REELS"
+              },
+              {
+                "name": "video_url",
+                "value": "={{ 'https://new-pets-repair.loca.lt' + $('POST to Remotion API').item.json.images[0] }}"
+              },
+              {
+                "name": "caption",
+                "value": "={{ $('AI Agent - Instagram Creator').item.json.output.instagramCaption + '\\n\\n' + $('AI Agent - Instagram Creator').item.json.output.instagramHashtags }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b7fe18e0-172a-4a87-9a6d-30e2b6e4e0c4",
+      "name": "Publish to Instagram",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        1904,
+        304
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "2PCK1FeP8cNmNLgV",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1CW134leY9k0VLHj2Y3BL6X_W_z1yDYlzEXbUQiEx7IQ",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CW134leY9k0VLHj2Y3BL6X_W_z1yDYlzEXbUQiEx7IQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "PostedNews"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2722ed5f-d638-4af3-8638-63c0b88e483e",
+      "name": "Mark as Posted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3400,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "kdyJ9nQoqhfmd4VI",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "article_url",
+              "value": "={{ .item.json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "posted_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9afa9e0c-c62c-497d-8645-b84812097300",
+      "name": "Prepare Posted Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3200,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "var-1",
+              "name": "BASE_RENDER_URL",
+              "value": "https://strong-dolls-vanish.loca.lt",
+              "type": "string"
+            },
+            {
+              "id": "var-2",
+              "name": "BASE_IG_PROXY_URL",
+              "value": "https://new-pets-repair.loca.lt",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-global-vars-xyz",
+      "name": "Set Global Vars",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        300,
+        304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger (30m)": {
+      "main": [
+        [
+          {
+            "node": "Set Global Vars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch GNews (Top tech article)": {
+      "main": [
+        [
+          {
+            "node": "Check if Already Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Instagram Creator": {
+      "main": [
+        [
+          {
+            "node": "POST to Remotion API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Instagram Creator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Instagram Creator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Posted?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AI Agent - Instagram Creator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Remotion API": {
+      "main": [
+        [
+          {
+            "node": "Split Rendered Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Posted Data": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Global Vars": {
+      "main": [
+        [
+          {
+            "node": "Fetch GNews (Recent 5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch GNews (Recent 5)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Posted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Posted Data": {
+      "main": [
+        [
+          {
+            "node": "Find First Unposted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find First Unposted": {
+      "main": [
+        [
+          {
+            "node": "Any Unposted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Rendered Images": {
+      "main": [
+        [
+          {
+            "node": "Create Media Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Media Container": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Item IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Item IDs": {
+      "main": [
+        [
+          {
+            "node": "Wait for IG Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for IG Processing": {
+      "main": [
+        [
+          {
+            "node": "Create Carousel Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Carousel Container": {
+      "main": [
+        [
+          {
+            "node": "Wait for Carousel Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Carousel Info": {
+      "main": [
+        [
+          {
+            "node": "Publish to IG Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to IG Feed": {
+      "main": [
+        [
+          {
+            "node": "Prepare Posted Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "availableInMCP": false
+  },
+  "versionId": "d7bd6adf-1dab-4eaf-8874-024683d1ffad",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16992db2d72f62ec444dd21f945f439fd3ba447c46945142396376c63d9bf5a9"
+  },
+  "id": "I7TBvFQdL8G2eC8R",
+  "tags": []
+}
