@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, OffthreadVideo } from 'remotion';
+import { useCurrentFrame, interpolate, Video } from 'remotion';
 import { Play } from 'lucide-react';
 
 /**
@@ -110,7 +110,7 @@ export default function ContentVideo({
             >
                 {/* Video element */}
                 {data.videoUrl ? (
-                    <OffthreadVideo
+                    <Video
                         src={data.videoUrl}
                         style={{
                             width: '100%',
