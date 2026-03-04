@@ -96,6 +96,8 @@ app.post('/api/render', async (req, res) => {
                         composition,
                         serveUrl,
                         codec: 'h264',
+                        imageFormat: 'jpeg',
+                        pixelFormat: 'yuv420p',
                         outputLocation: filepath,
                         inputProps,
                         // Hardcode concurrency to use 8GB efficiently per slide
