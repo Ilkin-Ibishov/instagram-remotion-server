@@ -21,12 +21,44 @@ if (!fs.existsSync(RENDER_DIR)) {
 // ─── Browser Process Cleanup ─────────────────────────────
 // Kill zombie Chrome processes that weren't cleaned by Remotion
 function cleanupChromeProcesses() {
+    if (process.platform === 'win32') {
+        try { execSync('taskkill /F /IM chrome.exe 2>nul', { stdio: 'ignore' }); } catch (_) {}
+        try { execSync('taskkill /F /IM chromium.exe 2>nul', { stdio: 'ignore' }); } catch (_) {}
+        return;
+    }
+
+    // Linux/Mac: use pgrep to find PIDs, then kill them explicitly
     try {
-        if (process.platform === 'win32') {
-            execSync('taskkill /F /IM chrome.exe 2>nul', { stdio: 'ignore' });
-            execSync('taskkill /F /IM chromium.exe 2>nul', { stdio: 'ignore' });
+        const pids = execSync('pgrep -x "chrome" 2>/dev/null || pgrep -x "chromium" 2>/dev/null || pgrep -x "chromium-browser" 2>/dev/null || true', {
+            encoding: 'utf-8',
+        }).trim();
+
+        if (pids) {
+            const pidList = pids.split('\n').filter(Boolean);
+            console.log(`[cleanup] Killing ${pidList.length} Chrome process(es): ${pidList.join(', ')}`);
+
+            // Graceful SIGTERM first
+            try {
+                execSync(`kill -15 ${pidList.join(' ')} 2>/dev/null || true`, { stdio: 'ignore' });
+            } catch (_) {}
+
+            // Give processes up to 3 seconds to exit, then force-kill
+            const forceKillTimeout = setTimeout(() => {
+                try {
+                    const remaining = execSync('pgrep -x "chrome" 2>/dev/null || pgrep -x "chromium" 2>/dev/null || pgrep -x "chromium-browser" 2>/dev/null || true', {
+                        encoding: 'utf-8',
+                    }).trim();
+                    if (remaining) {
+                        const remainingPids = remaining.split('\n').filter(Boolean);
+                        console.log(`[cleanup] Force-killing ${remainingPids.length} stubborn Chrome process(es): ${remainingPids.join(', ')}`);
+                        execSync(`kill -9 ${remainingPids.join(' ')} 2>/dev/null || true`, { stdio: 'ignore' });
+                    }
+                } catch (_) {}
+            }, 3000);
+            // Don't block process exit waiting for this timer
+            forceKillTimeout.unref();
         } else {
-            execSync('pkill -9 -f "chrome|chromium" 2>/dev/null', { stdio: 'ignore' });
+            console.log('[cleanup] No Chrome processes found to kill');
         }
     } catch (e) {
         // Silently fail - processes may not exist
@@ -41,17 +73,30 @@ function warnIfTooManyChromeProcesses() {
             const output = execSync('tasklist | find /c "chrome.exe"', { encoding: 'utf-8' }).trim();
             count = parseInt(output) || 0;
         } else {
-            const output = execSync('pgrep -f "chrome|chromium" | wc -l', { encoding: 'utf-8' }).trim();
+            const output = execSync(
+                '{ pgrep -x "chrome" 2>/dev/null; pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null; } | wc -l',
+                { encoding: 'utf-8' }
+            ).trim();
             count = parseInt(output) || 0;
         }
-        if (count > 5) {
+        if (count > 10) {
             console.warn(`⚠️  WARNING: ${count} Chrome processes detected! Resource leak detected.`);
-            console.warn(`    Consider running: taskkill /F /IM chrome.exe (Windows) or pkill chrome (Linux/Mac)`);
+            console.warn(`    Run: pkill -9 -x chrome || pkill -9 -x chromium`);
+        } else if (count > 0) {
+            console.log(`[cleanup] Chrome process count: ${count}`);
         }
     } catch (e) {
         // Silently fail - process counting not critical
     }
 }
+
+// Periodic cleanup every 30 seconds to catch any stragglers
+const periodicCleanupInterval = setInterval(() => {
+    warnIfTooManyChromeProcesses();
+    cleanupChromeProcesses();
+}, 30_000);
+// Don't block process exit waiting for this interval
+periodicCleanupInterval.unref();
 
 // ─── Bundle cache (created once, reused for all renders) ─
 let bundleLocation: string | null = null;
@@ -200,7 +245,6 @@ app.post('/api/render', async (req, res) => {
                                 '--disable-setuid-sandbox',
                                 '--disable-dev-shm-usage',
                                 '--disable-gpu',
-                                '--single-process', // Force single process to avoid multiple Chrome instances
                             ]
                         },
                         onProgress: ({ progress }) => {
@@ -228,7 +272,6 @@ app.post('/api/render', async (req, res) => {
                                 '--disable-setuid-sandbox',
                                 '--disable-dev-shm-usage',
                                 '--disable-gpu',
-                                '--single-process', // Force single process to avoid multiple Chrome instances
                             ]
                         },
                         scale: 2,
