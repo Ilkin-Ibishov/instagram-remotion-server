@@ -109,9 +109,12 @@ export async function startServer() {
         console.error('[bundle] Failed to create bundle:', err);
     });
 
-    return app.listen(PORT, '0.0.0.0', () => {
-        console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
-        console.log(`✓ Endpoints: GET /health, POST /api/render, GET /api/renders/:file`);
+    return new Promise<void>((resolve) => {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
+            console.log(`✓ Endpoints: GET /health, POST /api/render, GET /api/renders/:file`);
+            resolve();
+        });
     });
 }
 
