@@ -77,6 +77,16 @@ async function ensureBundle(): Promise<string> {
 
 // ─── Server ──────────────────────────────────────────────
 export const app = express();
+
+// MUST be before any routes - logs ALL incoming requests
+app.use((req, res, next) => {
+    console.log(`\n[INCOMING] ${new Date().toISOString()} | ${req.method} ${req.path} | Content-Type: ${req.headers['content-type']}`);
+    res.on('finish', () => {
+        console.log(`[OUTGOING] ${req.method} ${req.path} -> ${res.statusCode} ${res.statusMessage}`);
+    });
+    next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 
 // Use Railway's PORT env var or default to 3000
@@ -88,12 +98,6 @@ app.use('/api/renders', express.static(RENDER_DIR));
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Debug middleware - log all requests
-app.use((req, res, next) => {
-    console.log(`[${req.method}] ${req.path}`);
-    next();
 });
 
 export async function startServer() {
