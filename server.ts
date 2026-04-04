@@ -97,6 +97,9 @@ app.use((req, res, next) => {
 });
 
 export async function startServer() {
+    console.log(`[startup] PORT env var: "${process.env.PORT}" (typeof: ${typeof process.env.PORT})`);
+    console.log(`[startup] Resolved PORT: ${PORT}`);
+    
     // Pre-warm the bundle on server start.
     ensureBundle().catch((err) => {
         console.error('[bundle] Failed to create bundle:', err);
