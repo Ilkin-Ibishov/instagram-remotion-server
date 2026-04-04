@@ -41,4 +41,7 @@ RUN npm ci
 
 COPY . .
 
+# Expose port for Railway
+EXPOSE 3000
+
 CMD ["npm", "start"]
