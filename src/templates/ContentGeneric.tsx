@@ -10,6 +10,9 @@ export default function ContentGeneric({
 }) {
     const frame = useCurrentFrame();
 
+    const title = data.title || 'Details';
+    const body = data.body || '';
+
     // Top accent bar: scaleX 0→1, duration 0.8s (24 frames)
     const barScaleX = interpolate(frame, [0, 24], [0, 1], {
         extrapolateRight: 'clamp',
@@ -97,17 +100,17 @@ export default function ContentGeneric({
                 {/* Title */}
                 <h2
                     style={{
-                        fontSize: 60,
+                        fontSize: 72,
                         fontWeight: 900,
                         color: 'white',
-                        marginBottom: 48,
-                        lineHeight: 1.15,
+                        marginBottom: 56,
+                        lineHeight: 1.3,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${titleY}px)`,
                         opacity: titleOpacity,
                     }}
                 >
-                    {data.title}
+                    {title}
                 </h2>
 
                 {/* Divider */}
@@ -125,16 +128,16 @@ export default function ContentGeneric({
                 {/* Body */}
                 <p
                     style={{
-                        fontSize: 36,
+                        fontSize: 40,
                         color: '#e5e7eb',
-                        lineHeight: 1.6,
+                        lineHeight: 1.7,
                         fontWeight: 500,
                         margin: 0,
                         transform: `translateY(${bodyY}px)`,
                         opacity: bodyOpacity,
                     }}
                 >
-                    {data.body}
+                    {body}
                 </p>
 
                 {/* Highlight */}
@@ -151,11 +154,12 @@ export default function ContentGeneric({
                     >
                         <p
                             style={{
-                                fontSize: 28,
+                                fontSize: 32,
                                 fontWeight: 700,
                                 fontStyle: 'italic',
                                 color: 'white',
                                 margin: 0,
+                                lineHeight: 1.5,
                             }}
                         >
                             {data.highlight}

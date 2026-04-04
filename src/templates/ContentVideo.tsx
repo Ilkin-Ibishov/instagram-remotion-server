@@ -26,6 +26,8 @@ export default function ContentVideo({
     const frame = useCurrentFrame();
     const fps = 30;
 
+    const title = data.title || 'Video Details';
+
     // Frame border reveal: scaleY 0→1 over 0.6s
     const frameBorderScale = interpolate(frame, [0, 18], [0, 1], {
         extrapolateRight: 'clamp',
@@ -198,7 +200,7 @@ export default function ContentVideo({
                             fontFamily: "'Montserrat', sans-serif",
                         }}
                     >
-                        {data.title}
+                        {title}
                     </h2>
                 </div>
             </div>

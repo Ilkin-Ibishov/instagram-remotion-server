@@ -1,0 +1,27 @@
+# Decisions Log — Long-Term Memory
+
+**Purpose:** Dated entries recording key decisions and their rationale. Append new entries at the top.
+
+---
+
+## 2026-03-28 — Context pack initial creation
+
+- **Context:** New modular `context/` docs created for agent use.
+- **Decision:** `templates.md` is the single source of truth for `data` field names.
+- **Key insight:** n8n workflow prompts may use `footer` while `ContentListicle` reads `footnote` — align prompts or map fields in workflow.
+
+## 2026-03-28 — Package.json Remotion Studio entry fix
+
+- **Context:** `preview` script pointed at `src/remotion/index.ts`.
+- **Issue:** Remotion root file is `.tsx` not `.ts` — wrong extension breaks Studio.
+- **Fix:** Updated `package.json` `preview` script to `src/remotion/index.tsx`.
+
+## 2026-03-30 — Agent brain restructure
+
+- **Context:** Monolithic `token-control-system.md` (24K chars) was self-consuming tokens.
+- **Decision:** Split into 5 modular files. Only `core.md` is always-on. Others loaded on-demand.
+- **Decision:** Migrated `context/` folder into `.agent/memory/` (LTM) and `.agent/working/` (STM).
+
+---
+
+*(Add new entries above this line.)*

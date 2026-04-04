@@ -1,0 +1,37 @@
+---
+description: For substantial work, read context/*.md before planning or executing (ground truth vs memory)
+alwaysApply: true
+---
+
+# Read project context before big work
+
+## When this applies
+
+If the user asks for a **substantial** change—**new feature**, **multi-file refactor**, **API or payload change**, **new template**, **render pipeline change**, **automation integration**, or any implementation where getting **endpoints, paths, or data shapes** wrong would waste time—treat **`context/`** as the **source of truth** for this repo.
+
+**Skip** a full context pass for **trivial** edits (single typo, rename in one file, obvious one-liner) when the risk of contract mismatch is negligible.
+
+## What to do first
+
+1. **Do not** rely only on memory or prior chat turns for contracts, routes, or `templateId` / `data` shapes—those drift from reality (**hallucination risk**).
+2. If the relevant facts are **not already** verified in your current context (you have not just read the files), **read the appropriate `context/*.md` files** (use the Read tool) **before** deep planning or writing code.
+3. Start from **`context/README.md`** to pick files; use **`context/overview.md`** when the scope is unclear. Use **`context/lesson-learned.md`** when touching integrations, n8n, or known pitfalls.
+4. After grounding on docs, **read or search actual code** when the change must match implementation details the docs might not cover (then update docs per the context-sync rule if behavior changes).
+
+## Order of operations
+
+**Ground → plan → execute** (or **ground → execute** for straightforward tasks). Do not lock in a plan based on assumed APIs or folder layout without checking **`context/`** when this rule applies.
+
+## Mapping (quick reference)
+
+| Topic | Read first |
+|-------|------------|
+| HTTP API, render, webhooks | `context/api-server.md` |
+| Compositions, Remotion root | `context/remotion.md` |
+| Slides, `templateId`, `data` | `context/templates.md` |
+| Branding, effects | `context/effects.md` |
+| n8n / external callers | `context/integration-n8n.md` |
+| Scripts, tests, env | `context/development.md` |
+| Gotchas, past mistakes | `context/lesson-learned.md` |
+
+The table in **`.cursor/rules/context-sync.mdc`** matches maintenance duties; this rule matches **reading** before **doing**.

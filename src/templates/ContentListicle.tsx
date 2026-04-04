@@ -38,6 +38,7 @@ export default function ContentListicle({
     });
 
     // Items: staggered spring entrance, starting at 0.6s (frame 18)
+    const title = data.title || 'Key Points';
     const items: string[] = data.items || [];
 
     // Footnote: fade in at end, delay after last item
@@ -77,17 +78,17 @@ export default function ContentListicle({
             {/* Title */}
             <h2
                 style={{
-                    fontSize: 52,
+                    fontSize: 64,
                     fontWeight: 900,
                     color: 'white',
-                    lineHeight: 1.2,
-                    marginBottom: 16,
+                    lineHeight: 1.3,
+                    marginBottom: 24,
                     fontFamily: "'Montserrat', sans-serif",
                     transform: `translateY(${titleY}px)`,
                     opacity: titleOpacity,
                 }}
             >
-                {data.title}
+                {title}
             </h2>
 
             {/* Accent line */}
@@ -154,9 +155,9 @@ export default function ContentListicle({
                             {/* Item text */}
                             <p
                                 style={{
-                                    fontSize: 30,
+                                    fontSize: 36,
                                     color: '#e5e7eb',
-                                    lineHeight: 1.5,
+                                    lineHeight: 1.6,
                                     fontWeight: 500,
                                     margin: 0,
                                     paddingTop: 6,

@@ -1,0 +1,39 @@
+---
+description: Keep context/*.md in sync when this project’s behavior or contracts change
+globs: "**/*.{ts,tsx,json}"
+alwaysApply: false
+---
+
+# Context documentation (agent upkeep)
+
+This repo maintains modular agent docs under **`context/`** (see **`context/README.md`** for the index).
+
+## When to update
+
+After a substantive change to **any** of the following, update the **matching** context file(s) in the same change set (or immediately after), not only in code:
+
+| Change area | Prefer updating |
+|-------------|-------------------|
+| `server.ts`, routes, render options, webhooks | `context/api-server.md` |
+| `src/remotion/*`, composition id, duration, fps | `context/remotion.md` |
+| Template components, `templateId`, `data` shapes | `context/templates.md` |
+| `EffectsOverlay`, branding fields | `context/effects.md` |
+| n8n workflows, automation payload | `context/integration-n8n.md` |
+| Scripts, tests, tsconfig, deploy paths | `context/development.md` |
+| New top-level concern or many files touched | `context/overview.md` and/or `context/README.md` index |
+
+## What “update” means
+
+- Keep **field names**, **defaults**, **endpoints**, and **file paths** accurate.
+- If behavior is intentionally removed or deprecated, remove or strike it from docs in the same pass.
+- Do **not** duplicate long schemas in multiple files; cross-link to **`templates.md`** or **`api-server.md`**.
+
+## Lessons
+
+If a mistake was made (wrong assumption, wrong path, integration mismatch), add a short dated entry to **`context/lesson-learned.md`** at the **top** of the entries list, using the template in that file.
+
+## Scope
+
+This rule is **file-scoped** (`**/*.{ts,tsx,json}`): it applies when those files are relevant to the chat, not when you are only editing `context/*.md` or other docs.
+
+Skip doc-only edits for **trivial** edits (typos, formatting-only) unless they touch documented behavior. For **any** API or template contract change, treat context updates as **required**.

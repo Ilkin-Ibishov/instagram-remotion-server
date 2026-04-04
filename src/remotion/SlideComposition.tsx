@@ -50,6 +50,12 @@ export const SlideComposition: React.FC<SlideProps> = ({
         );
     }
 
+    const safeBranding = {
+        accentColor: branding?.accentColor || '#ef4444',
+        handle: branding?.handle || '',
+        effects: Array.isArray(branding?.effects) ? branding.effects : [],
+    };
+
     return (
         <div
             style={{
@@ -59,8 +65,8 @@ export const SlideComposition: React.FC<SlideProps> = ({
                 overflow: 'hidden',
             }}
         >
-            <Template data={data} branding={branding} />
-            <EffectsOverlay effects={branding.effects} />
+            <Template data={data} branding={safeBranding} />
+            <EffectsOverlay effects={safeBranding.effects} />
         </div>
     );
 };

@@ -8,6 +8,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
@@ -15,6 +16,41 @@ const COMPOSITION_ID = 'Slide';
 
 if (!fs.existsSync(RENDER_DIR)) {
     fs.mkdirSync(RENDER_DIR, { recursive: true });
+}
+
+// ─── Browser Process Cleanup ─────────────────────────────
+// Kill zombie Chrome processes that weren't cleaned by Remotion
+function cleanupChromeProcesses() {
+    try {
+        if (process.platform === 'win32') {
+            execSync('taskkill /F /IM chrome.exe 2>nul', { stdio: 'ignore' });
+            execSync('taskkill /F /IM chromium.exe 2>nul', { stdio: 'ignore' });
+        } else {
+            execSync('pkill -9 -f "chrome|chromium" 2>/dev/null', { stdio: 'ignore' });
+        }
+    } catch (e) {
+        // Silently fail - processes may not exist
+    }
+}
+
+// Warn if too many Chrome processes are running
+function warnIfTooManyChromeProcesses() {
+    try {
+        let count = 0;
+        if (process.platform === 'win32') {
+            const output = execSync('tasklist | find /c "chrome.exe"', { encoding: 'utf-8' }).trim();
+            count = parseInt(output) || 0;
+        } else {
+            const output = execSync('pgrep -f "chrome|chromium" | wc -l', { encoding: 'utf-8' }).trim();
+            count = parseInt(output) || 0;
+        }
+        if (count > 5) {
+            console.warn(`⚠️  WARNING: ${count} Chrome processes detected! Resource leak detected.`);
+            console.warn(`    Consider running: taskkill /F /IM chrome.exe (Windows) or pkill chrome (Linux/Mac)`);
+        }
+    } catch (e) {
+        // Silently fail - process counting not critical
+    }
 }
 
 // ─── Bundle cache (created once, reused for all renders) ─
@@ -67,6 +103,30 @@ app.post('/api/render', async (req, res) => {
             return res.status(400).json({ error: 'Invalid manifest format' });
         }
 
+        const VALID_TEMPLATES = new Set([
+            'HOOK_A', 'CONTENT_LISTICLE', 'CONTENT_GENERIC', 'CONTENT_VIDEO', 'CTA_FINAL'
+        ]);
+
+        if (!globalBranding.accentColor || !globalBranding.handle) {
+            return res.status(400).json({ error: 'globalBranding must have accentColor and handle' });
+        }
+        if (!Array.isArray(globalBranding.effects)) {
+            globalBranding.effects = [];
+        }
+
+        if (carousel.length === 0) {
+            return res.status(400).json({ error: 'carousel must have at least 1 slide' });
+        }
+
+        for (const [i, slide] of carousel.entries()) {
+            if (!slide.templateId || !VALID_TEMPLATES.has(slide.templateId)) {
+                return res.status(400).json({ error: `slide[${i}].templateId invalid: "${slide.templateId}"` });
+            }
+            if (!slide.data || typeof slide.data !== 'object') {
+                return res.status(400).json({ error: `slide[${i}].data must be a non-null object` });
+            }
+        }
+
         const serveUrl = await ensureBundle();
         const batchId = crypto.randomBytes(4).toString('hex');
 
@@ -100,12 +160,21 @@ app.post('/api/render', async (req, res) => {
                         pixelFormat: 'yuv420p',
                         outputLocation: filepath,
                         inputProps,
-                        // Hardcode concurrency to use 8GB efficiently per slide
-                        concurrency: 4,
+                        // Reduced concurrency for stability (x264 memory errors with concurrency > 1)
+                        // Set RENDER_CONCURRENCY env var to override (e.g., 2 or 3 on high-RAM systems)
+                        concurrency: parseInt(process.env.RENDER_CONCURRENCY || '1', 10),
+                        timeoutInMilliseconds: 60000, // Increased from default 33s to 60s
                         chromiumOptions: {
                             disableWebSecurity: true,
                             gl: 'angle',
-                            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                            // @ts-ignore - Remotion typings don't expose args but puppeteer accepts it
+                            args: [
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox',
+                                '--disable-dev-shm-usage',
+                                '--disable-gpu',
+                                '--single-process', // Force single process to avoid multiple Chrome instances
+                            ]
                         },
                         onProgress: ({ progress }) => {
                             if (Math.round(progress * 100) % 25 === 0) {
@@ -122,10 +191,18 @@ app.post('/api/render', async (req, res) => {
                         output: filepath,
                         inputProps,
                         frame: composition.durationInFrames - 1,
+                        timeoutInMilliseconds: 60000, // Increased from default 33s to 60s
                         chromiumOptions: {
                             disableWebSecurity: true,
                             gl: 'angle',
-                            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                            // @ts-ignore - Remotion typings don't expose args but puppeteer accepts it
+                            args: [
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox',
+                                '--disable-dev-shm-usage',
+                                '--disable-gpu',
+                                '--single-process', // Force single process to avoid multiple Chrome instances
+                            ]
                         },
                         scale: 2,
                     });
@@ -138,11 +215,23 @@ app.post('/api/render', async (req, res) => {
             return Promise.all(renderPromises);
         };
 
+        const renderStartTime = Date.now();
+        let renderUrls: string[] = [];
+        try {
+            renderUrls = await processRenders();
+        } finally {
+            // Always cleanup after render completes (success or failure)
+            cleanupChromeProcesses();
+            warnIfTooManyChromeProcesses();
+            const elapsed = ((Date.now() - renderStartTime) / 1000).toFixed(1);
+            console.log(`[cleanup] ✓ Render batch completed in ${elapsed}s, Chrome processes cleaned`);
+        }
+
         if (webhookUrl) {
             // Respond immediately for n8n to avoid 503 timeouts
             res.status(202).json({ success: true, status: 'processing', batchId });
 
-            // Process in the background
+            // Process in the background with cleanup
             processRenders().then(async (outputUrls) => {
                 try {
                     await fetch(webhookUrl, {
@@ -153,10 +242,13 @@ app.post('/api/render', async (req, res) => {
                     console.log(`[webhook] ✓ Delivered to ${webhookUrl}`);
                 } catch (e) {
                     console.error('[webhook] Failed to send success ping:', e);
+                } finally {
+                    cleanupChromeProcesses();
+                    warnIfTooManyChromeProcesses();
                 }
             }).catch(async (error) => {
-                console.error('[webhook] Background render error:', error);
                 try {
+                    console.error('[webhook] Background render error:', error);
                     await fetch(webhookUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -168,6 +260,9 @@ app.post('/api/render', async (req, res) => {
                     });
                 } catch (e) {
                     console.error('[webhook] Failed to send error ping:', e);
+                } finally {
+                    cleanupChromeProcesses();
+                    warnIfTooManyChromeProcesses();
                 }
             });
             return;

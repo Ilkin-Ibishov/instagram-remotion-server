@@ -12,6 +12,9 @@ export default function CtaFinal({
     const frame = useCurrentFrame();
     const fps = 30;
 
+    const callToAction = data.callToAction || 'Follow for More';
+    const subtext = data.subtext || '';
+
     // Bookmark icon: spring scale 0→1, rotate -180→0, delay 0.2s (6 frames)
     const iconFrame = Math.max(0, frame - 6);
     const iconSpring = spring({
@@ -96,26 +99,28 @@ export default function CtaFinal({
                         fontSize: 72,
                         fontWeight: 900,
                         color: 'white',
-                        marginBottom: 24,
+                        marginBottom: 32,
+                        lineHeight: 1.3,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${ctaY}px)`,
                         opacity: ctaOpacity,
                     }}
                 >
-                    {data.callToAction}
+                    {callToAction}
                 </h2>
 
                 {/* Subtext */}
                 <p
                     style={{
-                        fontSize: 28,
+                        fontSize: 32,
                         color: '#9ca3af',
-                        marginBottom: 64,
+                        marginBottom: 72,
+                        lineHeight: 1.5,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
                     }}
                 >
-                    {data.subtext}
+                    {subtext}
                 </p>
 
                 {/* Like / Comment / Share icons */}

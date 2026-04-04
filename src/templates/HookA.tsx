@@ -12,6 +12,9 @@ export default function HookA({
     const frame = useCurrentFrame();
     const fps = 30;
 
+    const headline = data.headline || 'Breaking News';
+    const subheadline = data.subheadline || '';
+
     // Background image: scale 1.1→1, opacity 0→0.4 over 2s starting at frame 0
     const imgScale = interpolate(frame, [0, 2 * fps], [1.1, 1], {
         extrapolateRight: 'clamp',
@@ -147,31 +150,31 @@ export default function HookA({
                         fontSize: 96,
                         fontWeight: 900,
                         color: 'white',
-                        lineHeight: 1.1,
+                        lineHeight: 1.3,
                         letterSpacing: '-0.02em',
-                        marginBottom: 32,
+                        marginBottom: 40,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${headlineY}px)`,
                         opacity: headlineOpacity,
                     }}
                 >
-                    {data.headline}
+                    {headline}
                 </h1>
 
                 {/* Subheadline */}
                 <p
                     style={{
-                        fontSize: 36,
+                        fontSize: 38,
                         color: '#d1d5db',
                         fontWeight: 600,
                         maxWidth: 900,
-                        lineHeight: 1.4,
+                        lineHeight: 1.6,
                         margin: 0,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
                     }}
                 >
-                    {data.subheadline}
+                    {subheadline}
                 </p>
             </div>
 

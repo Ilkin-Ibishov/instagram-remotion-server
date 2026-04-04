@@ -5,14 +5,20 @@
     "scripts": {
         "dev": "tsx server.ts",
         "start": "tsx server.ts",
-        "preview": "npx remotion studio src/remotion/index.ts"
+        "preview": "npx remotion studio src/remotion/index.tsx",
+        "pipeline": "npm exec tsx -- src/pipelineRun.ts",
+        "verify": "npm exec tsx -- verify-option-b.ts",
+        "test": "vitest"
     },
     "dependencies": {
+        "@google/generative-ai": "^0.24.1",
         "@remotion/bundler": "^4.0.0",
         "@remotion/cli": "^4.0.0",
         "@remotion/renderer": "^4.0.0",
+        "dotenv": "^17.3.1",
         "express": "^4.18.2",
         "lucide-react": "^0.309.0",
+        "playwright": "^1.59.1",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "remotion": "^4.0.0",
