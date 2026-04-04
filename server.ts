@@ -79,10 +79,22 @@ async function ensureBundle(): Promise<string> {
 export const app = express();
 app.use(express.json({ limit: '50mb' }));
 
-const PORT = 3000;
+// Use Railway's PORT env var or default to 3000
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Serve rendered assets.
 app.use('/api/renders', express.static(RENDER_DIR));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Debug middleware - log all requests
+app.use((req, res, next) => {
+    console.log(`[${req.method}] ${req.path}`);
+    next();
+});
 
 export async function startServer() {
     // Pre-warm the bundle on server start.
@@ -91,11 +103,13 @@ export async function startServer() {
     });
 
     return app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on http://localhost:${PORT}`);
+        console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
+        console.log(`✓ Endpoints: GET /health, POST /api/render, GET /api/renders/:file`);
     });
 }
 
 app.post('/api/render', async (req, res) => {
+    console.log('[api/render] POST request received');
     try {
         const { globalBranding, carousel, format = 'png', webhookUrl } = req.body;
 
@@ -164,6 +178,9 @@ app.post('/api/render', async (req, res) => {
                         // Set RENDER_CONCURRENCY env var to override (e.g., 2 or 3 on high-RAM systems)
                         concurrency: parseInt(process.env.RENDER_CONCURRENCY || '1', 10),
                         timeoutInMilliseconds: 60000, // Increased from default 33s to 60s
+                        // Use 'veryfast' preset to reduce x264 memory usage and thread count
+                        // Also reduces CPU strain and encoding time
+                        x264Preset: 'veryfast',
                         chromiumOptions: {
                             disableWebSecurity: true,
                             gl: 'angle',
@@ -277,6 +294,12 @@ app.post('/api/render', async (req, res) => {
             details: error instanceof Error ? error.message : String(error),
         });
     }
+});
+
+// Catch-all 404 handler
+app.use((req, res) => {
+    console.log(`[404] No route for ${req.method} ${req.path}`);
+    res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
 });
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST;

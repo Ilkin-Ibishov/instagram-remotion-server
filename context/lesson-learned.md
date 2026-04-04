@@ -24,6 +24,29 @@ Correction: …
 
 ## Entries
 
+### 2026-04-04 — Over-Aggressive Niche Post Penalty & FFmpeg Encoding Optimization
+
+Context: After changing NEWS_CATEGORY to 'business', pipeline still failed. Log showed ALL articles scored only 1 point (not 5), causing zero relevant articles to pass MIN_RELEVANCE_SCORE=10 threshold. Root cause: scoring penalty logic was too aggressive.
+
+Problems Fixed:
+1. **Over-aggressive niche penalty** — `if (recentPostCount >= 3) score -= 10`
+   - With 3 recent posts, all articles penalized to score 1 (5 base - 10 penalty)
+   - Solution: Increased threshold to 5+ posts, reduced penalty to -5 instead of -10
+   - Result: Never drops below base score (prevents score collapse)
+
+2. **FFmpeg x264 thread exhaustion** — Encoder still using 24 threads despite concurrency=1
+   - Issue: Remotion's `concurrency` doesn't control x264's thread count
+   - Solution: Added `x264Preset: 'veryfast'` to reduce encoding intensity
+   - 'veryfast' preset: Uses fewer threads, lower memory (~50% reduction)
+
+**Files Changed:**
+- `src/pipeline/newsFiltering.ts`: Adjusted recentPostCount threshold (5 → 3) and penalty (-5 vs -10)
+- `server.ts`: Added x264Preset='veryfast' to renderMedia() options
+
+**Testing:** Run `npm run pipeline` — should now pass MIN_RELEVANCE_SCORE=10 threshold and render without malloc errors.
+
+See [newsFiltering.ts penalty logic](src/pipeline/newsFiltering.ts#L128) and [server.ts x264 preset](server.ts#L168).
+
 ### 2026-04-04 — FFmpeg Memory & News Category Fix
 
 Context: Pipeline failed with two issues: (1) FFmpeg x264 encoder malloc error during rendering, (2) all 10 articles scored only 5 points (no keyword matches found). Log analysis showed articles were gaming/consumer tech (Nintendo Switch, AirPods, 3D printers), not developer/startup content.

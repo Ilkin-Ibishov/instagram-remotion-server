@@ -119,12 +119,17 @@ export function scoreArticleRelevance(
   if (article.title && article.description) {
     score += baseScore;
     reasons.push('Has title and description (+5)');
+  } else {
+    // If missing title/description, still give minimal base score
+    score += 1;
   }
 
-  // If posting too frequently from same niche, reduce score
-  if (recentPostCount >= 3) {
-    score = Math.max(1, score - 10);
-    reasons.push('⚠️ Already posted 3+ from this niche recently (-10)');
+  // If posting too frequently from same niche, apply mild penalty (not too aggressive)
+  // Only penalize if we have 5+ recent posts (threshold higher than before)
+  // And reduce penalty to -5 instead of -10 (prevent over-penalization)
+  if (recentPostCount >= 5) {
+    score = Math.max(baseScore, score - 5); // Never go below base score
+    reasons.push('⚠️ Many recent posts from this niche (-5)');
   }
 
   return {
