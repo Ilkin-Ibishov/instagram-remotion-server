@@ -311,5 +311,13 @@ app.use((req, res) => {
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST;
 if (!isTestMode) {
-    startServer();
+    // Start server and await to ensure HTTP server is fully initialized before module finishes
+    (async () => {
+        try {
+            await startServer();
+        } catch (err) {
+            console.error('[startup] Failed to start server:', err);
+            process.exit(1);
+        }
+    })();
 }
