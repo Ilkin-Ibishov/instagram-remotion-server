@@ -311,5 +311,7 @@ app.use((req, res) => {
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST;
 if (!isTestMode) {
-    startServer();
+    (async () => {
+        await startServer();
+    })();
 }
