@@ -49,6 +49,59 @@ If **`webhookUrl`** is present:
 
 This avoids gateway timeouts for n8n and similar tools.
 
+## POST `/api/schedule/run`
+
+Scheduler endpoint for Railway cron ticks. This endpoint is separate from the render contract and orchestrates gated pipeline execution.
+
+### Behavior
+
+- Calls scheduler orchestration in `src/pipeline/schedulerRunner.ts`.
+- Uses persisted schedule state from Postgres to decide if the run is due.
+- Uses Redis distributed lock to prevent overlapping runs.
+- Runs pipeline with bounded retry (single retry by default).
+- Performs Instagram session preflight before execution.
+- If `SCHEDULE_RUN_SECRET` is configured, request must include header `x-scheduler-secret` with matching value.
+
+### Response shape
+
+- `200` for `executed`, `skipped_due_to_time`, and `skipped_lock_held`
+- `401` for missing/invalid scheduler secret when `SCHEDULE_RUN_SECRET` is enabled
+- `500` for `failed`
+
+Example success:
+
+```json
+{
+	"success": true,
+	"status": "executed",
+	"accountId": "default",
+	"nextRunAt": "2026-04-06T23:00:00.000Z"
+}
+```
+
+Example skip:
+
+```json
+{
+	"success": true,
+	"status": "skipped_due_to_time",
+	"reason": "not_due",
+	"accountId": "default",
+	"nextRunAt": "2026-04-06T23:00:00.000Z"
+}
+```
+
+Example failure:
+
+```json
+{
+	"success": false,
+	"status": "failed",
+	"reason": "Session expires too soon",
+	"accountId": "default"
+}
+```
+
 ## Code references
 
 - Bundle + render loop: `server.ts` (`ensureBundle`, `app.post('/api/render', ...)`).

@@ -24,6 +24,18 @@ Correction: …
 
 ## Entries
 
+### 2026-04-06 — Scheduler endpoint must be guarded in production
+
+Context: Added `POST /api/schedule/run` for Railway cron-driven automation.  
+Mistake: Initial implementation allowed unauthenticated trigger calls when exposed publicly.  
+Correction: Added optional secret guard in `server.ts` using `SCHEDULE_RUN_SECRET` and `x-scheduler-secret` header; endpoint now returns 401 for missing/invalid secret when configured. Added API tests for both unauthorized cases in `__tests__/server.test.ts`.
+
+### 2026-04-06 — Scheduler integration requires import-safe pipeline execution
+
+Context: Added a new `POST /api/schedule/run` endpoint that calls into pipeline logic from `server.ts`.  
+Mistake: `src/pipelineRun.ts` always executed immediately on import and called `process.exit(1)` in its catch block. Importing it from scheduler code would terminate the server process on errors.  
+Correction: Exported `runPipeline()` and gated CLI execution behind direct-entry detection (`import.meta.url === pathToFileURL(process.argv[1]).href`). Runtime failures now throw to callers; CLI mode still exits with status 1. Added endpoint tests for scheduler outcomes in `__tests__/server.test.ts`.
+
 ### 2026-04-04 — Over-Aggressive Niche Post Penalty & FFmpeg Encoding Optimization
 
 Context: After changing NEWS_CATEGORY to 'business', pipeline still failed. Log showed ALL articles scored only 1 point (not 5), causing zero relevant articles to pass MIN_RELEVANCE_SCORE=10 threshold. Root cause: scoring penalty logic was too aggressive.

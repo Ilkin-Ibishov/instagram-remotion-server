@@ -5,6 +5,67 @@ import type { PublishablePost } from '../pipeline/types';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+export interface SessionValidationResult {
+  valid: boolean;
+  reason?: string;
+  expiresAt?: string | null;
+}
+
+export function validateInstagramSessionExpiry(
+  sessionFile: string = 'storage.json',
+  minimumRemainingMs: number = 60 * 60 * 1000
+): SessionValidationResult {
+  if (!fs.existsSync(sessionFile)) {
+    return {
+      valid: false,
+      reason: `Session file ${sessionFile} not found. Please run saveSession script first.`,
+      expiresAt: null,
+    };
+  }
+
+  const raw = fs.readFileSync(sessionFile, 'utf-8');
+  const parsed = JSON.parse(raw) as { cookies?: Array<{ name?: string; expires?: number }> };
+  const cookies = Array.isArray(parsed.cookies) ? parsed.cookies : [];
+
+  if (cookies.length === 0) {
+    return {
+      valid: false,
+      reason: 'Session file has no cookies.',
+      expiresAt: null,
+    };
+  }
+
+  const nowSeconds = Date.now() / 1000;
+  const finiteExpirySeconds = cookies
+    .map((cookie) => cookie.expires)
+    .filter((expires): expires is number => typeof expires === 'number' && Number.isFinite(expires) && expires > 0);
+
+  if (finiteExpirySeconds.length === 0) {
+    return {
+      valid: false,
+      reason: 'Session cookies do not contain a finite expiry.',
+      expiresAt: null,
+    };
+  }
+
+  const maxExpirySeconds = Math.max(...finiteExpirySeconds);
+  const remainingMs = (maxExpirySeconds - nowSeconds) * 1000;
+  const expiresAt = new Date(maxExpirySeconds * 1000).toISOString();
+
+  if (remainingMs < minimumRemainingMs) {
+    return {
+      valid: false,
+      reason: `Session expires too soon (${expiresAt}). Re-authentication is required.`,
+      expiresAt,
+    };
+  }
+
+  return {
+    valid: true,
+    expiresAt,
+  };
+}
+
 export async function publishToInstagram(post: PublishablePost): Promise<void> {
   const sessionFile = 'storage.json';
   

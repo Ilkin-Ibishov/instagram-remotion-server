@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
+import { runScheduledPipeline } from './src/pipeline/schedulerRunner';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
@@ -145,6 +146,45 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.post('/api/schedule/run', async (req, res) => {
+    console.log('[api/schedule/run] POST request received');
+
+    const configuredSecret = process.env.SCHEDULE_RUN_SECRET;
+    if (configuredSecret) {
+        const providedSecret = req.header('x-scheduler-secret');
+        if (!providedSecret || providedSecret !== configuredSecret) {
+            return res.status(401).json({
+                success: false,
+                status: 'unauthorized',
+                reason: 'Invalid scheduler secret',
+            });
+        }
+    }
+
+    try {
+        const outcome = await runScheduledPipeline();
+
+        if (outcome.status === 'failed') {
+            return res.status(500).json({
+                success: false,
+                ...outcome,
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            ...outcome,
+        });
+    } catch (error) {
+        console.error('[api/schedule/run] Unexpected error:', error);
+        return res.status(500).json({
+            success: false,
+            status: 'failed',
+            reason: error instanceof Error ? error.message : String(error),
+        });
+    }
+});
+
 export async function startServer() {
     console.log(`[startup] PORT env var: "${process.env.PORT}" (typeof: ${typeof process.env.PORT})`);
     console.log(`[startup] Resolved PORT: ${PORT}`);
@@ -157,7 +197,7 @@ export async function startServer() {
     return new Promise<void>((resolve) => {
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
-            console.log(`✓ Endpoints: GET /health, POST /api/render, GET /api/renders/:file`);
+            console.log(`✓ Endpoints: GET /health, POST /api/schedule/run, POST /api/render, GET /api/renders/:file`);
             resolve();
         });
     });

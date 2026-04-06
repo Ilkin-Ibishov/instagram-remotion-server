@@ -9,6 +9,7 @@ import path from 'path';
 import Logger from './utils/logger';
 import { generatePostContentAI } from './pipeline/aiService';
 import * as dotenv from 'dotenv';
+import { pathToFileURL } from 'url';
 
 dotenv.config();
 
@@ -54,7 +55,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
   return result.images;
 }
 
-async function runPipeline() {
+export async function runPipeline() {
   const logger = new Logger();
   const accountProfile = loadAccountProfile();
   const accountKeywords = getAccountKeywords(accountProfile);
@@ -200,10 +201,18 @@ async function runPipeline() {
   } catch (error) {
     logger.error('pipeline', 'Pipeline failed', error);
     console.error(error);
-    process.exit(1);
+    throw error;
   }
 }
 
-// Run the pipeline
+// Run the pipeline when executed directly from CLI.
 // NOTE: Make sure `npm run start` is running in another terminal so the server on port 3000 takes the render request.
-runPipeline();
+const isDirectExecution = process.argv[1]
+  ? import.meta.url === pathToFileURL(process.argv[1]).href
+  : false;
+
+if (isDirectExecution) {
+  runPipeline().catch(() => {
+    process.exit(1);
+  });
+}

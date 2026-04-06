@@ -28,6 +28,27 @@ npx vitest run
 - **`RENDER_DIR`** in `server.ts` is set to **`/tmp/renders`**. On **Linux/macOS** this is standard. On **Windows**, absolute POSIX-style paths can behave differently depending on Node version and environment; validate output directory when deploying to Windows or use a cross-platform `path.join` + `os.tmpdir()` if you change this in code.
 - **`package-lock.json`** present — use `npm ci` for reproducible installs in CI.
 
+## Scheduler environment
+
+The scheduler route (`POST /api/schedule/run`) requires both Postgres and Redis.
+
+Required:
+
+- `DATABASE_URL` — Postgres connection string for persisted schedule state
+- `REDIS_URL` — Redis connection string for distributed lock
+
+Optional (defaults in code):
+
+- `SCHEDULE_ACCOUNT_ID` (default: `default`)
+- `SCHEDULE_RUN_SECRET` (if set, must be provided as `x-scheduler-secret` header)
+- `SCHEDULE_MIN_DELAY_HOURS` (default: `3`)
+- `SCHEDULE_MAX_DELAY_HOURS` (default: `5`)
+- `SCHEDULE_LOCK_TTL_SECONDS` (default: `7200`)
+- `SCHEDULE_RETRY_COUNT` (default: `1`)
+- `SCHEDULE_RETRY_DELAY_MS` (default: `5000`)
+
+For Railway cron usage, trigger `POST /api/schedule/run` on a fixed cadence (for example every 30 minutes). The endpoint decides run vs skip based on persisted `next_run_at`.
+
 ## Railway (CLI + MCP)
 
 - **CLI:** Install from [Railway CLI docs](https://docs.railway.com/cli); authenticate with `railway login`. The MCP server expects a logged-in CLI ([Railway MCP reference](https://docs.railway.com/reference/mcp-server)).
