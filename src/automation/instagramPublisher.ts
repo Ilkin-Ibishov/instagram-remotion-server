@@ -68,6 +68,7 @@ export function validateInstagramSessionExpiry(
 
 export async function publishToInstagram(post: PublishablePost): Promise<void> {
   const sessionFile = 'storage.json';
+  const isHeadless = (process.env.PLAYWRIGHT_HEADLESS || 'true').toLowerCase() !== 'false';
   
   if (!fs.existsSync(sessionFile)) {
     throw new Error(`Session file ${sessionFile} not found. Please run saveSession script first.`);
@@ -80,7 +81,10 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
   }
 
   console.log('Launching browser...');
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({
+    headless: isHeadless,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
   
   try {
     const context = await browser.newContext({

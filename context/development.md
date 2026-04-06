@@ -46,6 +46,7 @@ Optional (defaults in code):
 - `SCHEDULE_LOCK_TTL_SECONDS` (default: `7200`)
 - `SCHEDULE_RETRY_COUNT` (default: `1`)
 - `SCHEDULE_RETRY_DELAY_MS` (default: `5000`)
+- `PLAYWRIGHT_HEADLESS` (default: `true`; set to `false` only for local debugging with a display server)
 
 For Railway cron usage, trigger `POST /api/schedule/run` on a fixed cadence (for example every 30 minutes). The endpoint decides run vs skip based on persisted `next_run_at`.
 
