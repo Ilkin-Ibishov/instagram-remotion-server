@@ -76,7 +76,99 @@ Account niche: ${account.niche.join(", ")}.
 Ensure the content aligns with this audience and tone.`
     : '';
 
-  const prompt = `You are an Instagram content expert. Transform this news into a 4-slide carousel JSON.
+  const prompt = `You are NOT a news summarizer.
+
+You are a high-performing Instagram content strategist whose goal is:
+→ MAXIMIZE attention, retention, and engagement
+→ WITHOUT distorting facts
+
+---
+
+## CORE PRINCIPLES (STRICT)
+
+- DO NOT sound like AI
+- DO NOT be formal or corporate
+- DO NOT summarize like a blog
+- PRIORITIZE curiosity, tension, and emotion
+- WRITE like a human creator
+
+BUT ALSO:
+
+- DO NOT invent facts, quotes, numbers, or entities
+- DO NOT exaggerate beyond the given article
+- If information is missing -> stay general, do NOT guess
+- Use tension, NOT misinformation
+
+---
+
+## CONTENT STRATEGY
+
+### SLIDE 1 - HOOK (SCROLL STOPPER)
+- Short, punchy, curiosity-driven
+- Must be grounded in actual article
+- No generic titles
+
+---
+
+### SLIDE 2 - TENSION
+- NOT boring bullet points
+- Max 4 lines
+- Each line <= 12 words
+- Escalation feeling
+
+---
+
+### SLIDE 3 - PAYOFF
+- Max 2-3 short lines OR 2 sentences
+- No long paragraphs
+- Focus on WHY it matters
+
+---
+
+### SLIDE 4 - CTA
+- Must provoke opinion
+- MUST be a question
+- No generic "follow for more"
+
+---
+
+## CAPTION RULES
+
+- First line = strong hook
+- Short lines only
+- Use "\\n" for line breaks (IMPORTANT)
+- No double quotes inside text
+- Conversational tone
+
+Structure:
+- Hook
+- Context
+- Insight
+- Question
+
+---
+
+## HASHTAGS RULES
+
+- 8-12 hashtags ONLY
+- No duplicates
+- No generic tags (#news, #breaking)
+- Mix niche + topic-specific
+
+---
+
+## JSON SAFETY RULES (CRITICAL)
+
+- RETURN ONLY VALID JSON
+- Escape all double quotes inside values
+- Caption MUST use \\n for new lines
+- No trailing commas
+- No markdown
+- No explanations
+
+---
+
+## INPUT
 
 ACCOUNT:
 Handle: ${account.handle}
@@ -88,7 +180,9 @@ Title: ${article.title}
 Source: ${article.source}
 Description: ${article.description}
 
-INSTRUCTION: Return ONLY this JSON structure with all fields filled:
+---
+
+## OUTPUT FORMAT
 
 {
   "manifest": {
@@ -102,46 +196,51 @@ INSTRUCTION: Return ONLY this JSON structure with all fields filled:
       {
         "templateId": "HOOK_A",
         "data": {
-          "headline": "Breaking News Title",
-          "subheadline": "Compelling subtitle here",
+          "headline": "...",
+          "subheadline": "...",
           "imageUrl": ${article.imageUrl ? `"${article.imageUrl}"` : 'null'}
         }
       },
       {
         "templateId": "CONTENT_LISTICLE",
         "data": {
-          "title": "Key Points",
-          "items": ["First important point", "Second key detail", "Third fact", "Fourth insight"],
+          "title": "...",
+          "items": ["...", "...", "...", "..."],
           "footnote": "Source: ${article.source}"
         }
       },
       {
         "templateId": "CONTENT_GENERIC",
         "data": {
-          "title": "Full Story",
-          "body": "A clear 2-3 sentence explanation of what happened and why it matters.",
-          "highlight": "One powerful quote or key statement"
+          "title": "...",
+          "body": "...",
+          "highlight": "..."
         }
       },
       {
         "templateId": "CTA_FINAL",
         "data": {
-          "callToAction": "Save & Share",
-          "subtext": "Follow ${brandConfig.brandHandle} for more"
+          "callToAction": "...",
+          "subtext": "Reply in comments"
         }
       }
     ]
   },
-  "caption": "Engaging Instagram caption with relevant emojis about the news story",
-  "hashtags": "#News #Breaking #TopStory #Current #Updates #Alert #Article #Coverage #Trending #Story"
+  "caption": "...",
+  "hashtags": "..."
 }
 
-Rules:
-- Return ONLY valid JSON
-- Fill every field with real content
-- NO empty objects or arrays
-- NO markdown formatting
-- NO explanations`;
+---
+
+## HARD RULES
+
+- NO clickbait lies
+- NO generic phrases
+- NO long paragraphs
+- NO robotic tone
+- MUST feel like real creator content
+
+RETURN ONLY JSON.`;
 
   try {
     const result = await model.generateContent(prompt);
@@ -161,6 +260,7 @@ Rules:
     try {
       json = JSON.parse(responseText);
     } catch (parseError) {
+      const parseErrorMessage = parseError instanceof Error ? parseError.message : String(parseError);
       console.error('❌ Failed to parse Gemini response as JSON');
       console.error('Raw response (first 1000 chars):', responseText.substring(0, 1000));
       console.error('Full error:', parseError);
@@ -171,7 +271,7 @@ Rules:
       fs.writeFileSync(debugPath, responseText);
       console.error(`Full response written to: ${debugPath}`);
       
-      throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseError.message}`);
+      throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseErrorMessage}`);
     }
     
     // Validate that carousel has data
