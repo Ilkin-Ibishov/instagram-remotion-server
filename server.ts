@@ -325,23 +325,12 @@ app.post('/api/render', async (req, res) => {
             return Promise.all(renderPromises);
         };
 
-        const renderStartTime = Date.now();
-        let renderUrls: string[] = [];
-        try {
-            renderUrls = await processRenders();
-        } finally {
-            // Always cleanup after render completes (success or failure)
-            cleanupChromeProcesses();
-            warnIfTooManyChromeProcesses();
-            const elapsed = ((Date.now() - renderStartTime) / 1000).toFixed(1);
-            console.log(`[cleanup] ✓ Render batch completed in ${elapsed}s, Chrome processes cleaned`);
-        }
-
         if (webhookUrl) {
             // Respond immediately for n8n to avoid 503 timeouts
             res.status(202).json({ success: true, status: 'processing', batchId });
 
             // Process in the background with cleanup
+            const backgroundStartTime = Date.now();
             processRenders().then(async (outputUrls) => {
                 try {
                     await fetch(webhookUrl, {
@@ -355,6 +344,8 @@ app.post('/api/render', async (req, res) => {
                 } finally {
                     cleanupChromeProcesses();
                     warnIfTooManyChromeProcesses();
+                    const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
+                    console.log(`[cleanup] ✓ Webhook render batch completed in ${elapsed}s, Chrome processes cleaned`);
                 }
             }).catch(async (error) => {
                 try {
@@ -373,12 +364,25 @@ app.post('/api/render', async (req, res) => {
                 } finally {
                     cleanupChromeProcesses();
                     warnIfTooManyChromeProcesses();
+                    const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
+                    console.log(`[cleanup] ✗ Webhook render batch failed after ${elapsed}s, Chrome processes cleaned`);
                 }
             });
             return;
         }
 
-        const outputUrls = await processRenders();
+        const renderStartTime = Date.now();
+        let outputUrls: string[] = [];
+        try {
+            outputUrls = await processRenders();
+        } finally {
+            // Always cleanup after render completes (success or failure)
+            cleanupChromeProcesses();
+            warnIfTooManyChromeProcesses();
+            const elapsed = ((Date.now() - renderStartTime) / 1000).toFixed(1);
+            console.log(`[cleanup] ✓ Render batch completed in ${elapsed}s, Chrome processes cleaned`);
+        }
+
         res.json({ success: true, images: outputUrls });
     } catch (error) {
         console.error('Render error:', error);
