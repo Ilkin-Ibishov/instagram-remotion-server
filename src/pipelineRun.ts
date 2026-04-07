@@ -26,8 +26,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
   console.log(`Sending manifest to local Remotion server for rendering (format: ${format})...`);
   
   // Debug: Log payload before sending
-  console.log('\n📤 DEBUG: Sending to /api/render:');
-  console.log(JSON.stringify(manifest, null, 2));
+  console.log(`📤 DEBUG /api/render payload: ${JSON.stringify(manifest)}`);
   
   const response = await fetch('http://localhost:3000/api/render', {
     method: 'POST',
@@ -45,8 +44,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
   const result = await response.json();
   
   // Debug: Log render response
-  console.log('\n📥 DEBUG: Render Response:');
-  console.log(JSON.stringify(result, null, 2));
+  console.log(`📥 DEBUG /api/render response: ${JSON.stringify(result)}`);
   
   if (!result.success || !result.images) {
     throw new Error('Render response format is invalid');

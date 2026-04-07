@@ -138,6 +138,45 @@ app.use(express.json({ limit: '50mb' }));
 // Use Railway's PORT env var or default to 3000
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validateSlideData(templateId: string, data: Record<string, unknown>, index: number): string | null {
+    if (templateId === 'HOOK_A') {
+        if (!isNonEmptyString(data.headline)) return `slide[${index}].data.headline must be a non-empty string`;
+        if (!isNonEmptyString(data.subheadline)) return `slide[${index}].data.subheadline must be a non-empty string`;
+        if (data.imageUrl !== undefined && data.imageUrl !== null && typeof data.imageUrl !== 'string') {
+            return `slide[${index}].data.imageUrl must be string, null, or undefined`;
+        }
+        return null;
+    }
+
+    if (templateId === 'CONTENT_LISTICLE') {
+        if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
+        if (!Array.isArray(data.items) || data.items.length !== 4 || data.items.some((item) => !isNonEmptyString(item))) {
+            return `slide[${index}].data.items must be an array of exactly 4 non-empty strings`;
+        }
+        if (!isNonEmptyString(data.footnote)) return `slide[${index}].data.footnote must be a non-empty string`;
+        return null;
+    }
+
+    if (templateId === 'CONTENT_GENERIC') {
+        if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
+        if (!isNonEmptyString(data.body)) return `slide[${index}].data.body must be a non-empty string`;
+        if (!isNonEmptyString(data.highlight)) return `slide[${index}].data.highlight must be a non-empty string`;
+        return null;
+    }
+
+    if (templateId === 'CTA_FINAL') {
+        if (!isNonEmptyString(data.callToAction)) return `slide[${index}].data.callToAction must be a non-empty string`;
+        if (!isNonEmptyString(data.subtext)) return `slide[${index}].data.subtext must be a non-empty string`;
+        return null;
+    }
+
+    return null;
+}
+
 // Serve rendered assets.
 app.use('/api/renders', express.static(RENDER_DIR));
 
@@ -234,13 +273,19 @@ app.post('/api/render', async (req, res) => {
             if (!slide.data || typeof slide.data !== 'object') {
                 return res.status(400).json({ error: `slide[${i}].data must be a non-null object` });
             }
+
+            const slideDataError = validateSlideData(slide.templateId, slide.data as Record<string, unknown>, i);
+            if (slideDataError) {
+                return res.status(400).json({ error: slideDataError });
+            }
         }
 
         const serveUrl = await ensureBundle();
         const batchId = crypto.randomBytes(4).toString('hex');
 
         const processRenders = async () => {
-            const renderPromises = carousel.map(async (slide, i) => {
+            const outputUrls: string[] = [];
+            for (const [i, slide] of carousel.entries()) {
                 console.log(
                     `[render] slide ${i + 1}/${carousel.length} (${slide.templateId}, ${format})`
                 );
@@ -319,10 +364,10 @@ app.post('/api/render', async (req, res) => {
                 }
 
                 console.log(`[render] ✓ ${filename}`);
-                return `/api/renders/${filename}`;
-            });
+                outputUrls.push(`/api/renders/${filename}`);
+            }
 
-            return Promise.all(renderPromises);
+            return outputUrls;
         };
 
         if (webhookUrl) {

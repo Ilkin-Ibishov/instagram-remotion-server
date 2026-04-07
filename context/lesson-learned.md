@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-07 — Malformed AI payloads must be rejected before render
+
+Context: Production logs showed mixed/garbled hashtag output and malformed slide payloads reaching `/api/render`, followed by unstable mp4 rendering behavior.  
+Mistake: We relied on prompt-only JSON compliance and permissive runtime checks (`data` object existence) rather than strict contract validation. We also rendered all slides in parallel and emitted multi-line pretty logs that can interleave under load.  
+Correction: Added strict runtime validation in `src/pipeline/aiService.ts` (shape, template order, required fields, non-empty strings), strict per-template `slide.data` validation in `server.ts`, switched batch slide rendering to sequential processing to reduce memory pressure, and changed logger/pipeline debug output to single-line JSON-friendly entries.
+
 ### 2026-04-06 — Scheduler endpoint must be guarded in production
 
 Context: Added `POST /api/schedule/run` for Railway cron-driven automation.  

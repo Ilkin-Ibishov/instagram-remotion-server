@@ -24,14 +24,24 @@
 | `format` | No | `'png'` (default) or `'mp4'` |
 | `webhookUrl` | No | If set, changes response behavior (below) |
 
-**Validation:** Returns **400** with `{ error: 'Invalid manifest format' }` if `globalBranding` or `carousel` is missing, or `carousel` is not an array.
+**Validation:**
+- Returns **400** with `{ error: 'Invalid manifest format' }` if `globalBranding` or `carousel` is missing, or `carousel` is not an array.
+- Returns **400** for unknown `templateId` values.
+- Returns **400** when slide `data` is missing required per-template fields.
+
+Current per-template required fields:
+- `HOOK_A`: `headline`, `subheadline` (non-empty strings), `imageUrl` (string/null/undefined)
+- `CONTENT_LISTICLE`: `title`, `footnote` (non-empty strings), `items` (exactly 4 non-empty strings)
+- `CONTENT_GENERIC`: `title`, `body`, `highlight` (non-empty strings)
+- `CTA_FINAL`: `callToAction`, `subtext` (non-empty strings)
 
 ### Render behavior
 
 - For each slide, builds **`inputProps`:** `{ templateId, data, branding: globalBranding }`.
 - Selects composition id **`Slide`** via `selectComposition`.
 - **PNG:** `renderStill` — last frame (`composition.durationInFrames - 1`), `scale: 2`, Chromium options (no-sandbox, angle GL, etc.).
-- **MP4:** `renderMedia` — `h264`, `concurrency: 4`, same Chromium options.
+- **MP4:** `renderMedia` — `h264`, per-slide `concurrency` defaults to `1` (override via `RENDER_CONCURRENCY`), same Chromium options.
+- Slides are rendered **sequentially** within a batch to reduce Chromium/x264 memory pressure.
 
 ### Output storage and URLs
 

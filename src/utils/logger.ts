@@ -21,6 +21,14 @@ interface LogEntry {
   data?: any;
 }
 
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 export class Logger {
   private runId: string;
   private logFile: string;
@@ -43,8 +51,8 @@ export class Logger {
     
     console.log(`${color}${logMessage}\x1b[0m`);
     
-    if (entry.data) {
-      console.log(JSON.stringify(entry.data, null, 2));
+    if (entry.data !== undefined) {
+      console.log(`${color}[data] ${safeStringify(entry.data)}\x1b[0m`);
     }
 
     // File output (JSON lines format)

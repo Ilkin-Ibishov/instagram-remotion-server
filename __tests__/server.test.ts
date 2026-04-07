@@ -30,6 +30,50 @@ describe('POST /api/render', () => {
         expect(response.status).toBe(400);
         expect(response.body).toEqual({ error: 'Invalid manifest format' });
     });
+
+    it('should return 400 for invalid HOOK_A data', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'HOOK_A',
+                    data: {
+                        subheadline: 'Missing headline should fail',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('slide[0].data.headline');
+    });
+
+    it('should return 400 for invalid CONTENT_LISTICLE items', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'CONTENT_LISTICLE',
+                    data: {
+                        title: 'Title',
+                        items: ['a', 'b'],
+                        footnote: 'Source: Test',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('slide[0].data.items');
+    });
 });
 
 describe('POST /api/schedule/run', () => {
