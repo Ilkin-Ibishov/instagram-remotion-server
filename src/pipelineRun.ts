@@ -93,27 +93,11 @@ export async function runPipeline() {
     
     if (scoredArticles.length === 0) {
       logger.warn('pipeline', `⚠️ No relevant articles found! All articles have score < ${MIN_RELEVANCE_SCORE} or were already posted.`);
-      logger.info('pipeline', 'Fallback: Using first available article');
-      // Fallback to first article if no relevant ones found
-      if (articles.length === 0) {
-        throw new Error('No articles available (empty or all filtered)');
-      }
+      throw new Error(`No relevant articles found for category '${NEWS_CATEGORY}' (threshold: ${MIN_RELEVANCE_SCORE})`);
     }
 
     // Select best article
-    const selectedArticleItem = selectBestArticle(
-      scoredArticles.length > 0 
-        ? scoredArticles 
-        : articles.map(a => ({
-            article: a,
-            score: 1,
-            reasons: ['fallback - no relevant articles found'],
-            matchedKeywords: [],
-            scoreBreakdown: { titleMatches: 0, descriptionMatches: 0, baseScore: 1 },
-          })),
-      'top',
-      logger
-    );
+    const selectedArticleItem = selectBestArticle(scoredArticles, 'top', logger);
     
     if (!selectedArticleItem) {
       throw new Error('No articles available to post');

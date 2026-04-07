@@ -29,6 +29,7 @@ This project is **instagram-content-generator-remotion**: A Node.js rendering se
 
 ### 2. **Maintenance After Changes**
 - Update `context/*.md` files when changing implementation details
+- Update `.github/instructions/*.instructions.md` whenever behavior/contracts change in implementation (same PR/commit)
 - Sync rules in `.agent/rules/*.md` when patterns change
 - Add important corrections to `context/lesson-learned.md`
 
@@ -51,7 +52,7 @@ Renders Instagram carousel slides into images or video.
 - `webhookUrl`: For async rendering (returns 202, POSTs result to webhook)
 
 **Response:**
-- 202 (if webhook) or 200 with file URLs
+- 202 (if webhook) or 200 with render URLs in `images`
 - Files stored at `/tmp/renders/render-{batchId}-{index}.{ext}`
 
 ## Rendering Pipeline
@@ -59,8 +60,8 @@ Renders Instagram carousel slides into images or video.
 2. **Bundle**: Cache Remotion bundle via `ensureBundle()`
 3. **Per-Slide Render**: 
    - `renderStill()` for PNG (1 frame)
-   - `renderMedia()` for MP4 (h264, concurrency 4)
-4. **Output**: Return file URLs or webhook POST result
+   - `renderMedia()` for MP4 (h264, default concurrency 1, env-overridable)
+4. **Output**: Return `{ success, images }` (sync) or webhook POST result (async)
 
 ## Template Constraints
 All templates in `src/templates/*.tsx` must follow:
@@ -106,5 +107,5 @@ npm run render:test  # Test a single render
 2. **Check** applicable instruction file in `.github/instructions/`
 3. **Implement** the feature
 4. **Test** with new test cases
-5. **Update** `context/` or `.agent/rules/` if behavior changed
+5. **Update** `.github/instructions/` and `context/` if behavior/contracts changed
 6. **Sync** findings to `context/lesson-learned.md` if important

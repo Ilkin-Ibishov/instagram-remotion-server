@@ -40,7 +40,7 @@ News Article (from n8n → GNews API)
 ### Current Model
 - **Model**: `gemini-2.5-flash` (latest as of April 2026)
 - **Authentication**: `GEMINI_API_KEY` from `.env`
-- **Response Format**: JSON (via `responseMimeType` and `responseSchema`)
+- **Response Format**: JSON (`responseMimeType: "application/json"`)
 - **Cost**: Cost-effective for high-volume requests
 
 ### Prompt Design
@@ -64,33 +64,24 @@ const prompt = `
 `;
 ```
 
-### Response Schema
+### Validation Strategy
 
-The JSON schema enforces the exact structure returned by Gemini:
+The service currently uses a strict runtime validator after JSON parse (instead of SDK-level schema enforcement):
 
 ```typescript
-const schema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    manifest: {
-      properties: {
-        format: SchemaType.STRING,
-        globalBranding: { /* color, handle, effects */ },
-        carousel: [
-          { templateId: string, data: object }
-        ]
-      }
-    },
-    caption: SchemaType.STRING,
-    hashtags: SchemaType.STRING,
-  }
-};
+function validateGeneratedContent(payload: unknown): GeneratedContent {
+  // validates:
+  // - manifest/globalBranding structure
+  // - exact 4-slide sequence: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CTA_FINAL
+  // - per-template data constraints
+  // - non-empty caption and hashtags
+}
 ```
 
-**Why this structure?**
+**Why this strategy?**
 - `manifest` → Direct payload for `/api/render`
 - `caption` + `hashtags` → For Instagram post caption
-- Enforced schema prevents invalid responses
+- Runtime validation prevents invalid responses and provides precise error messages
 
 ## Content Generator
 
@@ -144,10 +135,11 @@ interface GeneratedContent {
 
 ```typescript
 export const config = {
-  brandAccentColor: '#FF5733',     // Primary color for slides
-  brandHandle: '@techjournal',      // Instagram handle
-  brandEffects: ['blur', 'glow'],   // Visual effects to apply
-  aiModel: 'gemini-2.5-flash',      // Gemini model version
+  renderFormat: 'mp4',
+  brandAccentColor: accountProfile.accentColor,
+  brandHandle: accountProfile.handle,
+  brandEffects: accountProfile.effects,
+  accountProfile,
 };
 ```
 
@@ -155,7 +147,7 @@ export const config = {
 - Update `brandAccentColor` to change slide color scheme
 - Update `brandHandle` for multi-account setups
 - Add/remove effects based on template support
-- **Never change** `aiModel` without testing compatibility
+- Keep `accountProfile` fields aligned with `.env` and `accountProfile.ts`
 
 ## Testing the Pipeline
 

@@ -79,8 +79,8 @@ export function scoreArticleRelevance(
   const reasons: string[] = [];
   const matchedKeywords: Array<{ keyword: string; location: 'title' | 'description'; weight: number }> = [];
 
-  const titleLower = article.title.toLowerCase();
-  const descLower = article.description.toLowerCase();
+  const titleLower = (article.title || '').toLowerCase();
+  const descLower = (article.description || '').toLowerCase();
 
   // Keywords in title (high weight, weighted by specificity)
   let titleScore = 0;

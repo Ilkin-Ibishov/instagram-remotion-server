@@ -86,10 +86,10 @@ Each article gets a relevance score based on:
 
 | Match Type | Weight | Example |
 |------------|--------|---------|
-| Keyword in title | +10 | "AI" in title when "AI" is a niche keyword |
-| Keyword in description | +5 | "AI" only in description |
+| Keyword in title | Weighted by specificity (`KEYWORD_WEIGHTS`) | Specific keywords (e.g. `dev-tools`) score higher |
+| Keyword in description | ~60% of title keyword weight | Description-only matches are lower confidence |
 | Has content | +5 | Article has title + description |
-| Recent post penalty | -10 | If 3+ posts already from same niche this week |
+| Recent post penalty | -5 | Applied only when `recentPostCount >= 5` |
 
 **Example Scoring:**
 ```
@@ -110,8 +110,8 @@ Article 2: "Stock Market Trends"
 scoreArticleRelevance(article, keywords): { score, reasons }
 // Returns score and human-readable reasons
 
-filterAndRankArticles(articles, keywords): ScoredArticle[]
-// Removes posted articles, scores remaining, returns ranked list
+filterAndRankArticles(articles, keywords, logger?, minScore?): ScoredArticle[]
+// Removes posted articles, scores remaining, applies minScore threshold (default 10), returns ranked list
 
 selectBestArticle(scored, strategy): ScoredArticle | null
 // Picks one: 'top' (always best) or 'diverse' (random from top 3)

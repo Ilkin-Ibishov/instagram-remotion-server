@@ -42,11 +42,10 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "batchId": "a1b2c3d4",
-  "renders": [
-    "http://localhost:3000/api/renders/render-a1b2c3d4-0.png",
-    "http://localhost:3000/api/renders/render-a1b2c3d4-1.png",
-    ...
+  "success": true,
+  "images": [
+    "/api/renders/render-a1b2c3d4-0.png",
+    "/api/renders/render-a1b2c3d4-1.png"
   ]
 }
 ```
@@ -57,8 +56,9 @@ HTTP 202 Accepted
 Content-Type: application/json
 
 {
-  "batchId": "a1b2c3d4",
-  "message": "Render queued for async processing"
+  "success": true,
+  "status": "processing",
+  "batchId": "a1b2c3d4"
 }
 ```
 
@@ -68,15 +68,15 @@ POST https://your-webhook-url
 Content-Type: application/json
 
 {
+  "success": true,
   "batchId": "a1b2c3d4",
-  "renders": [...],
-  "status": "success"
+  "images": ["/api/renders/render-a1b2c3d4-0.png"]
 }
 ```
 
 ### Payload Limits
 - **JSON Body Limit**: 50MB (do not decrease)
-- **Batch Concurrency**: 4 slides per batch (Remotion h264 encoder limit)
+- **MP4 Render Concurrency**: Defaults to `1` for stability, configurable via `RENDER_CONCURRENCY`
 - **File Naming**: Use 8-character hex batchId: `render-{batchId}-{slideIndex}.{ext}`
 
 Example batch ID generation:
@@ -113,7 +113,7 @@ const options = {
 ## Storage & File Serving
 
 ### Render Directory
-- **Location**: `/tmp/renders` (configurable via `RENDER_DIR` env var)
+- **Location**: `/tmp/renders` (currently fixed in `server.ts`)
 - **Cleanup**: Remove files after 24 hours to avoid disk bloat
 - **Serving**: Use Express static middleware:
   ```typescript
@@ -166,14 +166,12 @@ NODE_ENV=production
 | Invalid template ID | 400 | List valid IDs in response |
 | Bundle compilation failed | 500 | Log error; instruct user to check templates |
 | Chrome crash / OOM | 500 | Retry once; if persistent, return 503 |
-| Webhook URL unreachable | 202 + log | Queue marked as "failed"; log for manual review |
+| Webhook URL unreachable | 202 + log | Background render continues; webhook failure logged |
 
 Example error response:
 ```json
 {
-  "error": "Invalid templateId: UNKNOWN_TEMPLATE",
-  "validTemplates": ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CTA_FINAL"],
-  "status": 400
+  "error": "slide[0].templateId invalid: \"UNKNOWN_TEMPLATE\""
 }
 ```
 

@@ -101,8 +101,9 @@ describe('POST /api/render', () => {
       .send(validPayload);
 
     expect(response.status).toBe(200);
-    expect(response.body.renders).toBeInstanceOf(Array);
-    expect(response.body.renders[0]).toMatch(/^http/);
+    expect(response.body.success).toBe(true);
+    expect(response.body.images).toBeInstanceOf(Array);
+    expect(response.body.images[0]).toMatch(/^\/api\/renders\//);
   });
 });
 ```
@@ -196,12 +197,8 @@ describe('quality parameter', () => {
 ## Environment Variables in Tests
 
 ### RENDER_DIR
-Point to a temp directory during tests to avoid polluting production render storage:
-
-```typescript
-// In test setup or vitest.config.ts
-process.env.RENDER_DIR = '/tmp/test-renders-' + Date.now();
-```
+Current server implementation uses a fixed render directory (`/tmp/renders`).
+If render path configurability is introduced later, add test coverage for env-driven path handling.
 
 ### NODE_ENV
 Set to 'test' to skip server startup:
@@ -305,7 +302,7 @@ it('returns result immediately', async () => {
   const elapsed = Date.now() - start;
 
   expect(response.status).toBe(200);
-  expect(response.body.renders).toBeDefined();
+  expect(response.body.images).toBeDefined();
   expect(elapsed).toBeLessThan(5000); // Should be < 5s (mocked)
 });
 ```

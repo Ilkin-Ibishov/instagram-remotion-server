@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-08 — Do not force fallback to first article when relevance filter returns zero
+
+Context: Scheduled runs could fetch a category that doesn't match the account niche and still continue by selecting the first available article, producing off-brand posts despite strict scoring.  
+Mistake: `runPipeline()` fell back to synthetic scored candidates (`score: 1`) when no article passed `MIN_RELEVANCE_SCORE`, which also made logs inconsistent with normal scoring semantics (`baseScore: 5`).  
+Correction: Removed forced first-article fallback in `src/pipelineRun.ts`; pipeline now throws a clear "No relevant articles found" error and exits safely. Also hardened relevance scoring input in `src/pipeline/newsFiltering.ts` and `src/pipeline/newsService.ts` to tolerate null/empty descriptions without crashes.
+
 ### 2026-04-07 — Railway SIGTERM logs can look like npm failure without explicit shutdown hooks
 
 Context: Deployment logs showed repeated `npm error signal SIGTERM` after long healthy uptime, which looked like an app crash at first glance.  

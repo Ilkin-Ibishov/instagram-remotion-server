@@ -44,7 +44,7 @@ export async function fetchTopNews(category: string = 'technology'): Promise<New
 function mapToNewsArticle(raw: any): NewsArticle {
   return {
     title: raw.title,
-    description: raw.description,
+    description: raw.description || '',
     content: raw.content || raw.description, // Fallback if content is missing
     url: raw.url,
     imageUrl: raw.image || undefined,
