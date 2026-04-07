@@ -26,6 +26,10 @@ npx vitest run
 ## Environment and paths
 
 - **`RENDER_DIR`** in `server.ts` is set to **`/tmp/renders`**. On **Linux/macOS** this is standard. On **Windows**, absolute POSIX-style paths can behave differently depending on Node version and environment; validate output directory when deploying to Windows or use a cross-platform `path.join` + `os.tmpdir()` if you change this in code.
+- Chrome cleanup tuning in `server.ts` (optional):
+	- **`CHROME_CLEANUP_INTERVAL_MS`** (default: `3600000` = 1 hour)
+	- **`CHROME_CLEANUP_RETRIES`** (default: `3` retries after the initial cleanup attempt)
+	- **`CHROME_CLEANUP_RETRY_DELAY_MS`** (default: `1000` ms between retries)
 - **`package-lock.json`** present — use `npm ci` for reproducible installs in CI.
 
 ## Scheduler environment

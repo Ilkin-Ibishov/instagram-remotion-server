@@ -192,9 +192,10 @@ Root Cause: Remotion's internal browser cleanup wasn't functioning properly on W
 Correction: Added explicit cleanup functions to `server.ts`:  
 - `cleanupChromeProcesses()`: Runs after each render batch to force-kill remaining Chrome processes  
 - `warnIfTooManyChromeProcesses()`: Detects runaway Chrome and warns user  
-- Both functions run in `finally` block after render completes (success or failure)  
-- Cleanup logic added to both synchronous render path and webhook background render path  
-Reference: See [server.ts lines 12-55](server.ts#L12-L55) for cleanup implementation.  
+- Added `cleanupChromeProcessesWithRetries()` to retry post-render cleanup up to 3 times if Chrome processes are still detected  
+- Post-render cleanup + retry logic runs in both synchronous and webhook render paths (success or failure)  
+- Periodic safety cleanup interval tuned to 1 hour (`setInterval(..., 3_600_000)`) to reduce overhead while retaining protection  
+Reference: See [server.ts](server.ts) for updated cleanup implementation.  
 **Fix Status: ✅ APPLIED** — Next pipeline run should complete all 4 slides without process accumulation.
 
 ### 2026-04-04 — Rendering Timeout: Dev Server Not Running

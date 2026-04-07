@@ -16,6 +16,25 @@ import { runScheduledPipeline } from './src/pipeline/schedulerRunner';
 const RENDER_DIR = '/tmp/renders';
 const COMPOSITION_ID = 'Slide';
 
+function parseIntEnv(name: string, defaultValue: number, minValue = 0): number {
+    const raw = process.env[name];
+    if (raw === undefined) {
+        return defaultValue;
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed < minValue) {
+        console.warn(`[config] Invalid ${name}="${raw}". Using default ${defaultValue}.`);
+        return defaultValue;
+    }
+
+    return parsed;
+}
+
+const CHROME_CLEANUP_INTERVAL_MS = parseIntEnv('CHROME_CLEANUP_INTERVAL_MS', 3_600_000, 1);
+const CHROME_CLEANUP_RETRIES = parseIntEnv('CHROME_CLEANUP_RETRIES', 3, 0);
+const CHROME_CLEANUP_RETRY_DELAY_MS = parseIntEnv('CHROME_CLEANUP_RETRY_DELAY_MS', 1_000, 0);
+
 if (!fs.existsSync(RENDER_DIR)) {
     fs.mkdirSync(RENDER_DIR, { recursive: true });
 }
@@ -67,19 +86,72 @@ function cleanupChromeProcesses() {
     }
 }
 
+function getChromeProcessCount(): number | null {
+    try {
+        if (process.platform === 'win32') {
+            const chromeOutput = execSync('tasklist /FI "IMAGENAME eq chrome.exe" /NH | find /I /C "chrome.exe"', {
+                encoding: 'utf-8',
+            }).trim();
+            const chromiumOutput = execSync('tasklist /FI "IMAGENAME eq chromium.exe" /NH | find /I /C "chromium.exe"', {
+                encoding: 'utf-8',
+            }).trim();
+            const chromeCount = parseInt(chromeOutput, 10) || 0;
+            const chromiumCount = parseInt(chromiumOutput, 10) || 0;
+            return chromeCount + chromiumCount;
+        }
+
+        const output = execSync(
+            '{ pgrep -x "chrome" 2>/dev/null; pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null; } | wc -l',
+            { encoding: 'utf-8' }
+        ).trim();
+        return parseInt(output, 10) || 0;
+    } catch (_) {
+        return null;
+    }
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function cleanupChromeProcessesWithRetries(
+    contextLabel: string,
+    retries = CHROME_CLEANUP_RETRIES,
+    retryDelayMs = CHROME_CLEANUP_RETRY_DELAY_MS,
+): Promise<void> {
+    const totalAttempts = retries + 1;
+    for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+        cleanupChromeProcesses();
+        const remaining = getChromeProcessCount();
+
+        if (remaining === 0) {
+            if (attempt > 1) {
+                console.log(`[cleanup] ${contextLabel}: Chrome processes cleared on retry ${attempt}/${totalAttempts}`);
+            }
+            return;
+        }
+
+        if (remaining === null) {
+            console.warn(`[cleanup] ${contextLabel}: unable to verify Chrome process count after attempt ${attempt}/${totalAttempts}`);
+            return;
+        }
+
+        if (attempt < totalAttempts) {
+            console.warn(`[cleanup] ${contextLabel}: ${remaining} Chrome process(es) remain after attempt ${attempt}/${totalAttempts}; retrying`);
+            await sleep(retryDelayMs);
+            continue;
+        }
+
+        console.warn(`[cleanup] ${contextLabel}: ${remaining} Chrome process(es) still running after ${totalAttempts} attempts`);
+    }
+}
+
 // Warn if too many Chrome processes are running
 function warnIfTooManyChromeProcesses() {
     try {
-        let count = 0;
-        if (process.platform === 'win32') {
-            const output = execSync('tasklist | find /c "chrome.exe"', { encoding: 'utf-8' }).trim();
-            count = parseInt(output) || 0;
-        } else {
-            const output = execSync(
-                '{ pgrep -x "chrome" 2>/dev/null; pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null; } | wc -l',
-                { encoding: 'utf-8' }
-            ).trim();
-            count = parseInt(output) || 0;
+        const count = getChromeProcessCount();
+        if (count === null) {
+            return;
         }
         if (count > 10) {
             console.warn(`⚠️  WARNING: ${count} Chrome processes detected! Resource leak detected.`);
@@ -92,11 +164,11 @@ function warnIfTooManyChromeProcesses() {
     }
 }
 
-// Periodic cleanup every 30 seconds to catch any stragglers
+// Periodic safety cleanup every 1 hour to catch any stragglers
 const periodicCleanupInterval = setInterval(() => {
     warnIfTooManyChromeProcesses();
     cleanupChromeProcesses();
-}, 30_000);
+}, CHROME_CLEANUP_INTERVAL_MS);
 // Don't block process exit waiting for this interval
 periodicCleanupInterval.unref();
 
@@ -230,6 +302,9 @@ app.post('/api/schedule/run', async (req, res) => {
 export async function startServer() {
     console.log(`[startup] PORT env var: "${process.env.PORT}" (typeof: ${typeof process.env.PORT})`);
     console.log(`[startup] Resolved PORT: ${PORT}`);
+    console.log(
+        `[cleanup] Config: interval=${CHROME_CLEANUP_INTERVAL_MS}ms, retries=${CHROME_CLEANUP_RETRIES}, retryDelay=${CHROME_CLEANUP_RETRY_DELAY_MS}ms`
+    );
     
     // Pre-warm the bundle on server start.
     ensureBundle().catch((err) => {
@@ -434,7 +509,7 @@ app.post('/api/render', async (req, res) => {
                 } catch (e) {
                     console.error('[webhook] Failed to send success ping:', e);
                 } finally {
-                    cleanupChromeProcesses();
+                    await cleanupChromeProcessesWithRetries('webhook success cleanup');
                     warnIfTooManyChromeProcesses();
                     const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
                     console.log(`[cleanup] ✓ Webhook render batch completed in ${elapsed}s, Chrome processes cleaned`);
@@ -454,7 +529,7 @@ app.post('/api/render', async (req, res) => {
                 } catch (e) {
                     console.error('[webhook] Failed to send error ping:', e);
                 } finally {
-                    cleanupChromeProcesses();
+                    await cleanupChromeProcessesWithRetries('webhook failure cleanup');
                     warnIfTooManyChromeProcesses();
                     const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
                     console.log(`[cleanup] ✗ Webhook render batch failed after ${elapsed}s, Chrome processes cleaned`);
@@ -469,7 +544,7 @@ app.post('/api/render', async (req, res) => {
             outputUrls = await processRenders();
         } finally {
             // Always cleanup after render completes (success or failure)
-            cleanupChromeProcesses();
+            await cleanupChromeProcessesWithRetries('sync render cleanup');
             warnIfTooManyChromeProcesses();
             const elapsed = ((Date.now() - renderStartTime) / 1000).toFixed(1);
             console.log(`[cleanup] ✓ Render batch completed in ${elapsed}s, Chrome processes cleaned`);
