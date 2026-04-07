@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
+import type { Server } from 'http';
 import { runScheduledPipeline } from './src/pipeline/schedulerRunner';
 
 // ─── Config ──────────────────────────────────────────────
@@ -137,6 +138,8 @@ app.use(express.json({ limit: '50mb' }));
 
 // Use Railway's PORT env var or default to 3000
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+let httpServer: Server | null = null;
+let shutdownInProgress = false;
 
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
@@ -234,13 +237,57 @@ export async function startServer() {
     });
 
     return new Promise<void>((resolve) => {
-        app.listen(PORT, '0.0.0.0', () => {
+        httpServer = app.listen(PORT, '0.0.0.0', () => {
             console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
             console.log(`✓ Endpoints: GET /health, POST /api/schedule/run, POST /api/render, GET /api/renders/:file`);
             resolve();
         });
+
+        httpServer.on('close', () => {
+            console.log('[shutdown] HTTP server closed');
+        });
     });
 }
+
+function gracefulShutdown(signal: NodeJS.Signals) {
+    if (shutdownInProgress) {
+        console.log(`[shutdown] ${signal} received while shutdown already in progress`);
+        return;
+    }
+
+    shutdownInProgress = true;
+    console.log(`[shutdown] Received ${signal}; starting graceful shutdown`);
+
+    clearInterval(periodicCleanupInterval);
+    cleanupChromeProcesses();
+
+    const forceExitTimeout = setTimeout(() => {
+        console.error('[shutdown] Graceful shutdown timed out after 10s; forcing exit');
+        process.exit(1);
+    }, 10_000);
+    forceExitTimeout.unref();
+
+    if (!httpServer) {
+        console.log('[shutdown] No active HTTP server instance found; exiting');
+        process.exit(0);
+        return;
+    }
+
+    httpServer.close((error?: Error) => {
+        clearTimeout(forceExitTimeout);
+        if (error) {
+            console.error('[shutdown] Error while closing HTTP server:', error);
+            process.exit(1);
+            return;
+        }
+
+        console.log('[shutdown] Graceful shutdown complete');
+        process.exit(0);
+    });
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 app.post('/api/render', async (req, res) => {
     console.log('[api/render] POST request received');

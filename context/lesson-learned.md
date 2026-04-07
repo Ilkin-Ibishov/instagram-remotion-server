@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-07 — Railway SIGTERM logs can look like npm failure without explicit shutdown hooks
+
+Context: Deployment logs showed repeated `npm error signal SIGTERM` after long healthy uptime, which looked like an app crash at first glance.  
+Mistake: We had no explicit process signal logging in `server.ts`, so orchestrator-driven stop events (deploy rotation/removal) were hard to distinguish from runtime faults.  
+Correction: Added graceful shutdown hooks for `SIGTERM` and `SIGINT` in `server.ts` that log shutdown start/completion, clear cleanup timers, close the HTTP server, and force-exit only on timeout. Also analyzed removed Railway deployments to confirm many stop events were orchestrator-driven and separate from app-level errors.
+
 ### 2026-04-07 — Malformed AI payloads must be rejected before render
 
 Context: Production logs showed mixed/garbled hashtag output and malformed slide payloads reaching `/api/render`, followed by unstable mp4 rendering behavior.  
