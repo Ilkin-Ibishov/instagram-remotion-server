@@ -1,6 +1,6 @@
 import { publishToInstagram } from './automation/instagramPublisher';
 import { generateContent } from './pipeline/contentGenerator';
-import { fetchTopNews } from './pipeline/newsService';
+import { fetchTopNews, fetchSearchNews } from './pipeline/newsService';
 import { filterAndRankArticles, selectBestArticle, printScoringResults } from './pipeline/newsFiltering';
 import { recordPost } from './pipeline/postHistory';
 import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfile';
@@ -78,11 +78,22 @@ export async function runPipeline() {
       explanation: 'Articles must score ≥ this to be selected. Score = keyword matches (weighted by specificity) + 5 base points',
     });
     
-    const scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+    let scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
     printScoringResults(scoredArticles, logger);
-    
+
+    // Fallback: top-headlines returned 0 relevant results → retry with a keyword search
     if (scoredArticles.length === 0) {
-      logger.warn('pipeline', `⚠️ No relevant articles found! All articles have score < ${MIN_RELEVANCE_SCORE} or were already posted.`);
+      logger.info('pipeline', '--- Step 0c: Search Fallback (top-headlines yielded no relevant results) ---');
+      const searchQuery = accountProfile.niche.map(k => k.replace(/-/g, ' ')).join(' OR ');
+      logger.info('search-fallback', `Searching GNews with niche keywords: "${searchQuery}"`);
+      const searchArticles = await fetchSearchNews(searchQuery, { sortby: 'relevance' });
+      logger.info('news-fetch', `Search fallback fetched ${searchArticles.length} articles`, { count: searchArticles.length });
+      scoredArticles = filterAndRankArticles(searchArticles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+      printScoringResults(scoredArticles, logger);
+    }
+
+    if (scoredArticles.length === 0) {
+      logger.warn('pipeline', `⚠️ No relevant articles found even after search fallback! All articles have score < ${MIN_RELEVANCE_SCORE} or were already posted.`);
       throw new Error(`No relevant articles found for category '${NEWS_CATEGORY}' (threshold: ${MIN_RELEVANCE_SCORE})`);
     }
 
