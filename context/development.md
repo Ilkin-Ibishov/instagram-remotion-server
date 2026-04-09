@@ -53,10 +53,12 @@ Optional (defaults in code):
 - `PLAYWRIGHT_HEADLESS` (default: `true`; set to `false` only for local debugging with a display server)
 - `SCHEDULER_ENABLED` (default: `false`; set to `true` to enable the internal polling loop)
 - `SCHEDULER_POLL_INTERVAL_MS` (default: `1800000` = 30 minutes; minimum `60000` = 1 minute)
+- `SCHEDULER_STARTUP_RETRY_DELAY_MS` (default: `60000` = 1 minute)
+- `SCHEDULER_STARTUP_MAX_RETRIES` (default: `10`)
 
 ### Internal scheduler loop
 
-When `SCHEDULER_ENABLED=true`, the server performs one scheduler run immediately after startup and then starts a `setInterval` loop that calls `runScheduledPipeline()` at the configured poll cadence. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.
+When `SCHEDULER_ENABLED=true`, the server performs one scheduler run immediately after startup and then starts a `setInterval` loop that calls `runScheduledPipeline()` at the configured poll cadence. If the startup run returns `skipped_lock_held`, the server performs short bounded retries before falling back to the normal poll interval. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.
 
 The `POST /api/schedule/run` endpoint remains available for manual triggers and external integrations.
 

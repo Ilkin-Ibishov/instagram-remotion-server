@@ -10,7 +10,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
 import type { Server } from 'http';
-import { runScheduledPipeline } from './src/pipeline/schedulerRunner';
+import { runScheduledPipeline, type SchedulerOutcome } from './src/pipeline/schedulerRunner';
 import { readScheduleState } from './src/pipeline/scheduleState';
 
 // ─── Config ──────────────────────────────────────────────
@@ -38,6 +38,8 @@ const CHROME_CLEANUP_RETRY_DELAY_MS = parseIntEnv('CHROME_CLEANUP_RETRY_DELAY_MS
 
 const SCHEDULER_ENABLED = process.env.SCHEDULER_ENABLED === 'true';
 const SCHEDULER_POLL_INTERVAL_MS = parseIntEnv('SCHEDULER_POLL_INTERVAL_MS', 1_800_000, 60_000);
+const SCHEDULER_STARTUP_RETRY_DELAY_MS = parseIntEnv('SCHEDULER_STARTUP_RETRY_DELAY_MS', 60_000, 1_000);
+const SCHEDULER_STARTUP_MAX_RETRIES = parseIntEnv('SCHEDULER_STARTUP_MAX_RETRIES', 10, 0);
 
 if (!fs.existsSync(RENDER_DIR)) {
     fs.mkdirSync(RENDER_DIR, { recursive: true });
@@ -178,25 +180,56 @@ periodicCleanupInterval.unref();
 
 // ─── Internal Scheduler Loop ─────────────────────────────
 let schedulerInterval: NodeJS.Timeout | null = null;
+let schedulerStartupRetryTimeout: NodeJS.Timeout | null = null;
 
-async function runSchedulerTick(trigger: 'startup' | 'interval') {
+async function runSchedulerTick(trigger: 'startup' | 'startup_retry' | 'interval'): Promise<SchedulerOutcome | null> {
     try {
         const outcome = await runScheduledPipeline();
         console.log(
             `[scheduler] Outcome (${trigger}): ${outcome.status}`,
             outcome.nextRunAt ? `nextRunAt=${outcome.nextRunAt}` : ''
         );
+        return outcome;
     } catch (error) {
         console.error(
             `[scheduler] Unexpected error in ${trigger} scheduler run:`,
             error instanceof Error ? error.message : String(error)
         );
+        return null;
     }
 }
 
+function scheduleStartupRetry(attempt: number) {
+    if (attempt > SCHEDULER_STARTUP_MAX_RETRIES) {
+        console.warn(`[scheduler] Startup retries exhausted after ${SCHEDULER_STARTUP_MAX_RETRIES} attempt(s)`);
+        return;
+    }
+
+    schedulerStartupRetryTimeout = setTimeout(async () => {
+        schedulerStartupRetryTimeout = null;
+        const outcome = await runSchedulerTick('startup_retry');
+        if (outcome?.status === 'skipped_lock_held') {
+            console.warn(
+                `[scheduler] Lock still held during startup retry ${attempt}/${SCHEDULER_STARTUP_MAX_RETRIES}; retrying in ${SCHEDULER_STARTUP_RETRY_DELAY_MS}ms`
+            );
+            scheduleStartupRetry(attempt + 1);
+        }
+    }, SCHEDULER_STARTUP_RETRY_DELAY_MS);
+    schedulerStartupRetryTimeout.unref();
+}
+
 export function startSchedulerLoop() {
-    console.log(`[scheduler] Internal scheduler enabled, running once on startup and polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`);
-    void runSchedulerTick('startup');
+    console.log(
+        `[scheduler] Internal scheduler enabled, running once on startup and polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`
+    );
+    void runSchedulerTick('startup').then((outcome) => {
+        if (outcome?.status === 'skipped_lock_held') {
+            console.warn(
+                `[scheduler] Startup run skipped due to lock; retrying up to ${SCHEDULER_STARTUP_MAX_RETRIES} time(s) every ${SCHEDULER_STARTUP_RETRY_DELAY_MS}ms`
+            );
+            scheduleStartupRetry(1);
+        }
+    });
     schedulerInterval = setInterval(async () => {
         await runSchedulerTick('interval');
     }, SCHEDULER_POLL_INTERVAL_MS);
@@ -207,6 +240,10 @@ export function stopSchedulerLoop() {
     if (schedulerInterval) {
         clearInterval(schedulerInterval);
         schedulerInterval = null;
+    }
+    if (schedulerStartupRetryTimeout) {
+        clearTimeout(schedulerStartupRetryTimeout);
+        schedulerStartupRetryTimeout = null;
     }
 }
 
@@ -406,7 +443,7 @@ function gracefulShutdown(signal: NodeJS.Signals) {
     console.log(`[shutdown] Received ${signal}; starting graceful shutdown`);
 
     clearInterval(periodicCleanupInterval);
-    if (schedulerInterval) clearInterval(schedulerInterval);
+    stopSchedulerLoop();
     cleanupChromeProcesses();
 
     const forceExitTimeout = setTimeout(() => {

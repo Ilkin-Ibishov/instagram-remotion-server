@@ -236,4 +236,18 @@ describe('startSchedulerLoop', () => {
     await vi.advanceTimersByTimeAsync(1_800_000);
     expect(spy).toHaveBeenCalledTimes(3);
   });
+
+  it('retries shortly after startup when the lock is held', async () => {
+    const spy = vi.spyOn(await import('../src/pipeline/schedulerRunner'), 'runScheduledPipeline')
+      .mockResolvedValueOnce({ status: 'skipped_lock_held', reason: 'lock_held', accountId: 'default', lockKey: 'pipeline:schedule:default' })
+      .mockResolvedValueOnce({ status: 'skipped_due_to_time', reason: 'not_due', accountId: 'default', nextRunAt: baseState.nextRunAt.toISOString() });
+
+    startSchedulerLoop();
+
+    await vi.runAllTicks();
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
 });
