@@ -36,6 +36,9 @@ const CHROME_CLEANUP_INTERVAL_MS = parseIntEnv('CHROME_CLEANUP_INTERVAL_MS', 3_6
 const CHROME_CLEANUP_RETRIES = parseIntEnv('CHROME_CLEANUP_RETRIES', 3, 0);
 const CHROME_CLEANUP_RETRY_DELAY_MS = parseIntEnv('CHROME_CLEANUP_RETRY_DELAY_MS', 1_000, 0);
 
+const SCHEDULER_ENABLED = process.env.SCHEDULER_ENABLED === 'true';
+const SCHEDULER_POLL_INTERVAL_MS = parseIntEnv('SCHEDULER_POLL_INTERVAL_MS', 1_800_000, 60_000);
+
 if (!fs.existsSync(RENDER_DIR)) {
     fs.mkdirSync(RENDER_DIR, { recursive: true });
 }
@@ -172,6 +175,29 @@ const periodicCleanupInterval = setInterval(() => {
 }, CHROME_CLEANUP_INTERVAL_MS);
 // Don't block process exit waiting for this interval
 periodicCleanupInterval.unref();
+
+// ─── Internal Scheduler Loop ─────────────────────────────
+let schedulerInterval: NodeJS.Timeout | null = null;
+
+export function startSchedulerLoop() {
+    console.log(`[scheduler] Internal scheduler enabled, polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`);
+    schedulerInterval = setInterval(async () => {
+        try {
+            const outcome = await runScheduledPipeline();
+            console.log(`[scheduler] Outcome: ${outcome.status}`, outcome.nextRunAt ? `nextRunAt=${outcome.nextRunAt}` : '');
+        } catch (error) {
+            console.error('[scheduler] Unexpected error in scheduler loop:', error instanceof Error ? error.message : String(error));
+        }
+    }, SCHEDULER_POLL_INTERVAL_MS);
+    schedulerInterval.unref();
+}
+
+export function stopSchedulerLoop() {
+    if (schedulerInterval) {
+        clearInterval(schedulerInterval);
+        schedulerInterval = null;
+    }
+}
 
 // ─── Bundle cache (created once, reused for all renders) ─
 let bundleLocation: string | null = null;
@@ -345,6 +371,11 @@ export async function startServer() {
         httpServer = app.listen(PORT, '0.0.0.0', () => {
             console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
             console.log(`✓ Endpoints: GET /health, POST /api/schedule/run, POST /api/render, GET /api/renders/:file`);
+            if (SCHEDULER_ENABLED) {
+                startSchedulerLoop();
+            } else {
+                console.log(`✓ Scheduler: disabled (set SCHEDULER_ENABLED=true to enable)`);
+            }
             resolve();
         });
 
@@ -364,6 +395,7 @@ function gracefulShutdown(signal: NodeJS.Signals) {
     console.log(`[shutdown] Received ${signal}; starting graceful shutdown`);
 
     clearInterval(periodicCleanupInterval);
+    if (schedulerInterval) clearInterval(schedulerInterval);
     cleanupChromeProcesses();
 
     const forceExitTimeout = setTimeout(() => {

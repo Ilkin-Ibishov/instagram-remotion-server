@@ -40,6 +40,7 @@ vi.mock('../src/pipeline/retryPolicy', () => ({
 
 import { runPipeline } from '../src/pipelineRun';
 import { runScheduledPipeline } from '../src/pipeline/schedulerRunner';
+import { startSchedulerLoop, stopSchedulerLoop } from '../server';
 import { validateInstagramSessionExpiry } from '../src/automation/instagramPublisher';
 import { shouldRunNow, recordRunSuccess, recordRunFailure } from '../src/pipeline/scheduleState';
 import { acquireDistributedLock, releaseDistributedLock } from '../src/pipeline/schedulerLock';
@@ -189,5 +190,44 @@ describe('runScheduledPipeline', () => {
     const firstRunResult = await firstRunPromise;
     expect(firstRunResult.status).toBe('executed');
     expect(mockedReleaseLock).toHaveBeenCalled();
+  });
+});
+
+describe('startSchedulerLoop', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.restoreAllMocks();
+    mockedShouldRunNow.mockResolvedValue({ allowed: false, reason: 'not_due', state: baseState });
+  });
+
+  afterEach(() => {
+    stopSchedulerLoop();
+    vi.useRealTimers();
+  });
+
+  it('calls runScheduledPipeline on each poll interval', async () => {
+    const spy = vi.spyOn(await import('../src/pipeline/schedulerRunner'), 'runScheduledPipeline')
+      .mockResolvedValue({ status: 'skipped_due_to_time', reason: 'not_due', accountId: 'default', nextRunAt: baseState.nextRunAt.toISOString() });
+
+    startSchedulerLoop();
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('survives errors from runScheduledPipeline without stopping', async () => {
+    const spy = vi.spyOn(await import('../src/pipeline/schedulerRunner'), 'runScheduledPipeline')
+      .mockRejectedValue(new Error('boom'));
+
+    startSchedulerLoop();
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });

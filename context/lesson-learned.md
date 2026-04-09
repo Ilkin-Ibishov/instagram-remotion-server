@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-09 — Railway cron is wrong for always-on servers; use internal polling
+
+Context: The scheduler (`POST /api/schedule/run`) required an external trigger but no cron was configured on Railway, so the automation never ran automatically.
+Mistake: Assumed Railway cron could hit the HTTP endpoint on a schedule. Railway cron actually **restarts the service's start command** on a schedule and expects it to exit. For an always-on Express server this would restart the entire container every poll cycle, and Railway would skip subsequent cron runs while the process is alive.
+Correction: Added an internal `setInterval` polling loop in `server.ts` behind `SCHEDULER_ENABLED=true`. The loop calls `runScheduledPipeline()` directly (no HTTP hop). All existing guards (`shouldRunNow()`, distributed lock, jittered `next_run_at`) remain unchanged. Railway cron should only be used for short-lived start-run-exit services. See `context/development.md` → Scheduler environment.
+
 ### 2026-04-08 — GNews API error handling must be status-specific for robust integration
 
 Context: GNews free plan has rate limits (429, 1 req/s) and quota exhaustion (403, 100 req/day). Generic error handling masks these and causes unnecessary retries or silent failures.

@@ -51,8 +51,14 @@ Optional (defaults in code):
 - `SCHEDULE_RETRY_COUNT` (default: `1`)
 - `SCHEDULE_RETRY_DELAY_MS` (default: `5000`)
 - `PLAYWRIGHT_HEADLESS` (default: `true`; set to `false` only for local debugging with a display server)
+- `SCHEDULER_ENABLED` (default: `false`; set to `true` to enable the internal polling loop)
+- `SCHEDULER_POLL_INTERVAL_MS` (default: `1800000` = 30 minutes; minimum `60000` = 1 minute)
 
-For Railway cron usage, trigger `POST /api/schedule/run` on a fixed cadence (for example every 30 minutes). The endpoint decides run vs skip based on persisted `next_run_at`.
+### Internal scheduler loop
+
+When `SCHEDULER_ENABLED=true`, the server starts a `setInterval` loop after `app.listen()` that calls `runScheduledPipeline()` at the configured poll cadence. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.
+
+The `POST /api/schedule/run` endpoint remains available for manual triggers and external integrations.
 
 ## Railway (CLI + MCP)
 
