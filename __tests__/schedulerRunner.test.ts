@@ -211,11 +211,14 @@ describe('startSchedulerLoop', () => {
 
     startSchedulerLoop();
 
-    await vi.advanceTimersByTimeAsync(1_800_000);
+    await vi.runAllTicks();
     expect(spy).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(1_800_000);
     expect(spy).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(3);
   });
 
   it('survives errors from runScheduledPipeline without stopping', async () => {
@@ -224,10 +227,13 @@ describe('startSchedulerLoop', () => {
 
     startSchedulerLoop();
 
-    await vi.advanceTimersByTimeAsync(1_800_000);
+    await vi.runAllTicks();
     expect(spy).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(1_800_000);
     expect(spy).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(1_800_000);
+    expect(spy).toHaveBeenCalledTimes(3);
   });
 });

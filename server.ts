@@ -179,15 +179,26 @@ periodicCleanupInterval.unref();
 // ─── Internal Scheduler Loop ─────────────────────────────
 let schedulerInterval: NodeJS.Timeout | null = null;
 
+async function runSchedulerTick(trigger: 'startup' | 'interval') {
+    try {
+        const outcome = await runScheduledPipeline();
+        console.log(
+            `[scheduler] Outcome (${trigger}): ${outcome.status}`,
+            outcome.nextRunAt ? `nextRunAt=${outcome.nextRunAt}` : ''
+        );
+    } catch (error) {
+        console.error(
+            `[scheduler] Unexpected error in ${trigger} scheduler run:`,
+            error instanceof Error ? error.message : String(error)
+        );
+    }
+}
+
 export function startSchedulerLoop() {
-    console.log(`[scheduler] Internal scheduler enabled, polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`);
+    console.log(`[scheduler] Internal scheduler enabled, running once on startup and polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`);
+    void runSchedulerTick('startup');
     schedulerInterval = setInterval(async () => {
-        try {
-            const outcome = await runScheduledPipeline();
-            console.log(`[scheduler] Outcome: ${outcome.status}`, outcome.nextRunAt ? `nextRunAt=${outcome.nextRunAt}` : '');
-        } catch (error) {
-            console.error('[scheduler] Unexpected error in scheduler loop:', error instanceof Error ? error.message : String(error));
-        }
+        await runSchedulerTick('interval');
     }, SCHEDULER_POLL_INTERVAL_MS);
     schedulerInterval.unref();
 }

@@ -56,7 +56,7 @@ Optional (defaults in code):
 
 ### Internal scheduler loop
 
-When `SCHEDULER_ENABLED=true`, the server starts a `setInterval` loop after `app.listen()` that calls `runScheduledPipeline()` at the configured poll cadence. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.
+When `SCHEDULER_ENABLED=true`, the server performs one scheduler run immediately after startup and then starts a `setInterval` loop that calls `runScheduledPipeline()` at the configured poll cadence. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.
 
 The `POST /api/schedule/run` endpoint remains available for manual triggers and external integrations.
 
