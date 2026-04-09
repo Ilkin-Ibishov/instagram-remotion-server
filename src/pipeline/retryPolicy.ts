@@ -1,6 +1,6 @@
 export interface RetryPolicyOptions {
   maxRetries?: number;
-  retryDelayMs?: number;
+  retryDelayMs?: number | (() => number);
   isRetryable?: (error: unknown) => boolean;
   onRetry?: (attempt: number, error: unknown) => void;
 }
@@ -44,7 +44,8 @@ export async function executeWithRetry<T>(
       }
 
       options.onRetry?.(attempt + 1, error);
-      await wait(retryDelayMs);
+      let delay = typeof retryDelayMs === 'function' ? retryDelayMs() : retryDelayMs;
+      await wait(delay);
     }
   }
 

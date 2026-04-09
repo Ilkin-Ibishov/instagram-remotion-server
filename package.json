@@ -8,7 +8,8 @@
         "preview": "npx remotion studio src/remotion/index.tsx",
         "pipeline": "npm exec tsx -- src/pipelineRun.ts",
         "verify": "npm exec tsx -- verify-option-b.ts",
-        "test": "vitest"
+        "test": "vitest",
+        "clickup:audit": "tsx scripts/clickup-audit.ts"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",

@@ -184,3 +184,23 @@ export async function recordRunFailure(
     client.release();
   }
 }
+
+/**
+ * Read the current schedule state for an account without modifying it.
+ * Returns null if no state has been recorded yet (pipeline has not run).
+ */
+export async function readScheduleState(accountId: string): Promise<ScheduleState | null> {
+  await ensureSchema();
+
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      'SELECT * FROM schedule_state WHERE account_id = $1',
+      [accountId]
+    );
+
+    return result.rows[0] ? toState(result.rows[0]) : null;
+  } finally {
+    client.release();
+  }
+}

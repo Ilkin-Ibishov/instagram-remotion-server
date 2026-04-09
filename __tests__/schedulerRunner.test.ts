@@ -30,6 +30,8 @@ vi.mock('../src/pipeline/scheduleState', () => ({
 vi.mock('../src/pipeline/schedulerLock', () => ({
   acquireDistributedLock: vi.fn(),
   releaseDistributedLock: vi.fn(),
+  // Pass-through: call the wrapped function immediately (no real Redis heartbeat in tests)
+  runWithLockHeartbeat: vi.fn((_handle: unknown, _ttl: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../src/pipeline/retryPolicy', () => ({

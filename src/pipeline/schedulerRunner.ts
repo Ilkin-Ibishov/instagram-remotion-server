@@ -7,7 +7,7 @@ import {
   shouldRunNow,
   type ScheduleState,
 } from './scheduleState';
-import { acquireDistributedLock, releaseDistributedLock } from './schedulerLock';
+import { acquireDistributedLock, releaseDistributedLock, runWithLockHeartbeat } from './schedulerLock';
 import { executeWithRetry } from './retryPolicy';
 
 export type SchedulerOutcomeStatus =
@@ -105,17 +105,19 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
       };
     }
 
-    await executeWithRetry(
-      async () => runPipeline(),
-      {
-        maxRetries: retryCount,
-        retryDelayMs,
-        onRetry: (attempt, error) => {
-          logger.warn('schedule-retry', `Retry attempt ${attempt}`, {
-            error: extractErrorMessage(error),
-          });
-        },
-      }
+    await runWithLockHeartbeat(lock, lockTtlSeconds, () =>
+      executeWithRetry(
+        async () => runPipeline(),
+        {
+          maxRetries: retryCount,
+          retryDelayMs,
+          onRetry: (attempt, error) => {
+            logger.warn('schedule-retry', `Retry attempt ${attempt}`, {
+              error: extractErrorMessage(error),
+            });
+          },
+        }
+      )
     );
 
     const finishedAt = new Date();

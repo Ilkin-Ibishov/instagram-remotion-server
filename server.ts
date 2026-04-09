@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 import type { Server } from 'http';
 import { runScheduledPipeline } from './src/pipeline/schedulerRunner';
+import { readScheduleState } from './src/pipeline/scheduleState';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
@@ -258,6 +259,35 @@ app.use('/api/renders', express.static(RENDER_DIR));
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Scheduler status endpoint — returns last success, next run, and last error
+app.get('/api/status', async (req, res) => {
+    const accountId = process.env.ACCOUNT_ID ?? 'default';
+    try {
+        const state = await readScheduleState(accountId);
+        if (!state) {
+            return res.json({
+                status: 'no_data',
+                message: 'Pipeline has not run yet',
+                accountId,
+            });
+        }
+        return res.json({
+            status: 'ok',
+            accountId: state.accountId,
+            last_success_at: state.lastSuccessAt?.toISOString() ?? null,
+            last_error_at: state.lastErrorAt?.toISOString() ?? null,
+            last_error_message: state.lastErrorMessage ?? null,
+            next_run_at: state.nextRunAt.toISOString(),
+            last_run_at: state.lastRunAt?.toISOString() ?? null,
+        });
+    } catch (err) {
+        return res.status(503).json({
+            status: 'unavailable',
+            message: 'Schedule state database unavailable',
+        });
+    }
 });
 
 app.post('/api/schedule/run', async (req, res) => {

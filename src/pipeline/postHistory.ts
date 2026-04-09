@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { Logger } from '../utils/logger';
+import { normalizeArticleUrl } from '../utils/normalizeUrl';
 
 /**
  * Post History Tracker: Prevents duplicate news articles from being posted.
@@ -25,7 +27,7 @@ function loadHistory(): PostRecord[] {
       return JSON.parse(data);
     }
   } catch (e) {
-    console.warn(`[history] Failed to load post history: ${e}`);
+    new Logger().warn('history', `Failed to load post history: ${e}`);
   }
   return [];
 }
@@ -34,8 +36,9 @@ function loadHistory(): PostRecord[] {
  * Check if an article has already been posted.
  */
 export function hasBeenPosted(articleUrl: string): boolean {
+  const normalised = normalizeArticleUrl(articleUrl);
   const history = loadHistory();
-  return history.some(record => record.articleUrl === articleUrl);
+  return history.some(record => normalizeArticleUrl(record.articleUrl) === normalised);
 }
 
 /**
@@ -45,7 +48,7 @@ export function recordPost(article: { title: string; url: string }, batchId: str
   const history = loadHistory();
   const record: PostRecord = {
     articleTitle: article.title,
-    articleUrl: article.url,
+    articleUrl: normalizeArticleUrl(article.url),
     postedAt: new Date().toISOString(),
     batchId,
   };
@@ -57,11 +60,12 @@ export function recordPost(article: { title: string; url: string }, batchId: str
     history.splice(0, history.length - 500);
   }
 
+  const logger = new Logger();
   try {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-    console.log(`[history] ✓ Recorded post: "${article.title}"`);
+    logger.info('history', `Recorded post: "${article.title}"`);
   } catch (e) {
-    console.error(`[history] Failed to save post history: ${e}`);
+    logger.error('history', `Failed to save post history: ${e}`);
   }
 }
 

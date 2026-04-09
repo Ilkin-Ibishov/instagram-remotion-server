@@ -23,11 +23,9 @@ const MIN_RELEVANCE_SCORE = parseInt(process.env.MIN_RELEVANCE_SCORE || '10', 10
  * Returns an array of relative paths from the server response.
  */
 async function renderMedia(manifest: any, format: string = 'mp4'): Promise<string[]> {
-  console.log(`Sending manifest to local Remotion server for rendering (format: ${format})...`);
-  
-  // Debug: Log payload before sending
-  console.log(`📤 DEBUG /api/render payload: ${JSON.stringify(manifest)}`);
-  
+  const logger = new Logger();
+  logger.info('render', `Sending manifest to local Remotion server for rendering (format: ${format})`);
+
   const response = await fetch('http://localhost:3000/api/render', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -42,10 +40,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
   }
 
   const result = await response.json();
-  
-  // Debug: Log render response
-  console.log(`📥 DEBUG /api/render response: ${JSON.stringify(result)}`);
-  
+
   if (!result.success || !result.images) {
     throw new Error('Render response format is invalid');
   }
@@ -61,18 +56,13 @@ export async function runPipeline() {
   
   try {
     logger.info('pipeline', `--- Step 0: Fetching News (Category: ${NEWS_CATEGORY}) ---`);
-    console.log(`\n📰 Fetching news from category: ${NEWS_CATEGORY}`);
-    console.log(`📍 Account: ${accountProfile.handle} (@${accountProfile.displayName})`);
-    console.log(`🎯 Niche: ${accountProfile.niche.join(', ')}\n`);
+    logger.info('pipeline', `Account: ${accountProfile.handle} | Niche: ${accountProfile.niche.join(', ')}`);
     
     const articles = await fetchTopNews(NEWS_CATEGORY);
     logger.info('news-fetch', `Fetched ${articles.length} articles from API`, { count: articles.length });
 
     // Log keyword extraction
     logger.info('pipeline', '--- Step 0a: Extract Keywords from Account ---');
-    console.log(`\n🔑 Extracting keywords from account profile...`);
-    console.log(`  Niche keywords: ${accountProfile.niche.join(', ')}`);
-    console.log(`  Bio: "${accountProfile.bio}"\n`);
     
     logger.debug('keywords', 'Extracted keywords', {
       nicheKeywords: accountProfile.niche,
@@ -113,7 +103,7 @@ export async function runPipeline() {
         source: article.source 
       }
     );
-    console.log(`\n✅ Selected Article (Score: ${selectedArticleItem.score}): "${article.title}"\n`);
+    logger.info('pipeline', `Selected article (score: ${selectedArticleItem.score}): "${article.title}"`);
 
     logger.info('pipeline', '--- Step 1: AI Content Generation ---');
     const aiData = await generatePostContentAI(article, accountProfile);
@@ -182,7 +172,6 @@ export async function runPipeline() {
 
   } catch (error) {
     logger.error('pipeline', 'Pipeline failed', error);
-    console.error(error);
     throw error;
   }
 }

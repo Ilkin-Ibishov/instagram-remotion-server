@@ -4,6 +4,7 @@ import type { AccountProfile } from "./accountProfile";
 import { config as brandConfig } from "./config";
 import * as dotenv from "dotenv";
 import fs from "fs";
+import { Logger } from "../utils/logger";
 
 dotenv.config();
 
@@ -407,7 +408,7 @@ Bio: ${account.bio}${relevanceCheck}
 ARTICLE:
 Title: ${article.title}
 Source: ${article.source}
-Description: ${article.description}
+${/* NOTE: We use `description` (max ~300 chars) instead of `content` because GNews free tier truncates `content` at ~260 chars with a "[chars]" suffix. The description field reliably contains the full editorial summary. */""}Description: ${article.description}
 
 ---
 
@@ -471,17 +472,18 @@ Description: ${article.description}
 
 RETURN ONLY JSON.`;
 
+  const aiLogger = new Logger();
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let responseText = response.text();
     
-    console.log('📋 Raw Gemini Response (first 500 chars):', responseText.substring(0, 500));
+    aiLogger.debug('ai-service', `Raw Gemini response (first 500 chars): ${responseText.substring(0, 500)}`);
     
     // Handle markdown-formatted JSON (sometimes Gemini wraps response in ```json...```)
     const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/);
     if (jsonMatch) {
-      console.log('ℹ️ Found JSON in markdown code block, extracting...');
+      aiLogger.debug('ai-service', 'Found JSON in markdown code block, extracting...');
       responseText = jsonMatch[1];
     }
     
@@ -490,23 +492,19 @@ RETURN ONLY JSON.`;
       json = JSON.parse(responseText);
     } catch (parseError) {
       const parseErrorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      console.error('❌ Failed to parse Gemini response as JSON');
-      console.error('Raw response (first 1000 chars):', responseText.substring(0, 1000));
-      console.error('Full error:', parseError);
-      
-      // Write full response to a debug file
+      // Write full response to a debug file for post-mortem analysis
       const debugPath = `./logs/gemini-response-${Date.now()}.txt`;
       fs.writeFileSync(debugPath, responseText);
-      console.error(`Full response written to: ${debugPath}`);
-      
+      aiLogger.error('ai-service', `Failed to parse Gemini response as JSON. Full response saved to ${debugPath}`, {
+        rawPreview: responseText.substring(0, 1000),
+        parseError: parseErrorMessage,
+      });
       throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseErrorMessage}`);
     }
 
     return validateGeneratedContent(json);
   } catch (error) {
-    console.error("❌ Gemini Generation Error:", error);
-    console.error("Error message:", (error as Error).message);
-    console.error("Full error details:", error);
+    aiLogger.error('ai-service', 'Gemini generation error', error);
     throw error;
   }
 }

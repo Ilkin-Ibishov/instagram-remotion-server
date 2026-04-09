@@ -2,6 +2,7 @@ import type { NewsArticle } from './types';
 import { hasBeenPosted, getRecentPosts } from './postHistory';
 import type { AccountProfile } from './accountProfile';
 import Logger from '../utils/logger';
+import { normalizeArticleUrl } from '../utils/normalizeUrl';
 
 /**
  * News Relevance Scoring System
@@ -178,8 +179,8 @@ export function filterAndRankArticles(
 
   const filtered = articles
     .filter(article => {
-      // Skip already posted articles
-      if (hasBeenPosted(article.url)) {
+      // Skip already posted articles (normalise URL before checking to handle www/http variants)
+      if (hasBeenPosted(normalizeArticleUrl(article.url))) {
         if (logger) {
           logger.debug('filter-duplicates', `Skipping already posted: "${article.title}"`);
         }

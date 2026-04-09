@@ -24,6 +24,24 @@ Correction: …
 
 ## Entries
 
+### 2026-04-08 — GNews API error handling must be status-specific for robust integration
+
+Context: GNews free plan has rate limits (429, 1 req/s) and quota exhaustion (403, 100 req/day). Generic error handling masks these and causes unnecessary retries or silent failures.
+Mistake: Initial implementation threw generic errors for all GNews responses; no differentiation between retryable (429, 500, 503) and terminal errors (401, 403). This caused retries on quota exhaustion and no special handling of Retry-After headers.
+Correction: Implemented status-specific error handling: retry on 429/500/503 with exponential backoff + Retry-After support, fail fast on 401/403 with clear logging. Used `isRetryableGNewsError` function to detect retryable errors. Also wrapped `fetchTopNews` and `fetchSearchNews` with `executeWithRetry` for consistency. Key decision: 401 and 403 are not retried — they indicate config issues or quota limits that require manual intervention.
+
+### 2026-04-08 — Hardcoded API parameters must be environment-configurable for multi-plan deployments
+
+Context: Free plan limits are different from paid plans (max articles, languages, countries). Hard-coded values make plan upgrades require code changes and complicate multi-tenant or multi-region deployments.
+Mistake: `lang=en`, `country=us`, `max=10` were hardcoded in `newsService.ts`, making them impossible to customize without modifying source code.
+Correction: Moved all parameters to `.env` variables with safe defaults: `GNEWS_LANG`, `GNEWS_COUNTRY`, `GNEWS_MAX_ARTICLES`, `GNEWS_URL`. Added validation and warning logs for missing values. Migration: existing deployments should set these env vars or accept defaults; backward-compatible. See [gnews-implementation-guide-2026-04-08.md](./gnews-implementation-guide-2026-04-08.md) for details.
+
+### 2026-04-08 — Dual-endpoint strategy improves relevance but doubles quota cost
+
+Context: Top-headlines endpoint returns general trending news; account niche keywords don't automatically filter at API level. Client-side scoring can miss high-quality niche articles in the initial pool.
+Decision: Implemented `fetchSearchNews(query)` for niche-specific search using AND/OR/NOT operators, and `mergeAndDedupeArticles()` for combining results. Default stays top-headlines only (backward-compatible), but pipeline can optionally use both endpoints for higher relevance articles. Tradeoff: doubles quota usage (now 2 API calls per cycle) but improves article quality before AI generation.
+Benefit: Search endpoint + top-headlines + deduplication provides a best-of-both-worlds pool — trending coverage + niche relevance. Useful for accounts with very specific niches (e.g., "AI startups" or "DevOps tooling"). Not recommended for free plan due to quota pressure.
+
 ### 2026-04-08 — Do not force fallback to first article when relevance filter returns zero
 
 Context: Scheduled runs could fetch a category that doesn't match the account niche and still continue by selecting the first available article, producing off-brand posts despite strict scoring.  
