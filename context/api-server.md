@@ -57,7 +57,7 @@ If **`webhookUrl`** is present:
 2. Renders in the background; on success POSTs JSON `{ success: true, batchId, images: [...] }` to the webhook.
 3. On failure POSTs `{ success: false, batchId, error }`.
 
-This avoids gateway timeouts for n8n and similar tools.
+This avoids gateway timeouts for external automation tools.
 
 ## POST `/api/schedule/run`
 
@@ -69,6 +69,8 @@ Scheduler endpoint for Railway cron ticks. This endpoint is separate from the re
 - Uses persisted schedule state from Postgres to decide if the run is due.
 - Uses Redis distributed lock to prevent overlapping runs.
 - Runs pipeline with bounded retry (single retry by default).
+- Pipeline article sourcing is RSS-first (`src/pipeline/rssService.ts`) with GNews fallback behavior in `src/pipelineRun.ts`.
+- RSS source-health cooldowns are tracked in Redis and RSS run/source telemetry is best-effort persisted when `DATABASE_URL` is set.
 - Performs Instagram session preflight before execution.
 - If `SCHEDULE_RUN_SECRET` is configured, request must include header `x-scheduler-secret` with matching value.
 

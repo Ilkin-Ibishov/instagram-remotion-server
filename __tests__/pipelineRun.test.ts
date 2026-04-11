@@ -25,6 +25,10 @@ vi.mock('../src/pipeline/newsService', () => ({
   fetchSearchNews: vi.fn(),
 }));
 
+vi.mock('../src/pipeline/rssService', () => ({
+  fetchRssNews: vi.fn(),
+}));
+
 vi.mock('../src/pipeline/newsFiltering', () => ({
   filterAndRankArticles: vi.fn(),
   selectBestArticle: vi.fn(),
@@ -47,12 +51,14 @@ vi.mock('../src/pipeline/aiService', () => ({
 import { runPipeline } from '../src/pipelineRun';
 import { publishToInstagram } from '../src/automation/instagramPublisher';
 import { fetchTopNews, fetchSearchNews } from '../src/pipeline/newsService';
+import { fetchRssNews } from '../src/pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle } from '../src/pipeline/newsFiltering';
 import { loadAccountProfile, getAccountKeywords } from '../src/pipeline/accountProfile';
 import { generatePostContentAI } from '../src/pipeline/aiService';
 
 const mockedFetchTopNews = vi.mocked(fetchTopNews);
 const mockedFetchSearchNews = vi.mocked(fetchSearchNews);
+const mockedFetchRssNews = vi.mocked(fetchRssNews);
 const mockedFilterAndRankArticles = vi.mocked(filterAndRankArticles);
 const mockedSelectBestArticle = vi.mocked(selectBestArticle);
 const mockedLoadAccountProfile = vi.mocked(loadAccountProfile);
@@ -73,6 +79,7 @@ describe('runPipeline', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.USE_RSS_FEEDS = 'true';
 
     mockedLoadAccountProfile.mockReturnValue({
       handle: '@theinitial.dev',
@@ -83,8 +90,109 @@ describe('runPipeline', () => {
       effects: ['vignette'],
     });
     mockedGetAccountKeywords.mockReturnValue(['technology', 'development', 'startup']);
+    mockedFetchRssNews.mockResolvedValue([]);
     // Default: search fallback also returns nothing (overridden per test as needed)
     mockedFetchSearchNews.mockResolvedValue([]);
+  });
+
+  it('uses RSS as primary source when available and does not call GNews top fetch', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGeneratePostContentAI.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
+        carousel: [],
+      },
+      caption: 'Test caption',
+      hashtags: '#test',
+    } as any);
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
+    } as Response);
+
+    await runPipeline();
+
+    expect(mockedFetchRssNews).toHaveBeenCalledOnce();
+    expect(mockedFetchTopNews).not.toHaveBeenCalled();
+    expect(mockedPublishToInstagram).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to GNews when RSS primary fetch throws', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockRejectedValue(new Error('RSS failed'));
+    mockedFetchTopNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGeneratePostContentAI.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
+        carousel: [],
+      },
+      caption: 'Test caption',
+      hashtags: '#test',
+    } as any);
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
+    } as Response);
+
+    await runPipeline();
+
+    expect(mockedFetchRssNews).toHaveBeenCalledOnce();
+    expect(mockedFetchTopNews).toHaveBeenCalledOnce();
+    expect(mockedPublishToInstagram).toHaveBeenCalledOnce();
+  });
+
+  it('bypasses RSS when USE_RSS_FEEDS is false and uses GNews directly', async () => {
+    process.env.USE_RSS_FEEDS = 'false';
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchTopNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGeneratePostContentAI.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
+        carousel: [],
+      },
+      caption: 'Test caption',
+      hashtags: '#test',
+    } as any);
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
+    } as Response);
+
+    await runPipeline();
+
+    expect(mockedFetchRssNews).not.toHaveBeenCalled();
+    expect(mockedFetchTopNews).toHaveBeenCalledOnce();
   });
 
   it('throws when no relevant articles pass scoring and does not publish', async () => {
@@ -101,6 +209,7 @@ describe('runPipeline', () => {
 
   it('uses search fallback when top-headlines yield no relevant articles', async () => {
     const scoredArticle = { article: mockArticle, score: 15, reasons: ['startup in title'], matchedKeywords: [], scoreBreakdown: { titleMatches: 10, descriptionMatches: 0, baseScore: 5 } };
+    mockedFetchRssNews.mockResolvedValue([]);
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
     // First call (top-headlines) → no results; second call (search fallback) → match
     mockedFilterAndRankArticles

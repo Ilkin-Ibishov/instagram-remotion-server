@@ -239,6 +239,40 @@ import Logger from './utils/logger';
 
 const logger = new Logger(); // Creates logger with auto-generated runId
 
+## RSS workflow log steps
+
+RSS ingestion now emits structured logs for each stage in `src/pipeline/rssService.ts`.
+
+- `rss`:
+  - workflow start (env + threshold + timeout metadata)
+  - source selection and completion summary (fulfilled/rejected/merged/deduped/duration)
+  - global timeout trigger warnings
+- `rss-cache`:
+  - cache lookup start (key, ttl, redis enabled)
+  - cache hit/miss
+  - stale cache warning (>2x ttl)
+  - cache write success/failure and no-articles-to-cache events
+- `rss-fetch`:
+  - live fetch start for each source (url, timeout)
+  - normalization/filter summary per source
+  - retry execution metadata and fetch failures
+- `rss-retry`:
+  - retry attempt logs with source id and error reason
+- `rss-source`:
+  - per-source completion logs with article counts
+- `rss-dedup`:
+  - dedup start parameters and completion summary
+  - debug logs for dropped cross-source near duplicates
+- `rss-health`:
+  - source cooldown skip decisions
+  - source health state transitions (failure counters, cooldown applied)
+  - fail-open warnings when Redis checks fail
+- `rss-telemetry`:
+  - warnings when source/run telemetry persistence fails
+  - telemetry write failure context per source or run
+
+This logging structure enables end-to-end observability of RSS fetch, cache behavior, filtering, dedup decisions, and timing in a single run log.
+
 // Log at different levels
 logger.info('my-step', 'Something happened', { optional: 'data' });
 logger.debug('my-step', 'Debug details (only if DEBUG=1)', { payload: {...} });
