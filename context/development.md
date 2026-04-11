@@ -62,6 +62,25 @@ When `SCHEDULER_ENABLED=true`, the server performs one scheduler run immediately
 
 The `POST /api/schedule/run` endpoint remains available for manual triggers and external integrations.
 
+## RSS ingestion environment
+
+RSS is now the primary ingest path for the pipeline when enabled, with GNews as fallback.
+
+Optional (defaults in code):
+
+- `USE_RSS_FEEDS` (default: `true`; set to `false` to force GNews-only behavior)
+- `RSS_TITLE_DEDUP_THRESHOLD` (default: `0.6`; Jaccard threshold for cross-source title dedup)
+- `RSS_CACHE_TTL_SECONDS` (optional global cache TTL override in seconds; if unset, per-source TTL is used)
+- `RSS_GLOBAL_TIMEOUT_MS` (default: `15000`; max time budget for parallel RSS fetch batch)
+- `RSS_SOURCE_FAILURE_THRESHOLD` (default: `3`; consecutive per-source failures before cooldown is applied)
+- `RSS_SOURCE_COOLDOWN_SECONDS` (default: `3600`; cooldown duration for a source that crossed failure threshold)
+- `RSS_SOURCE_FAILURE_TTL_SECONDS` (default: `604800`; Redis TTL for source failure counters)
+
+Optional infrastructure:
+
+- `DATABASE_URL` enables durable RSS telemetry persistence in Postgres (`rss_source_telemetry`, `rss_run_telemetry`)
+- `REDIS_URL` enables source-health cooldown state (`rss:health:*` keys)
+
 ## Railway (CLI + MCP)
 
 - **CLI:** Install from [Railway CLI docs](https://docs.railway.com/cli); authenticate with `railway login`. The MCP server expects a logged-in CLI ([Railway MCP reference](https://docs.railway.com/reference/mcp-server)).

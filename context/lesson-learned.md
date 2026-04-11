@@ -24,6 +24,18 @@ Correction: …
 
 ## Entries
 
+### 2026-04-11 — RSS telemetry must be non-blocking and source-health checks must fail open
+
+Context: Added Postgres RSS telemetry persistence and Redis source cooldown guardrails to improve RSS operational visibility and source reliability handling.
+Mistake: A strict dependency on telemetry/health infrastructure would make pipeline publishing depend on Postgres/Redis availability and could block content generation during transient infra outages.
+Correction: Implemented non-fatal telemetry writes (log and continue) and fail-open cooldown checks (if Redis errors, do not skip source solely due to health read failure). This preserves publishing path reliability while still capturing operational state when infrastructure is healthy.
+
+### 2026-04-10 — RSS-first ingestion must enforce image and URL quality gates before scoring
+
+Context: Implemented RSS as primary news source with GNews fallback in `src/pipelineRun.ts` and new RSS modules. RSS feeds often include items without usable media or canonical links, unlike the stricter GNews mapping flow.
+Mistake: Treating all RSS items with title/description as valid would allow imageless slides and empty/non-URL links into dedup and post history, causing weak or broken carousel outputs.
+Correction: Added strict filters in `src/pipeline/rssService.ts` requiring `title + description + imageUrl + url`, validated GUID fallback only when it is an HTTP URL, used epoch fallback for missing dates to avoid sort bias, and wrapped RSS fetch in try/catch so fallback to GNews is always preserved.
+
 ### 2026-04-09 — Railway cron is wrong for always-on servers; use internal polling
 
 Context: The scheduler (`POST /api/schedule/run`) required an external trigger but no cron was configured on Railway, so the automation never ran automatically.
@@ -40,7 +52,7 @@ Correction: Implemented status-specific error handling: retry on 429/500/503 wit
 
 Context: Free plan limits are different from paid plans (max articles, languages, countries). Hard-coded values make plan upgrades require code changes and complicate multi-tenant or multi-region deployments.
 Mistake: `lang=en`, `country=us`, `max=10` were hardcoded in `newsService.ts`, making them impossible to customize without modifying source code.
-Correction: Moved all parameters to `.env` variables with safe defaults: `GNEWS_LANG`, `GNEWS_COUNTRY`, `GNEWS_MAX_ARTICLES`, `GNEWS_URL`. Added validation and warning logs for missing values. Migration: existing deployments should set these env vars or accept defaults; backward-compatible. See [gnews-implementation-guide-2026-04-08.md](./gnews-implementation-guide-2026-04-08.md) for details.
+Correction: Moved all parameters to `.env` variables with safe defaults: `GNEWS_LANG`, `GNEWS_COUNTRY`, `GNEWS_MAX_ARTICLES`, `GNEWS_URL`. Added validation and warning logs for missing values. Migration: existing deployments should set these env vars or accept defaults; backward-compatible.
 
 ### 2026-04-08 — Dual-endpoint strategy improves relevance but doubles quota cost
 
@@ -273,7 +285,7 @@ Fix:
 
 Context: New `context/` modular docs for agent use.  
 Mistake: (N/A — bootstrap)  
-Correction: Keep [templates.md](./templates.md) as the single source of truth for `data` field names; automation prompts in `n8n-workflow.json` may use **`footer`** while `ContentListicle` reads **`footnote`** — align prompts or map fields in the workflow.
+Correction: Keep [templates.md](./templates.md) as the single source of truth for `data` field names; automation prompts may use **`footer`** while `ContentListicle` reads **`footnote`** — align prompts or map fields in the automation layer.
 
 ### 2026-03-28 — `package.json` Remotion Studio entry extension
 

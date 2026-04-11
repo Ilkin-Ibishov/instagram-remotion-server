@@ -1,6 +1,7 @@
 import { publishToInstagram } from './automation/instagramPublisher';
 import { generateContent } from './pipeline/contentGenerator';
 import { fetchTopNews, fetchSearchNews } from './pipeline/newsService';
+import { fetchRssNews } from './pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle, printScoringResults } from './pipeline/newsFiltering';
 import { recordPost } from './pipeline/postHistory';
 import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfile';
@@ -52,14 +53,30 @@ export async function runPipeline() {
   const logger = new Logger();
   const accountProfile = loadAccountProfile();
   const accountKeywords = getAccountKeywords(accountProfile);
+  const useRssFeeds = process.env.USE_RSS_FEEDS !== 'false';
   const batchId = `batch-${Date.now()}`;
+  let rssFetchFailed = false;
   
   try {
-    logger.info('pipeline', `--- Step 0: Fetching News (Category: ${NEWS_CATEGORY}) ---`);
+    logger.info('pipeline', `--- Step 0: Fetching News (${useRssFeeds ? 'RSS primary + GNews fallback' : `GNews category: ${NEWS_CATEGORY}`}) ---`);
     logger.info('pipeline', `Account: ${accountProfile.handle} | Niche: ${accountProfile.niche.join(', ')}`);
-    
-    const articles = await fetchTopNews(NEWS_CATEGORY);
-    logger.info('news-fetch', `Fetched ${articles.length} articles from API`, { count: articles.length });
+
+    let articles: NewsArticle[] = [];
+    if (useRssFeeds) {
+      try {
+        articles = await fetchRssNews(accountProfile.niche);
+        logger.info('news-fetch', `RSS fetched ${articles.length} articles`, { count: articles.length });
+      } catch (error) {
+        logger.warn('pipeline', 'RSS fetch failed entirely; falling back to GNews.', {
+          error: error instanceof Error ? error.message : error,
+        });
+        rssFetchFailed = true;
+        articles = [];
+      }
+    } else {
+      articles = await fetchTopNews(NEWS_CATEGORY);
+      logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
+    }
 
     // Log keyword extraction
     logger.info('pipeline', '--- Step 0a: Extract Keywords from Account ---');
@@ -78,12 +95,29 @@ export async function runPipeline() {
       explanation: 'Articles must score ≥ this to be selected. Score = keyword matches (weighted by specificity) + 5 base points',
     });
     
-    let scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
-    printScoringResults(scoredArticles, logger);
+    let scoredArticles =
+      articles.length > 0
+        ? filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE)
+        : [];
+    if (articles.length > 0) {
+      printScoringResults(scoredArticles, logger);
+    }
 
-    // Fallback: top-headlines returned 0 relevant results → retry with a keyword search
+    // RSS returned articles but none were relevant: retry with top-headlines before search fallback.
+    if (useRssFeeds && scoredArticles.length === 0) {
+      logger.info(
+        'pipeline',
+        `--- Step 0c: Top-Headlines Fallback (${rssFetchFailed ? 'RSS fetch failed' : 'no relevant articles from RSS'}) ---`
+      );
+      articles = await fetchTopNews(NEWS_CATEGORY);
+      logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
+      scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+      printScoringResults(scoredArticles, logger);
+    }
+
+    // Fallback: current source yielded 0 relevant results → retry with a keyword search
     if (scoredArticles.length === 0) {
-      logger.info('pipeline', '--- Step 0c: Search Fallback (top-headlines yielded no relevant results) ---');
+      logger.info('pipeline', '--- Step 0d: Search Fallback (no relevant results from primary/top-headlines fetch) ---');
       const searchQuery = accountProfile.niche.map(k => k.replace(/-/g, ' ')).join(' OR ');
       logger.info('search-fallback', `Searching GNews with niche keywords: "${searchQuery}"`);
       const searchArticles = await fetchSearchNews(searchQuery, { sortby: 'relevance' });
