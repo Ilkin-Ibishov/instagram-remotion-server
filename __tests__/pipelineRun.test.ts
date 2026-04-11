@@ -139,7 +139,9 @@ describe('runPipeline', () => {
 
     mockedFetchRssNews.mockRejectedValue(new Error('RSS failed'));
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
-    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedFilterAndRankArticles
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
     mockedGeneratePostContentAI.mockResolvedValue({
       manifest: {
@@ -160,6 +162,42 @@ describe('runPipeline', () => {
     expect(mockedFetchRssNews).toHaveBeenCalledOnce();
     expect(mockedFetchTopNews).toHaveBeenCalledOnce();
     expect(mockedPublishToInstagram).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to GNews top-headlines when RSS returns only irrelevant articles', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFetchTopNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGeneratePostContentAI.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
+        carousel: [],
+      },
+      caption: 'Test caption',
+      hashtags: '#test',
+    } as any);
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
+    } as Response);
+
+    await runPipeline();
+
+    expect(mockedFetchRssNews).toHaveBeenCalledOnce();
+    expect(mockedFetchTopNews).toHaveBeenCalledOnce();
+    expect(mockedFetchSearchNews).not.toHaveBeenCalled();
   });
 
   it('bypasses RSS when USE_RSS_FEEDS is false and uses GNews directly', async () => {
@@ -207,12 +245,13 @@ describe('runPipeline', () => {
     expect(mockedPublishToInstagram).not.toHaveBeenCalled();
   });
 
-  it('uses search fallback when top-headlines yield no relevant articles', async () => {
+  it('uses search fallback when RSS and top-headlines yield no relevant articles', async () => {
     const scoredArticle = { article: mockArticle, score: 15, reasons: ['startup in title'], matchedKeywords: [], scoreBreakdown: { titleMatches: 10, descriptionMatches: 0, baseScore: 5 } };
     mockedFetchRssNews.mockResolvedValue([]);
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
-    // First call (top-headlines) → no results; second call (search fallback) → match
+    // First call (rss results) -> no results; second call (top-headlines) -> no results; third call (search) -> match
     mockedFilterAndRankArticles
+      .mockReturnValueOnce([])
       .mockReturnValueOnce([])
       .mockReturnValueOnce([scoredArticle]);
     mockedFetchSearchNews.mockResolvedValue([mockArticle]);
@@ -238,7 +277,7 @@ describe('runPipeline', () => {
       'technology OR development OR startup',
       { sortby: 'relevance' }
     );
-    // filterAndRankArticles called twice: once for top-headlines, once for search results
-    expect(mockedFilterAndRankArticles).toHaveBeenCalledTimes(2);
+    // filterAndRankArticles called three times: RSS, top-headlines fallback, search fallback
+    expect(mockedFilterAndRankArticles).toHaveBeenCalledTimes(3);
   });
 });

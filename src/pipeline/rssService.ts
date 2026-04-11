@@ -92,8 +92,17 @@ function resolveRssImage(item: RssItem): string | undefined {
   return candidates.find((candidate) => typeof candidate === 'string' && candidate.length > 0);
 }
 
+function stripHtml(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[^;]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeDescription(raw: RssItem): string {
-  const value = raw.contentSnippet || raw.summary || raw.description || raw.content || '';
+  const fallback = stripHtml(raw.summary || raw.description || raw.content || '');
+  const value = raw.contentSnippet || fallback;
   const clipped = value.substring(0, 500).trim();
   if (!clipped) {
     return '';
@@ -256,7 +265,7 @@ async function fetchFeedCached(source: RssSource, logger: Logger): Promise<Sourc
   const ttlSeconds = Number.isFinite(ttlOverride) && ttlOverride > 0 ? ttlOverride : source.cacheTtlSeconds;
   const startedAt = Date.now();
 
-  logger.info('rss-cache', `Starting cache lookup for ${source.id}`, {
+  logger.debug('rss-cache', `Starting cache lookup for ${source.id}`, {
     cacheKey,
     ttlSeconds,
     redisEnabled: Boolean(process.env.REDIS_URL),
@@ -268,7 +277,7 @@ async function fetchFeedCached(source: RssSource, logger: Logger): Promise<Sourc
       const cached = await redis.get(cacheKey);
       if (cached) {
         const cachedArticles = JSON.parse(cached) as NewsArticle[];
-        logger.info('rss-cache', `Cache hit for ${source.id}`, { count: cachedArticles.length, cacheKey });
+        logger.debug('rss-cache', `Cache hit for ${source.id}`, { count: cachedArticles.length, cacheKey });
 
         const newestArticleDate = cachedArticles.reduce<number>((maxDate, article) => {
           const value = new Date(article.publishedAt).getTime();
@@ -293,14 +302,14 @@ async function fetchFeedCached(source: RssSource, logger: Logger): Promise<Sourc
           durationMs: Date.now() - startedAt,
         };
       }
-      logger.info('rss-cache', `Cache miss for ${source.id}`, { cacheKey });
+      logger.debug('rss-cache', `Cache miss for ${source.id}`, { cacheKey });
     } catch (error) {
       logger.warn('rss-cache', `Redis read failed for ${source.id}. Falling back to live fetch.`, {
         error: error instanceof Error ? error.message : error,
       });
     }
   } else {
-    logger.info('rss-cache', `Redis disabled, skipping cache for ${source.id}`);
+    logger.debug('rss-cache', `Redis disabled, skipping cache for ${source.id}`);
   }
 
   logger.info('rss-fetch', `Executing live fetch with retry for ${source.id}`, {
@@ -437,8 +446,9 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
   const allSettledPromise = Promise.allSettled(
     sourceTasks
   );
+  let timeoutId: NodeJS.Timeout | null = null;
   const timeoutPromise = new Promise<PromiseSettledResult<SourceFetchResult>[]>((resolve) => {
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       globalTimeoutTriggered = true;
       logger.warn('rss', 'RSS global timeout reached before all sources settled', {
         globalTimeoutMs: GLOBAL_FETCH_TIMEOUT_MS,
@@ -448,10 +458,14 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
   });
 
   const settledResults = await Promise.race([allSettledPromise, timeoutPromise]);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
   const merged: NewsArticle[] = [];
   let fulfilledSources = 0;
   let rejectedSources = 0;
   let skippedSources = 0;
+  const telemetryTasks: Promise<unknown>[] = [];
 
   for (const result of settledResults) {
     if (result.status === 'fulfilled') {
@@ -466,7 +480,7 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
         fulfilledSources += 1;
       }
 
-      await recordRssSourceTelemetry(
+      telemetryTasks.push(recordRssSourceTelemetry(
         {
           runId,
           sourceId: sourceResult.sourceId,
@@ -481,16 +495,16 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
           errorMessage: sourceResult.errorMessage,
         },
         logger
-      );
+      ));
 
       if (sourceResult.status === 'failed') {
-        await noteSourceFetchFailure(
+        telemetryTasks.push(noteSourceFetchFailure(
           sourceResult.sourceId,
           sourceResult.errorType ?? 'unknown',
           logger
-        );
+        ));
       } else if (sourceResult.status === 'success') {
-        await noteSourceFetchSuccess(sourceResult.sourceId, logger);
+        telemetryTasks.push(noteSourceFetchSuccess(sourceResult.sourceId, logger));
       }
 
       logger.info('rss-source', `Source ${sourceResult.sourceId} completed`, {
@@ -505,6 +519,10 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
     logger.warn('rss', 'Source task failed unexpectedly', {
       reason: result.reason instanceof Error ? result.reason.message : result.reason,
     });
+  }
+
+  if (telemetryTasks.length > 0) {
+    await Promise.allSettled(telemetryTasks);
   }
 
   const deduped = crossSourceDedup(merged, logger);

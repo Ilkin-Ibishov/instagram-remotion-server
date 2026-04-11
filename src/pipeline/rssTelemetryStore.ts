@@ -351,6 +351,17 @@ export async function recordRssRunTelemetry(input: RssRunTelemetryInput, logger?
   }
 }
 
+export async function closeTelemetryPool(): Promise<void> {
+  if (!pool) {
+    return;
+  }
+
+  const activePool = pool;
+  pool = null;
+  schemaInitialized = false;
+  await activePool.end();
+}
+
 export const __testing = {
   classifyRssErrorType,
   keyForConsecutiveFailures,

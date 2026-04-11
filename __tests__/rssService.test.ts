@@ -227,6 +227,72 @@ describe('rssService', () => {
     expect(normalized.publishedAt).toBe('1970-01-01T00:00:00Z');
   });
 
+  it('normalizeItem strips HTML from fallback description fields', () => {
+    const normalized = normalizeItem(
+      {
+        title: 'HTML fallback test',
+        link: 'https://example.com/html',
+        summary: '<p>Hello <a href="https://example.com">world</a>&nbsp;from RSS.</p>',
+        enclosure: { url: 'https://example.com/image.jpg' },
+      },
+      {
+        id: 'x',
+        name: 'X Source',
+        feedUrl: 'https://x.test/feed',
+        niches: ['technology'],
+        cacheTtlSeconds: 900,
+        enabled: true,
+      }
+    );
+
+    expect(normalized.description).toBe('Hello world from RSS.');
+    expect(normalized.description).not.toContain('<');
+  });
+
+  it('normalizeItem resolves image from nested media fields', () => {
+    const normalized = normalizeItem(
+      {
+        title: 'Nested media test',
+        link: 'https://example.com/media',
+        contentSnippet: 'description',
+        mediaContent: { $: { url: 'https://example.com/media-content.jpg' } },
+      },
+      {
+        id: 'x',
+        name: 'X Source',
+        feedUrl: 'https://x.test/feed',
+        niches: ['technology'],
+        cacheTtlSeconds: 900,
+        enabled: true,
+      }
+    );
+
+    expect(normalized.imageUrl).toBe('https://example.com/media-content.jpg');
+  });
+
+  it('normalizeItem truncates long descriptions at sentence boundary', () => {
+    const long = `${'A'.repeat(210)}. ${'B'.repeat(350)}`;
+    const normalized = normalizeItem(
+      {
+        title: 'Sentence boundary test',
+        link: 'https://example.com/long',
+        contentSnippet: long,
+        enclosure: { url: 'https://example.com/image.jpg' },
+      },
+      {
+        id: 'x',
+        name: 'X Source',
+        feedUrl: 'https://x.test/feed',
+        niches: ['technology'],
+        cacheTtlSeconds: 900,
+        enabled: true,
+      }
+    );
+
+    expect(normalized.description.endsWith('.')).toBe(true);
+    expect(normalized.description.length).toBeLessThanOrEqual(500);
+  });
+
   it('jaccard helper returns expected similarity', () => {
     const a = __testing.titleWordSet('OpenAI launches enterprise AI model');
     const b = __testing.titleWordSet('OpenAI launches new enterprise model');
@@ -271,5 +337,39 @@ describe('rssService', () => {
     );
 
     expect(result).toHaveLength(1);
+  });
+
+  it('returns on global timeout when source fetches hang', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.parseURL.mockImplementation(() => new Promise(() => {}));
+
+      const pending = fetchRssNews(['technology']);
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      const result = await pending;
+      expect(result).toEqual([]);
+      expect(mocks.recordRssRunTelemetry).toHaveBeenCalledWith(
+        expect.objectContaining({ globalTimeoutTriggered: true }),
+        expect.anything()
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears global timeout timer when all sources finish before timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.parseURL.mockResolvedValue({ items: [] });
+
+      const pending = fetchRssNews(['technology']);
+      await vi.runAllTimersAsync();
+      await pending;
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

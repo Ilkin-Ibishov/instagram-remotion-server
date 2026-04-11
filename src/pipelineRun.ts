@@ -71,9 +71,7 @@ export async function runPipeline() {
         });
         articles = [];
       }
-    }
-
-    if (!useRssFeeds || articles.length === 0) {
+    } else {
       articles = await fetchTopNews(NEWS_CATEGORY);
       logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
     }
@@ -98,9 +96,18 @@ export async function runPipeline() {
     let scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
     printScoringResults(scoredArticles, logger);
 
+    // RSS returned articles but none were relevant: retry with top-headlines before search fallback.
+    if (useRssFeeds && scoredArticles.length === 0) {
+      logger.info('pipeline', '--- Step 0c: Top-Headlines Fallback (RSS yielded no relevant articles) ---');
+      articles = await fetchTopNews(NEWS_CATEGORY);
+      logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
+      scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+      printScoringResults(scoredArticles, logger);
+    }
+
     // Fallback: current source yielded 0 relevant results → retry with a keyword search
     if (scoredArticles.length === 0) {
-      logger.info('pipeline', '--- Step 0c: Search Fallback (no relevant results from primary fetch) ---');
+      logger.info('pipeline', '--- Step 0d: Search Fallback (no relevant results from primary/top-headlines fetch) ---');
       const searchQuery = accountProfile.niche.map(k => k.replace(/-/g, ' ')).join(' OR ');
       logger.info('search-fallback', `Searching GNews with niche keywords: "${searchQuery}"`);
       const searchArticles = await fetchSearchNews(searchQuery, { sortby: 'relevance' });

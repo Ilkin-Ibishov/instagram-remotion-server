@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
 import type { Server } from 'http';
 import { runScheduledPipeline, type SchedulerOutcome } from './src/pipeline/schedulerRunner';
 import { readScheduleState } from './src/pipeline/scheduleState';
+import { closeTelemetryPool } from './src/pipeline/rssTelemetryStore';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
@@ -466,8 +467,14 @@ function gracefulShutdown(signal: NodeJS.Signals) {
             return;
         }
 
-        console.log('[shutdown] Graceful shutdown complete');
-        process.exit(0);
+        void closeTelemetryPool()
+            .catch((poolError) => {
+                console.error('[shutdown] Error while closing telemetry pool:', poolError);
+            })
+            .finally(() => {
+                console.log('[shutdown] Graceful shutdown complete');
+                process.exit(0);
+            });
     });
 }
 
