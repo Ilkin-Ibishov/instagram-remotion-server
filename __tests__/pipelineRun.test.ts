@@ -140,7 +140,6 @@ describe('runPipeline', () => {
     mockedFetchRssNews.mockRejectedValue(new Error('RSS failed'));
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
     mockedFilterAndRankArticles
-      .mockReturnValueOnce([])
       .mockReturnValueOnce([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
     mockedGeneratePostContentAI.mockResolvedValue({
@@ -249,9 +248,8 @@ describe('runPipeline', () => {
     const scoredArticle = { article: mockArticle, score: 15, reasons: ['startup in title'], matchedKeywords: [], scoreBreakdown: { titleMatches: 10, descriptionMatches: 0, baseScore: 5 } };
     mockedFetchRssNews.mockResolvedValue([]);
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
-    // First call (rss results) -> no results; second call (top-headlines) -> no results; third call (search) -> match
+    // First call (top-headlines) -> no results; second call (search) -> match
     mockedFilterAndRankArticles
-      .mockReturnValueOnce([])
       .mockReturnValueOnce([])
       .mockReturnValueOnce([scoredArticle]);
     mockedFetchSearchNews.mockResolvedValue([mockArticle]);
@@ -277,7 +275,7 @@ describe('runPipeline', () => {
       'technology OR development OR startup',
       { sortby: 'relevance' }
     );
-    // filterAndRankArticles called three times: RSS, top-headlines fallback, search fallback
-    expect(mockedFilterAndRankArticles).toHaveBeenCalledTimes(3);
+    // filterAndRankArticles called twice: top-headlines fallback, then search fallback
+    expect(mockedFilterAndRankArticles).toHaveBeenCalledTimes(2);
   });
 });

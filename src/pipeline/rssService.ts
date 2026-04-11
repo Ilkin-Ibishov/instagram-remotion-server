@@ -95,6 +95,12 @@ function resolveRssImage(item: RssItem): string | undefined {
 function stripHtml(value: string): string {
   return value
     .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/gi, ' ')
     .replace(/&[^;]+;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

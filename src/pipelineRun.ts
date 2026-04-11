@@ -55,6 +55,7 @@ export async function runPipeline() {
   const accountKeywords = getAccountKeywords(accountProfile);
   const useRssFeeds = process.env.USE_RSS_FEEDS !== 'false';
   const batchId = `batch-${Date.now()}`;
+  let rssFetchFailed = false;
   
   try {
     logger.info('pipeline', `--- Step 0: Fetching News (${useRssFeeds ? 'RSS primary + GNews fallback' : `GNews category: ${NEWS_CATEGORY}`}) ---`);
@@ -69,6 +70,7 @@ export async function runPipeline() {
         logger.warn('pipeline', 'RSS fetch failed entirely; falling back to GNews.', {
           error: error instanceof Error ? error.message : error,
         });
+        rssFetchFailed = true;
         articles = [];
       }
     } else {
@@ -93,12 +95,20 @@ export async function runPipeline() {
       explanation: 'Articles must score ≥ this to be selected. Score = keyword matches (weighted by specificity) + 5 base points',
     });
     
-    let scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
-    printScoringResults(scoredArticles, logger);
+    let scoredArticles =
+      articles.length > 0
+        ? filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE)
+        : [];
+    if (articles.length > 0) {
+      printScoringResults(scoredArticles, logger);
+    }
 
     // RSS returned articles but none were relevant: retry with top-headlines before search fallback.
     if (useRssFeeds && scoredArticles.length === 0) {
-      logger.info('pipeline', '--- Step 0c: Top-Headlines Fallback (RSS yielded no relevant articles) ---');
+      logger.info(
+        'pipeline',
+        `--- Step 0c: Top-Headlines Fallback (${rssFetchFailed ? 'RSS fetch failed' : 'no relevant articles from RSS'}) ---`
+      );
       articles = await fetchTopNews(NEWS_CATEGORY);
       logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
       scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);

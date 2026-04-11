@@ -44,6 +44,7 @@ describe('rssService', () => {
     vi.clearAllMocks();
     delete process.env.REDIS_URL;
     delete process.env.RSS_CACHE_TTL_SECONDS;
+    delete process.env.RSS_GLOBAL_TIMEOUT_MS;
     mocks.shouldSkipSourceByCooldown.mockResolvedValue({ shouldSkip: false, cooldownUntil: null });
     mocks.noteSourceFetchSuccess.mockResolvedValue(undefined);
     mocks.noteSourceFetchFailure.mockResolvedValue({ failureCount: 1, cooldownApplied: false, cooldownUntil: null });
@@ -232,7 +233,7 @@ describe('rssService', () => {
       {
         title: 'HTML fallback test',
         link: 'https://example.com/html',
-        summary: '<p>Hello <a href="https://example.com">world</a>&nbsp;from RSS.</p>',
+        summary: '<p>Hello <a href="https://example.com">AT&amp;T</a>&nbsp;from RSS.</p>',
         enclosure: { url: 'https://example.com/image.jpg' },
       },
       {
@@ -245,7 +246,7 @@ describe('rssService', () => {
       }
     );
 
-    expect(normalized.description).toBe('Hello world from RSS.');
+    expect(normalized.description).toBe('Hello AT&T from RSS.');
     expect(normalized.description).not.toContain('<');
   });
 
@@ -342,6 +343,7 @@ describe('rssService', () => {
   it('returns on global timeout when source fetches hang', async () => {
     vi.useFakeTimers();
     try {
+      process.env.RSS_GLOBAL_TIMEOUT_MS = '15000';
       mocks.parseURL.mockImplementation(() => new Promise(() => {}));
 
       const pending = fetchRssNews(['technology']);
