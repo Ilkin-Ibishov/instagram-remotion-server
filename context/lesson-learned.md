@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-13 — Normalize overlength AI fields before strict slide validation
+
+Context: Production scheduler runs started failing when Gemini occasionally returned valid template IDs but text values slightly above per-field limits (for example `CONTENT_STAT_SNAPSHOT.context > 120`).
+Mistake: Treating small length overshoots as hard-fail validation errors caused avoidable pipeline failures even when payload structure and factual content were otherwise usable.
+Correction: Added `normalizeGeneratedPayloadForValidation()` in `src/pipeline/aiService.ts` to trim/clean per-template text fields, cap caption lines/length, and normalize hashtag lists before running existing strict validation.
+
 ### 2026-04-13 — Internal render calls should stay in-process, not loop through localhost HTTP
 
 Context: Production scheduler runs could render all slides but still fail the pipeline with `TypeError: fetch failed` when `pipelineRun.ts` posted to `http://localhost:3000/api/render` and waited on a long-running HTTP response.

@@ -157,6 +157,175 @@ function isQuestion(value: unknown): boolean {
   return typeof value === "string" && value.trim().endsWith("?");
 }
 
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function clampString(value: unknown, maxLength: number): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return normalizeText(value).slice(0, maxLength);
+}
+
+function clampQuestion(value: unknown, maxLength: number): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = clampString(value, maxLength);
+  if (typeof normalized !== "string" || normalized.length === 0 || normalized.endsWith("?")) {
+    return normalized;
+  }
+
+  if (normalized.length === maxLength) {
+    return `${normalized.slice(0, Math.max(0, maxLength - 1))}?`;
+  }
+
+  return `${normalized}?`;
+}
+
+function normalizeSlideDataForTemplate(templateId: string, data: unknown): unknown {
+  if (!isRecord(data)) {
+    return data;
+  }
+
+  if (templateId === "HOOK_A") {
+    return {
+      ...data,
+      headline: clampString(data.headline, 72),
+      subheadline: clampString(data.subheadline, 120),
+    };
+  }
+
+  if (templateId === "CONTENT_LISTICLE") {
+    const normalizedItems = Array.isArray(data.items)
+      ? data.items.map((item) => clampString(item, 60))
+      : data.items;
+    return {
+      ...data,
+      title: clampString(data.title, 76),
+      items: normalizedItems,
+      footnote: clampString(data.footnote, 84),
+    };
+  }
+
+  if (templateId === "CONTENT_GENERIC") {
+    return {
+      ...data,
+      title: clampString(data.title, 76),
+      body: clampString(data.body, 260),
+      highlight: clampString(data.highlight, 110),
+    };
+  }
+
+  if (templateId === "CONTENT_STAT_SNAPSHOT") {
+    return {
+      ...data,
+      kicker: clampString(data.kicker, 36),
+      stat: clampString(data.stat, 24),
+      context: clampString(data.context, 120),
+      takeaway: clampString(data.takeaway, 100),
+    };
+  }
+
+  if (templateId === "CONTENT_MYTH_VS_FACT") {
+    return {
+      ...data,
+      myth: clampString(data.myth, 92),
+      fact: clampString(data.fact, 130),
+      proof: clampString(data.proof, 96),
+    };
+  }
+
+  if (templateId === "CONTENT_VIDEO") {
+    return {
+      ...data,
+      title: clampString(data.title, 76),
+      caption: clampString(data.caption, 120),
+      source: clampString(data.source, 70),
+    };
+  }
+
+  if (templateId === "CTA_FINAL") {
+    return {
+      ...data,
+      callToAction: clampQuestion(data.callToAction, 100),
+      subtext: clampString(data.subtext, 84),
+    };
+  }
+
+  return data;
+}
+
+export function normalizeGeneratedPayloadForValidation(
+  payload: unknown,
+  requiredTemplateSequence: readonly string[]
+): unknown {
+  if (!isRecord(payload) || !isRecord(payload.manifest)) {
+    return payload;
+  }
+
+  const manifest = payload.manifest;
+  const carousel = Array.isArray(manifest.carousel) ? manifest.carousel : manifest.carousel;
+  const normalizedCarousel = Array.isArray(carousel)
+    ? carousel.map((slide, index) => {
+        if (!isRecord(slide)) {
+          return slide;
+        }
+
+        const expectedTemplateId = requiredTemplateSequence[index] ?? slide.templateId;
+        if (slide.templateId !== expectedTemplateId) {
+          return slide;
+        }
+
+        return {
+          ...slide,
+          data: normalizeSlideDataForTemplate(expectedTemplateId, slide.data),
+        };
+      })
+    : carousel;
+
+  let normalizedCaption = payload.caption;
+  if (typeof payload.caption === "string") {
+    const lines = payload.caption
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 8);
+    normalizedCaption = lines.join("\n").slice(0, 900);
+  }
+
+  let normalizedHashtags = payload.hashtags;
+  if (typeof payload.hashtags === "string") {
+    const seen = new Set<string>();
+    const tags = payload.hashtags
+      .split(/\s+/)
+      .map((tag) => tag.trim())
+      .filter((tag) => /^#[A-Za-z0-9_]+$/.test(tag))
+      .filter((tag) => {
+        if (seen.has(tag)) {
+          return false;
+        }
+        seen.add(tag);
+        return true;
+      })
+      .slice(0, 12);
+    normalizedHashtags = tags.join(" ");
+  }
+
+  return {
+    ...payload,
+    manifest: {
+      ...manifest,
+      carousel: normalizedCarousel,
+    },
+    caption: normalizedCaption,
+    hashtags: normalizedHashtags,
+  };
+}
+
 export function sanitizeForPrompt(value: string | undefined | null, maxLength = 500): string {
   if (!value) {
     return "";
@@ -855,7 +1024,8 @@ RETURN ONLY JSON.`;
       throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseErrorMessage}`);
     }
 
-    return validateGeneratedContent(json, requiredTemplateSequence);
+    const normalized = normalizeGeneratedPayloadForValidation(json, requiredTemplateSequence);
+    return validateGeneratedContent(normalized, requiredTemplateSequence);
   } catch (error) {
     aiLogger.error('ai-service', 'Gemini generation error', error);
     throw error;
