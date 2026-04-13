@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, Img } from 'remotion';
+import { useCurrentFrame, interpolate, Img, useVideoConfig } from 'remotion';
 import { Zap } from 'lucide-react';
 
 export default function HookA({
@@ -10,7 +10,7 @@ export default function HookA({
     branding: any;
 }) {
     const frame = useCurrentFrame();
-    const fps = 30;
+    const { fps } = useVideoConfig();
 
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';

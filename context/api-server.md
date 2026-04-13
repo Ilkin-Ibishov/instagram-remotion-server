@@ -53,6 +53,7 @@ Most text fields now also enforce upper bounds to reduce render overflow risk.
 - Selects composition id **`Slide`** via `selectComposition`.
 - **PNG:** `renderStill` — last frame (`composition.durationInFrames - 1`), `scale: 2`, Chromium options (no-sandbox, angle GL, etc.).
 - **MP4:** `renderMedia` — `h264`, per-slide `concurrency` defaults to `1` (override via `RENDER_CONCURRENCY`), same Chromium options.
+- **Render timeout:** both PNG and MP4 use `RENDER_TIMEOUT_MS` (default `60000`, valid range `10000..600000`).
 - Slides are rendered **sequentially** within a batch to reduce Chromium/x264 memory pressure.
 
 ### Output storage and URLs

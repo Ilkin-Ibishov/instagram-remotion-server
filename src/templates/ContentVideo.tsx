@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, Video, Img } from 'remotion';
+import { useCurrentFrame, interpolate, Video, Img, useVideoConfig } from 'remotion';
 import { Play } from 'lucide-react';
 
 function VideoWithFallback({
@@ -82,7 +82,7 @@ export default function ContentVideo({
     branding: any;
 }) {
     const frame = useCurrentFrame();
-    const fps = 30;
+    const { fps } = useVideoConfig();
 
     const title = data.title || 'Video Details';
 

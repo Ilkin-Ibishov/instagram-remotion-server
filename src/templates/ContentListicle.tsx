@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, spring } from 'remotion';
+import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
 
 /**
  * CONTENT_LISTICLE — designed for medium-length text with numbered items.
@@ -19,7 +19,7 @@ export default function ContentListicle({
     branding: any;
 }) {
     const frame = useCurrentFrame();
-    const fps = 30;
+    const { fps } = useVideoConfig();
 
     const titleY = interpolate(frame, [0, 24], [12, 0], {
         extrapolateLeft: 'clamp',

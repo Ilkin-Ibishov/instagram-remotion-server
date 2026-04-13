@@ -252,6 +252,7 @@ export async function renderManifest(
   const format = input.format === 'mp4' ? 'mp4' : 'png';
   const batchId = providedBatchId ?? crypto.randomBytes(4).toString('hex');
   const outputUrls: string[] = [];
+  const renderTimeoutMs = parseIntWithFallback('RENDER_TIMEOUT_MS', 60_000, 10_000, 600_000);
 
   for (const [i, slide] of input.carousel.entries()) {
     console.log(`[render] slide ${i + 1}/${input.carousel.length} (${slide.templateId}, ${format})`);
@@ -281,7 +282,7 @@ export async function renderManifest(
         outputLocation: filepath,
         inputProps,
         concurrency: parseIntWithFallback('RENDER_CONCURRENCY', 1, 1, 8),
-        timeoutInMilliseconds: 60_000,
+        timeoutInMilliseconds: renderTimeoutMs,
         x264Preset: 'veryfast',
         chromiumOptions: {
           gl: 'angle',
@@ -301,7 +302,7 @@ export async function renderManifest(
         output: filepath,
         inputProps,
         frame: composition.durationInFrames - 1,
-        timeoutInMilliseconds: 60_000,
+        timeoutInMilliseconds: renderTimeoutMs,
         chromiumOptions: {
           gl: 'angle',
           // @ts-ignore - Remotion typings don't expose args but puppeteer accepts it

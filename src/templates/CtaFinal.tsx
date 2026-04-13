@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, spring } from 'remotion';
+import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 
 export default function CtaFinal({
@@ -10,7 +10,7 @@ export default function CtaFinal({
     branding: any;
 }) {
     const frame = useCurrentFrame();
-    const fps = 30;
+    const { fps } = useVideoConfig();
 
     const callToAction = data.callToAction || 'Follow for More';
     const subtext = data.subtext || '';

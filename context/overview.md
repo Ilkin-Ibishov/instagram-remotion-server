@@ -37,7 +37,7 @@ Current pipeline behavior is **RSS-first ingestion with GNews fallback** for art
 ## Single composition
 
 - **ID:** `Slide` (must match `COMPOSITION_ID` in `server.ts`).
-- **Canvas:** 1080×1080, 30 fps, duration defaults to 720 frames (24s) and is configurable via `COMPOSITION_DURATION_SECONDS`.
+- **Canvas:** 1080×1080, fps is configurable via `COMPOSITION_FPS` (default 30), and duration is configurable via `COMPOSITION_DURATION_SECONDS` (frames = seconds × fps).
 
 ## Related docs
 

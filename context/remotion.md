@@ -7,8 +7,8 @@
   - **`id`:** `"Slide"` — must stay in sync with `COMPOSITION_ID` in `server.ts`.
   - **`component`:** `SlideComposition`
   - **Dimensions:** 1080×1080
-  - **`fps`:** 30
-  - **`durationInFrames`:** `COMPOSITION_DURATION_SECONDS * 30` (default 720 / 24 seconds)
+  - **`fps`:** `COMPOSITION_FPS` (default `30`, valid range `1..120`)
+  - **`durationInFrames`:** `COMPOSITION_DURATION_SECONDS * COMPOSITION_FPS` (default 720 / 24 seconds)
   - **`defaultProps`:** Example `templateId`, `data`, `branding` for Studio preview
 
 ## Slide router
@@ -32,5 +32,5 @@
 ## Animation conventions
 
 - Templates use **`useCurrentFrame`**, **`interpolate`**, and sometimes **`spring`** / **`Video`** / **`Img`** from `remotion`.
-- Timing assumes **30 fps** unless a template defines its own constant.
+- Timing should use `useVideoConfig().fps` so animation pacing stays consistent when `COMPOSITION_FPS` changes.
 - For MP4 posts, frame 0 must show readable foreground content (text or card UI) and should not start from fully black/fully transparent states, because Instagram grid previews frequently use the first frame as the visible thumbnail.
