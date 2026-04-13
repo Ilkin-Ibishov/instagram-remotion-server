@@ -9,6 +9,7 @@ import type { NewsArticle, PublishablePost } from './pipeline/types';
 import path from 'path';
 import Logger from './utils/logger';
 import { closeTelemetryPool } from './pipeline/rssTelemetryStore';
+import { renderManifest, validateRenderManifest, type RenderManifestInput } from './render/renderService';
 import * as dotenv from 'dotenv';
 import { pathToFileURL } from 'url';
 
@@ -19,33 +20,23 @@ const NEWS_CATEGORY = process.env.NEWS_CATEGORY || 'technology';
 const MIN_RELEVANCE_SCORE = parseInt(process.env.MIN_RELEVANCE_SCORE || '10', 10);
 
 /**
- * Renders the given manifest by making a local HTTP request to the Remotion server.
- * Sends format parameter to control PNG or MP4 output.
- * Returns an array of relative paths from the server response.
+ * Renders the given manifest in-process using the shared render service.
+ * Returns an array of relative API asset paths.
  */
 async function renderMedia(manifest: any, format: string = 'mp4'): Promise<string[]> {
   const logger = new Logger();
-  logger.info('render', `Sending manifest to local Remotion server for rendering (format: ${format})`);
+  logger.info('render', `Rendering manifest in-process (format: ${format})`);
 
-  const response = await fetch('http://localhost:3000/api/render', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...manifest,
-      format: format, // Pass format to server for MP4 or PNG rendering
-    }),
+  const validation = validateRenderManifest({
+    ...manifest,
+    format,
   });
 
-  if (!response.ok) {
-    throw new Error(`Render failed: ${await response.text()}`);
+  if (validation.error || !validation.normalized) {
+    throw new Error(`Render failed: ${validation.error ?? 'invalid manifest format'}`);
   }
 
-  const result = await response.json();
-
-  if (!result.success || !result.images) {
-    throw new Error('Render response format is invalid');
-  }
-
+  const result = await renderManifest(validation.normalized as RenderManifestInput);
   return result.images;
 }
 
@@ -235,7 +226,6 @@ export async function runPipeline(signal?: AbortSignal) {
 }
 
 // Run the pipeline when executed directly from CLI.
-// NOTE: Make sure `npm run start` is running in another terminal so the server on port 3000 takes the render request.
 const isDirectExecution = process.argv[1]
   ? import.meta.url === pathToFileURL(process.argv[1]).href
   : false;

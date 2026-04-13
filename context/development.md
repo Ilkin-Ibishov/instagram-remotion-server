@@ -38,6 +38,7 @@ npm run test:integration
 - **`GEMINI_TIMEOUT_MS`** controls the max wait time for a single Gemini generation call in `aiService.ts` (default: `60000`, minimum: `1`). Requests exceeding this budget fail with a descriptive timeout error instead of hanging indefinitely.
 - **`CONTENT_INTENT`** steers AI template sequencing by goal in `aiService.ts`: `balanced` (default), `educate`, `debate`, `newsflash`, or `visual_proof`.
 - **`SERVER_MODE`** is set internally by `server.ts` for long-lived API/scheduler runs so shared resources remain available between requests. CLI execution via `pipelineRun.ts` leaves this unset and closes RSS telemetry pool on exit.
+- `pipelineRun.ts` now renders via shared in-process logic (`src/render/renderService.ts`) instead of calling `http://localhost:3000/api/render`, so standalone pipeline execution no longer depends on a separate local API server for rendering.
 - Chrome cleanup tuning in `server.ts` (optional):
 	- **`CHROME_CLEANUP_INTERVAL_MS`** (default: `3600000` = 1 hour)
 	- **`CHROME_CLEANUP_RETRIES`** (default: `3` retries after the initial cleanup attempt)

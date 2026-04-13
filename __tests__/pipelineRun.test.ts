@@ -48,6 +48,11 @@ vi.mock('../src/pipeline/aiService', () => ({
   generatePostContentAI: vi.fn(),
 }));
 
+vi.mock('../src/render/renderService', () => ({
+  renderManifest: vi.fn(),
+  validateRenderManifest: vi.fn((payload: unknown) => ({ error: null, normalized: payload })),
+}));
+
 import { runPipeline } from '../src/pipelineRun';
 import { publishToInstagram } from '../src/automation/instagramPublisher';
 import { fetchTopNews, fetchSearchNews } from '../src/pipeline/newsService';
@@ -55,6 +60,7 @@ import { fetchRssNews } from '../src/pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle } from '../src/pipeline/newsFiltering';
 import { loadAccountProfile, getAccountKeywords } from '../src/pipeline/accountProfile';
 import { generateContent } from '../src/pipeline/contentGenerator';
+import { renderManifest } from '../src/render/renderService';
 
 const mockedFetchTopNews = vi.mocked(fetchTopNews);
 const mockedFetchSearchNews = vi.mocked(fetchSearchNews);
@@ -65,6 +71,7 @@ const mockedLoadAccountProfile = vi.mocked(loadAccountProfile);
 const mockedGetAccountKeywords = vi.mocked(getAccountKeywords);
 const mockedPublishToInstagram = vi.mocked(publishToInstagram);
 const mockedGenerateContent = vi.mocked(generateContent);
+const mockedRenderManifest = vi.mocked(renderManifest);
 
 describe('runPipeline', () => {
   const mockArticle = {
@@ -93,6 +100,7 @@ describe('runPipeline', () => {
     mockedFetchRssNews.mockResolvedValue([]);
     // Default: search fallback also returns nothing (overridden per test as needed)
     mockedFetchSearchNews.mockResolvedValue([]);
+    mockedRenderManifest.mockResolvedValue({ images: ['/api/renders/render-test-0.png'], batchId: 'render-test' } as any);
   });
 
   it('uses RSS as primary source when available and does not call GNews top fetch', async () => {
@@ -116,15 +124,11 @@ describe('runPipeline', () => {
       hashtags: '#test #developers #automation',
     } as any);
 
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
-    } as Response);
-
     await runPipeline();
 
     expect(mockedFetchRssNews).toHaveBeenCalledOnce();
     expect(mockedFetchTopNews).not.toHaveBeenCalled();
+    expect(mockedRenderManifest).toHaveBeenCalledOnce();
     expect(mockedPublishToInstagram).toHaveBeenCalledOnce();
   });
 
@@ -150,11 +154,6 @@ describe('runPipeline', () => {
       caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
       hashtags: '#test #developers #automation',
     } as any);
-
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
-    } as Response);
 
     await runPipeline();
 
@@ -187,11 +186,6 @@ describe('runPipeline', () => {
       hashtags: '#test #developers #automation',
     } as any);
 
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
-    } as Response);
-
     await runPipeline();
 
     expect(mockedFetchRssNews).toHaveBeenCalledOnce();
@@ -220,11 +214,6 @@ describe('runPipeline', () => {
       caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
       hashtags: '#test #developers #automation',
     } as any);
-
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
-    } as Response);
 
     await runPipeline();
 
@@ -262,12 +251,6 @@ describe('runPipeline', () => {
       caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
       hashtags: '#test #developers #automation',
     });
-
-    // render + publish are not the focus here — mock them to avoid errors
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, images: ['/tmp/renders/img.png'] }),
-    } as Response);
 
     await runPipeline().catch(() => {}); // may fail at publish step — that's fine
 

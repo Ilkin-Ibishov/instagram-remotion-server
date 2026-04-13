@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-13 — Internal render calls should stay in-process, not loop through localhost HTTP
+
+Context: Production scheduler runs could render all slides but still fail the pipeline with `TypeError: fetch failed` when `pipelineRun.ts` posted to `http://localhost:3000/api/render` and waited on a long-running HTTP response.
+Mistake: Treating in-process rendering as a network call introduced transport-level timeout/connection failure risk inside the same service, causing false pipeline failures before publish.
+Correction: Moved pipeline rendering to shared in-process logic in `src/render/renderService.ts` and made both `server.ts` (`POST /api/render`) and `src/pipelineRun.ts` use that shared service so internal runs no longer depend on loopback HTTP.
+
 ### 2026-04-13 — Random template sequencing should be steerable by content intent
 
 Context: After adding more middle-slide templates, fully random sequence selection made narrative pacing inconsistent between runs.
