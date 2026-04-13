@@ -70,6 +70,7 @@ function toState(row: any): ScheduleState {
 
 export async function getOrCreateScheduleState(accountId: string, now: Date): Promise<ScheduleState> {
   await ensureSchema();
+  const safeAccountId = accountId.replace(/\0/g, '');
 
   const client = await getPool().connect();
   try {
@@ -80,7 +81,7 @@ export async function getOrCreateScheduleState(accountId: string, now: Date): Pr
       ON CONFLICT (account_id) DO NOTHING
       RETURNING *
       `,
-      [accountId, now.toISOString()]
+      [safeAccountId, now.toISOString()]
     );
 
     if (inserted.rows[0]) {
@@ -89,11 +90,11 @@ export async function getOrCreateScheduleState(accountId: string, now: Date): Pr
 
     const selected = await client.query(
       'SELECT * FROM schedule_state WHERE account_id = $1',
-      [accountId]
+      [safeAccountId]
     );
 
     if (!selected.rows[0]) {
-      throw new Error(`Failed to read schedule state for ${accountId}`);
+      throw new Error(`Failed to read schedule state for ${safeAccountId}`);
     }
 
     return toState(selected.rows[0]);
@@ -103,7 +104,8 @@ export async function getOrCreateScheduleState(accountId: string, now: Date): Pr
 }
 
 export async function shouldRunNow(accountId: string, now: Date): Promise<ShouldRunDecision> {
-  const state = await getOrCreateScheduleState(accountId, now);
+  const safeAccountId = accountId.replace(/\0/g, '');
+  const state = await getOrCreateScheduleState(safeAccountId, now);
 
   if (state.nextRunAt.getTime() > now.getTime()) {
     return {
@@ -121,10 +123,13 @@ export async function shouldRunNow(accountId: string, now: Date): Promise<Should
 
 export async function recordRunSuccess(accountId: string, now: Date, nextRunAt: Date): Promise<ScheduleState> {
   await ensureSchema();
+  const safeAccountId = accountId.replace(/\0/g, '');
 
   const client = await getPool().connect();
   try {
-    const result = await client.query(
+    let result;
+    try {
+      result = await client.query(
       `
       UPDATE schedule_state
       SET
@@ -137,11 +142,22 @@ export async function recordRunSuccess(accountId: string, now: Date, nextRunAt: 
       WHERE account_id = $1
       RETURNING *
       `,
-      [accountId, now.toISOString(), nextRunAt.toISOString()]
-    );
+      [safeAccountId, now.toISOString(), nextRunAt.toISOString()]
+      );
+    } catch (err) {
+      console.error('Postgres query failed in recordRunSuccess', {
+        accountId: safeAccountId,
+        now: now.toISOString(),
+        nextRunAt: nextRunAt.toISOString(),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     if (!result.rows[0]) {
-      throw new Error(`Failed to persist success state for ${accountId}`);
+      const msg = `Failed to persist success state for ${safeAccountId}`;
+      console.error(msg);
+      throw new Error(msg);
     }
 
     return toState(result.rows[0]);
@@ -160,7 +176,13 @@ export async function recordRunFailure(
 
   const client = await getPool().connect();
   try {
-    const result = await client.query(
+    // Sanitize input strings to remove any NUL bytes which Postgres rejects for text types
+    const safeAccountId = accountId.replace(/\0/g, '');
+    const safeErrorMessage = errorMessage ? errorMessage.replace(/\0/g, '') : errorMessage;
+
+    let result;
+    try {
+      result = await client.query(
       `
       UPDATE schedule_state
       SET
@@ -172,11 +194,23 @@ export async function recordRunFailure(
       WHERE account_id = $1
       RETURNING *
       `,
-      [accountId, now.toISOString(), errorMessage, nextRunAt.toISOString()]
+      [safeAccountId, now.toISOString(), safeErrorMessage, nextRunAt.toISOString()]
     );
+    } catch (err) {
+      console.error('Postgres query failed in recordRunFailure', {
+        accountId: safeAccountId,
+        now: now.toISOString(),
+        nextRunAt: nextRunAt.toISOString(),
+        errorMessage: safeErrorMessage,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     if (!result.rows[0]) {
-      throw new Error(`Failed to persist failure state for ${accountId}`);
+      const msg = `Failed to persist failure state for ${safeAccountId}`;
+      console.error(msg);
+      throw new Error(msg);
     }
 
     return toState(result.rows[0]);
@@ -191,12 +225,13 @@ export async function recordRunFailure(
  */
 export async function readScheduleState(accountId: string): Promise<ScheduleState | null> {
   await ensureSchema();
+  const safeAccountId = accountId.replace(/\0/g, '');
 
   const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT * FROM schedule_state WHERE account_id = $1',
-      [accountId]
+      [safeAccountId]
     );
 
     return result.rows[0] ? toState(result.rows[0]) : null;

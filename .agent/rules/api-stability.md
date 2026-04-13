@@ -23,3 +23,4 @@ This rule ensures that the Express server and its rendering pipeline remain stab
 
 - **Headless Chrome**: Remotion uses Chromium. In `server.ts`, ensure `chromiumOptions` include `--no-sandbox` if running in a containerized environment (like Docker).
 - **Concurrency**: Default concurrency is **4**. Adjust based on the available CPU threads in the deployment environment.
+- **Hosted Instagram Session Bootstrap**: `bootstrapInstagramSession()` must preserve hosted deployments that source `storage.json` from `INSTAGRAM_SESSION_B64`. Treat the payload as JSON content, not opaque bytes: accept UTF-8 and UTF-16LE variants, strip NUL bytes, and write normalized UTF-8 so downstream session validation and scheduler logging do not produce malformed text.

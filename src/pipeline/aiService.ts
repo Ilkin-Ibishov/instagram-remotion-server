@@ -68,17 +68,78 @@ const DEFAULT_GEMINI_TIMEOUT_MS = 60000;
 const TEMPLATE_PLANS = [
   ["HOOK_A", "CONTENT_LISTICLE", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_STAT_SNAPSHOT", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_MYTH_VS_FACT", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_VIDEO", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_MYTH_VS_FACT", "CONTENT_STAT_SNAPSHOT", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_STAT_SNAPSHOT", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_MYTH_VS_FACT", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_VIDEO", "CONTENT_GENERIC", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_VIDEO", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_MYTH_VS_FACT", "CONTENT_STAT_SNAPSHOT", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_STAT_SNAPSHOT", "CONTENT_LISTICLE", "CONTENT_MYTH_VS_FACT", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CTA_FINAL"],
   ["HOOK_A", "CONTENT_VIDEO", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
 ] as const;
 
 type TemplatePlan = (typeof TEMPLATE_PLANS)[number];
+
+export type ContentIntent = "balanced" | "educate" | "debate" | "newsflash" | "visual_proof";
+
+function planHasTemplate(plan: TemplatePlan, templateId: string): boolean {
+  return (plan as readonly string[]).includes(templateId);
+}
+
+function resolveIntentPool(intent: ContentIntent): readonly TemplatePlan[] {
+  if (intent === "educate") {
+    return TEMPLATE_PLANS.filter(
+      (plan) =>
+        planHasTemplate(plan, "CONTENT_LISTICLE") ||
+        planHasTemplate(plan, "CONTENT_GENERIC") ||
+        planHasTemplate(plan, "CONTENT_STAT_SNAPSHOT")
+    );
+  }
+
+  if (intent === "debate") {
+    return TEMPLATE_PLANS.filter((plan) => planHasTemplate(plan, "CONTENT_MYTH_VS_FACT"));
+  }
+
+  if (intent === "newsflash") {
+    return TEMPLATE_PLANS.filter(
+      (plan) =>
+        plan.length <= 4 &&
+        (planHasTemplate(plan, "CONTENT_VIDEO") || planHasTemplate(plan, "CONTENT_STAT_SNAPSHOT"))
+    );
+  }
+
+  if (intent === "visual_proof") {
+    return TEMPLATE_PLANS.filter((plan) => planHasTemplate(plan, "CONTENT_VIDEO"));
+  }
+
+  return TEMPLATE_PLANS;
+}
+
+export function resolveContentIntent(raw: string | undefined = process.env.CONTENT_INTENT): ContentIntent {
+  const normalized = (raw || "balanced").toLowerCase().trim().replace(/[-\s]+/g, "_");
+
+  if (normalized === "educate") {
+    return "educate";
+  }
+  if (normalized === "debate") {
+    return "debate";
+  }
+  if (normalized === "newsflash") {
+    return "newsflash";
+  }
+  if (normalized === "visual_proof") {
+    return "visual_proof";
+  }
+
+  return "balanced";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -86,6 +147,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function exceedsMaxLength(value: unknown, max: number): boolean {
+  return typeof value === "string" && value.trim().length > max;
+}
+
+function isQuestion(value: unknown): boolean {
+  return typeof value === "string" && value.trim().endsWith("?");
 }
 
 export function sanitizeForPrompt(value: string | undefined | null, maxLength = 500): string {
@@ -158,12 +227,15 @@ export function resolveSlideBoundsFromEnv(): { minSlides: number; maxSlides: num
 export function buildRequiredTemplateSequence(
   minSlides: number,
   maxSlides: number,
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
+  intent: ContentIntent = "balanced"
 ): TemplatePlan {
-  const candidates = TEMPLATE_PLANS.filter((plan) => plan.length >= minSlides && plan.length <= maxSlides);
-  const pool = candidates.length > 0 ? candidates : TEMPLATE_PLANS;
-  const index = Math.floor(randomFn() * pool.length);
-  return pool[Math.max(0, Math.min(pool.length - 1, index))];
+  const intentPool = resolveIntentPool(intent);
+  const candidates = intentPool.filter((plan) => plan.length >= minSlides && plan.length <= maxSlides);
+  const pool = candidates.length > 0 ? candidates : TEMPLATE_PLANS.filter((plan) => plan.length >= minSlides && plan.length <= maxSlides);
+  const safePool = pool.length > 0 ? pool : TEMPLATE_PLANS;
+  const index = Math.floor(randomFn() * safePool.length);
+  return safePool[Math.max(0, Math.min(safePool.length - 1, index))];
 }
 
 function createSlideTemplateSpec(templateId: string, article: NewsArticle): Record<string, unknown> {
@@ -188,6 +260,23 @@ function createSlideTemplateSpec(templateId: string, article: NewsArticle): Reco
       title: "...",
       body: "...",
       highlight: "...",
+    };
+  }
+
+  if (templateId === "CONTENT_STAT_SNAPSHOT") {
+    return {
+      kicker: "Key signal",
+      stat: "47%",
+      context: "What changed and why this number matters now.",
+      takeaway: "One practical implication for the audience.",
+    };
+  }
+
+  if (templateId === "CONTENT_MYTH_VS_FACT") {
+    return {
+      myth: "Popular but inaccurate claim.",
+      fact: "Article-backed correction.",
+      proof: `Grounded evidence from ${article.source}`,
     };
   }
 
@@ -247,9 +336,13 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
   if (templateId === "HOOK_A") {
     if (!isNonEmptyString(data.headline)) {
       errors.push(`slide[${index}].data.headline must be a non-empty string`);
+    } else if (exceedsMaxLength(data.headline, 72)) {
+      errors.push(`slide[${index}].data.headline must be <= 72 characters`);
     }
     if (!isNonEmptyString(data.subheadline)) {
       errors.push(`slide[${index}].data.subheadline must be a non-empty string`);
+    } else if (exceedsMaxLength(data.subheadline, 120)) {
+      errors.push(`slide[${index}].data.subheadline must be <= 120 characters`);
     }
     const imageUrl = data.imageUrl;
     if (imageUrl !== null && imageUrl !== undefined && typeof imageUrl !== "string") {
@@ -260,30 +353,85 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
   if (templateId === "CONTENT_LISTICLE") {
     if (!isNonEmptyString(data.title)) {
       errors.push(`slide[${index}].data.title must be a non-empty string`);
+    } else if (exceedsMaxLength(data.title, 76)) {
+      errors.push(`slide[${index}].data.title must be <= 76 characters`);
     }
     if (!Array.isArray(data.items) || data.items.length !== 4 || data.items.some((item) => !isNonEmptyString(item))) {
       errors.push(`slide[${index}].data.items must be an array of exactly 4 non-empty strings`);
+    } else if (data.items.some((item) => exceedsMaxLength(item, 60))) {
+      errors.push(`slide[${index}].data.items entries must be <= 60 characters each`);
     }
     if (!isNonEmptyString(data.footnote)) {
       errors.push(`slide[${index}].data.footnote must be a non-empty string`);
+    } else if (exceedsMaxLength(data.footnote, 84)) {
+      errors.push(`slide[${index}].data.footnote must be <= 84 characters`);
     }
   }
 
   if (templateId === "CONTENT_GENERIC") {
     if (!isNonEmptyString(data.title)) {
       errors.push(`slide[${index}].data.title must be a non-empty string`);
+    } else if (exceedsMaxLength(data.title, 76)) {
+      errors.push(`slide[${index}].data.title must be <= 76 characters`);
     }
     if (!isNonEmptyString(data.body)) {
       errors.push(`slide[${index}].data.body must be a non-empty string`);
+    } else if (exceedsMaxLength(data.body, 260)) {
+      errors.push(`slide[${index}].data.body must be <= 260 characters`);
     }
     if (!isNonEmptyString(data.highlight)) {
       errors.push(`slide[${index}].data.highlight must be a non-empty string`);
+    } else if (exceedsMaxLength(data.highlight, 110)) {
+      errors.push(`slide[${index}].data.highlight must be <= 110 characters`);
+    }
+  }
+
+  if (templateId === "CONTENT_STAT_SNAPSHOT") {
+    if (!isNonEmptyString(data.kicker)) {
+      errors.push(`slide[${index}].data.kicker must be a non-empty string`);
+    } else if (exceedsMaxLength(data.kicker, 36)) {
+      errors.push(`slide[${index}].data.kicker must be <= 36 characters`);
+    }
+    if (!isNonEmptyString(data.stat)) {
+      errors.push(`slide[${index}].data.stat must be a non-empty string`);
+    } else if (exceedsMaxLength(data.stat, 24)) {
+      errors.push(`slide[${index}].data.stat must be <= 24 characters`);
+    }
+    if (!isNonEmptyString(data.context)) {
+      errors.push(`slide[${index}].data.context must be a non-empty string`);
+    } else if (exceedsMaxLength(data.context, 120)) {
+      errors.push(`slide[${index}].data.context must be <= 120 characters`);
+    }
+    if (!isNonEmptyString(data.takeaway)) {
+      errors.push(`slide[${index}].data.takeaway must be a non-empty string`);
+    } else if (exceedsMaxLength(data.takeaway, 100)) {
+      errors.push(`slide[${index}].data.takeaway must be <= 100 characters`);
+    }
+  }
+
+  if (templateId === "CONTENT_MYTH_VS_FACT") {
+    if (!isNonEmptyString(data.myth)) {
+      errors.push(`slide[${index}].data.myth must be a non-empty string`);
+    } else if (exceedsMaxLength(data.myth, 92)) {
+      errors.push(`slide[${index}].data.myth must be <= 92 characters`);
+    }
+    if (!isNonEmptyString(data.fact)) {
+      errors.push(`slide[${index}].data.fact must be a non-empty string`);
+    } else if (exceedsMaxLength(data.fact, 130)) {
+      errors.push(`slide[${index}].data.fact must be <= 130 characters`);
+    }
+    if (!isNonEmptyString(data.proof)) {
+      errors.push(`slide[${index}].data.proof must be a non-empty string`);
+    } else if (exceedsMaxLength(data.proof, 96)) {
+      errors.push(`slide[${index}].data.proof must be <= 96 characters`);
     }
   }
 
   if (templateId === "CONTENT_VIDEO") {
     if (!isNonEmptyString(data.title)) {
       errors.push(`slide[${index}].data.title must be a non-empty string`);
+    } else if (exceedsMaxLength(data.title, 76)) {
+      errors.push(`slide[${index}].data.title must be <= 76 characters`);
     }
     if (data.videoUrl !== null && data.videoUrl !== undefined && typeof data.videoUrl !== "string") {
       errors.push(`slide[${index}].data.videoUrl must be string, null, or undefined`);
@@ -293,18 +441,28 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
     }
     if (data.caption !== undefined && data.caption !== null && !isNonEmptyString(data.caption)) {
       errors.push(`slide[${index}].data.caption must be a non-empty string when provided`);
+    } else if (data.caption !== undefined && data.caption !== null && exceedsMaxLength(data.caption, 120)) {
+      errors.push(`slide[${index}].data.caption must be <= 120 characters when provided`);
     }
     if (data.source !== undefined && data.source !== null && !isNonEmptyString(data.source)) {
       errors.push(`slide[${index}].data.source must be a non-empty string when provided`);
+    } else if (data.source !== undefined && data.source !== null && exceedsMaxLength(data.source, 70)) {
+      errors.push(`slide[${index}].data.source must be <= 70 characters when provided`);
     }
   }
 
   if (templateId === "CTA_FINAL") {
     if (!isNonEmptyString(data.callToAction)) {
       errors.push(`slide[${index}].data.callToAction must be a non-empty string`);
+    } else if (!isQuestion(data.callToAction)) {
+      errors.push(`slide[${index}].data.callToAction must end with a question mark`);
+    } else if (exceedsMaxLength(data.callToAction, 100)) {
+      errors.push(`slide[${index}].data.callToAction must be <= 100 characters`);
     }
     if (!isNonEmptyString(data.subtext)) {
       errors.push(`slide[${index}].data.subtext must be a non-empty string`);
+    } else if (exceedsMaxLength(data.subtext, 84)) {
+      errors.push(`slide[${index}].data.subtext must be <= 84 characters`);
     }
   }
 
@@ -367,10 +525,31 @@ function validateGeneratedContent(payload: unknown, requiredTemplateSequence: re
 
   if (!isNonEmptyString(caption)) {
     validationErrors.push("caption must be a non-empty string");
+  } else {
+    const captionLines = caption.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (captionLines.length < 4 || captionLines.length > 8) {
+      validationErrors.push("caption must contain 4-8 non-empty lines");
+    }
+    if (caption.length < 80 || caption.length > 900) {
+      validationErrors.push("caption must be between 80 and 900 characters");
+    }
   }
 
   if (!isNonEmptyString(hashtags)) {
     validationErrors.push("hashtags must be a non-empty string");
+  } else {
+    const hashtagList = hashtags.split(/\s+/).filter(Boolean);
+    const unique = new Set(hashtagList);
+    const validHashtags = hashtagList.every((tag) => /^#[A-Za-z0-9_]+$/.test(tag));
+    if (hashtagList.length < 8 || hashtagList.length > 12) {
+      validationErrors.push("hashtags must contain 8-12 tags");
+    }
+    if (!validHashtags) {
+      validationErrors.push("hashtags must use Instagram-safe characters only");
+    }
+    if (unique.size !== hashtagList.length) {
+      validationErrors.push("hashtags must be unique");
+    }
   }
 
   if (validationErrors.length > 0) {
@@ -402,8 +581,9 @@ export async function generatePostContentAI(
 
   const account = accountProfile || brandConfig.accountProfile;
   const { minSlides, maxSlides } = resolveSlideBoundsFromEnv();
+  const contentIntent = resolveContentIntent();
   const geminiTimeoutMs = resolveGeminiTimeoutMs();
-  const requiredTemplateSequence = buildRequiredTemplateSequence(minSlides, maxSlides);
+  const requiredTemplateSequence = buildRequiredTemplateSequence(minSlides, maxSlides, Math.random, contentIntent);
   const outputExample = buildPromptOutputExample(requiredTemplateSequence, article);
   const sanitizedHandle = sanitizeForPrompt(account.handle, 50);
   const sanitizedDisplayName = sanitizeForPrompt(account.displayName, 100);
@@ -450,6 +630,11 @@ BUT ALSO:
 
 ## CONTENT STRATEGY
 
+### CONTENT GOAL
+
+- Target intent: ${contentIntent}
+- Adapt angle and pacing to this goal while keeping all factual constraints
+
 ## HOOK PATTERNS (MANDATORY)
 
 Use ONE of these styles:
@@ -484,37 +669,45 @@ Rules:
 
 ---
 
-### SLIDE 2 - TENSION
-## SLIDE 2 STRUCTURE
+## TEMPLATE ROLE RULES (MANDATORY)
 
-Lines MUST follow:
+For every middle slide, use the template's role and field limits:
 
-1. Situation
-2. Problem
-3. Escalation
-4. Consequence
+1. CONTENT_LISTICLE
+- Role: tension breakdown in 4 beats
+- title <= 76 chars
+- items = exactly 4 lines, each <= 60 chars
+- footnote <= 84 chars, include source context
 
-Rules:
-- Each line must add new tension
-- Avoid repetition
-- Avoid generic phrasing
-- Max 4 lines, <= 10 words each
+2. CONTENT_GENERIC
+- Role: explanation + implication
+- title <= 76 chars
+- body <= 260 chars (no paragraph wall)
+- highlight <= 110 chars (memorable takeaway)
 
----
+3. CONTENT_STAT_SNAPSHOT
+- Role: credibility anchor with a concrete metric or directional signal
+- kicker <= 36 chars
+- stat <= 24 chars
+- context <= 120 chars
+- takeaway <= 100 chars
 
-### SLIDE 3 - PAYOFF
-- ABSOLUTELY NO long paragraphs
-- Max 2-3 short lines OR 2 sentences
-- Prefer punchlines over explanations
-- If text is longer than 2 lines -> force shorten
-- Must feel sharp and memorable
+4. CONTENT_MYTH_VS_FACT
+- Role: challenge assumption, then correct it
+- myth <= 92 chars
+- fact <= 130 chars
+- proof <= 96 chars
 
----
+5. CONTENT_VIDEO
+- Role: visual proof or eyewitness context
+- title <= 76 chars
+- caption <= 120 chars (optional)
+- source <= 70 chars (optional)
 
-### SLIDE 4 - CTA
-- Must provoke opinion
-- MUST be a question
+CTA_FINAL rules:
+- callToAction MUST be a question and end with "?"
 - No generic "follow for more"
+- subtext should invite interaction in plain language
 
 ---
 

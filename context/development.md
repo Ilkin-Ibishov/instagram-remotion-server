@@ -36,6 +36,7 @@ npm run test:integration
 
 - **`RENDER_DIR`** in `server.ts` is set to **`/tmp/renders`**. On **Linux/macOS** this is standard. On **Windows**, absolute POSIX-style paths can behave differently depending on Node version and environment; validate output directory when deploying to Windows or use a cross-platform `path.join` + `os.tmpdir()` if you change this in code.
 - **`GEMINI_TIMEOUT_MS`** controls the max wait time for a single Gemini generation call in `aiService.ts` (default: `60000`, minimum: `1`). Requests exceeding this budget fail with a descriptive timeout error instead of hanging indefinitely.
+- **`CONTENT_INTENT`** steers AI template sequencing by goal in `aiService.ts`: `balanced` (default), `educate`, `debate`, `newsflash`, or `visual_proof`.
 - **`SERVER_MODE`** is set internally by `server.ts` for long-lived API/scheduler runs so shared resources remain available between requests. CLI execution via `pipelineRun.ts` leaves this unset and closes RSS telemetry pool on exit.
 - Chrome cleanup tuning in `server.ts` (optional):
 	- **`CHROME_CLEANUP_INTERVAL_MS`** (default: `3600000` = 1 hour)
@@ -97,7 +98,7 @@ Optional infrastructure:
 
 - `DATABASE_URL` enables durable RSS telemetry persistence in Postgres (`rss_source_telemetry`, `rss_run_telemetry`)
 - `REDIS_URL` enables source-health cooldown state (`rss:health:*` keys)
-- `INSTAGRAM_SESSION_B64` can supply Playwright storage state as base64; `server.ts` decodes it to `storage.json` at startup for hosted deployments
+- `INSTAGRAM_SESSION_B64` can supply Playwright storage state as base64; `server.ts` validates the decoded payload as JSON, accepts UTF-8 or UTF-16LE encodings, strips embedded NULs, and writes normalized UTF-8 to `storage.json` at startup for hosted deployments
 
 ## Railway (CLI + MCP)
 

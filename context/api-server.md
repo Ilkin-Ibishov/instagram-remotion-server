@@ -5,6 +5,7 @@
 - **`server.ts`** exports `app` (Express) and `startServer()`.
 - Server listens on **port 3000**, host **`0.0.0.0`**.
 - **`NODE_ENV === 'test'`** or **`VITEST`** skips `startServer()` so tests can import `app` without binding the port.
+- On startup, **`bootstrapInstagramSession()`** can decode **`INSTAGRAM_SESSION_B64`** into `storage.json` for hosted deployments. The bootstrap path now accepts either UTF-8 JSON or UTF-16LE JSON payloads, removes embedded NUL characters, and writes normalized UTF-8 JSON so Playwright session validation reads a valid file.
 
 ## Bundle cache
 
@@ -39,7 +40,12 @@ Current per-template required fields:
 - `HOOK_A`: `headline`, `subheadline` (non-empty strings), `imageUrl` (string/null/undefined)
 - `CONTENT_LISTICLE`: `title`, `footnote` (non-empty strings), `items` (exactly 4 non-empty strings)
 - `CONTENT_GENERIC`: `title`, `body`, `highlight` (non-empty strings)
-- `CTA_FINAL`: `callToAction`, `subtext` (non-empty strings)
+- `CONTENT_STAT_SNAPSHOT`: `kicker`, `stat`, `context`, `takeaway` (non-empty strings)
+- `CONTENT_MYTH_VS_FACT`: `myth`, `fact`, `proof` (non-empty strings)
+- `CONTENT_VIDEO`: `title` (non-empty), `videoUrl`/`imageUrl` (string/null/undefined), optional `caption` and `source` (non-empty when provided)
+- `CTA_FINAL`: `callToAction`, `subtext` (non-empty strings), with `callToAction` ending in `?`
+
+Most text fields now also enforce upper bounds to reduce render overflow risk.
 
 ### Render behavior
 
@@ -78,6 +84,7 @@ Scheduler endpoint for Railway cron ticks. This endpoint is separate from the re
 - Pipeline article sourcing is RSS-first (`src/pipeline/rssService.ts`) with GNews fallback behavior in `src/pipelineRun.ts`.
 - RSS source-health cooldowns are tracked in Redis and RSS run/source telemetry is best-effort persisted when `DATABASE_URL` is set.
 - Performs Instagram session preflight before execution.
+- Failure-state persistence sanitizes scheduler strings before Postgres writes so malformed upstream payloads do not propagate NUL bytes into text columns.
 - If `SCHEDULE_RUN_SECRET` is configured, request must include header `x-scheduler-secret` with matching value.
 
 ### Response shape

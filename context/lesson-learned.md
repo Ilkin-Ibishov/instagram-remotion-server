@@ -24,6 +24,24 @@ Correction: …
 
 ## Entries
 
+### 2026-04-13 — Random template sequencing should be steerable by content intent
+
+Context: After adding more middle-slide templates, fully random sequence selection made narrative pacing inconsistent between runs.
+Mistake: Treating all valid template plans as equally suitable regardless of post goal creates unnecessary variability in storytelling quality.
+Correction: Added `CONTENT_INTENT`-aware sequence pools in `src/pipeline/aiService.ts` (`balanced`, `educate`, `debate`, `newsflash`, `visual_proof`) and covered normalization + intent-specific selection behavior in `__tests__/aiTemplateSequence.test.ts`.
+
+### 2026-04-13 — Carousel quality improves when template roles are explicit and validated in both AI + API paths
+
+Context: Template/content audit showed that prompt-only instructions were not enough to prevent generic middle slides or weak CTA copy.
+Mistake: Keeping middle-slide intent implicit (and only loosely validated) allowed structurally valid but low-retention output to pass into rendering.
+Correction: Added role-based middle templates (`CONTENT_STAT_SNAPSHOT`, `CONTENT_MYTH_VS_FACT`), expanded sequence plans, and enforced per-template text limits plus CTA question validation in both `src/pipeline/aiService.ts` and `server.ts` so generation and render validation stay aligned.
+
+### 2026-04-13 — Hosted session bootstrap must normalize UTF-16LE secrets before writing storage.json
+
+Context: Railway production scheduler runs started failing with `Unexpected token` JSON parse errors from `storage.json`, followed by Postgres `invalid byte sequence for encoding "UTF8": 0x00` errors during failure-state persistence.
+Mistake: Decoding `INSTAGRAM_SESSION_B64` straight to raw bytes assumed the secret always contained UTF-8 JSON, but the production value was UTF-16LE-style JSON with embedded NUL bytes.
+Correction: Updated `bootstrapInstagramSession()` in `server.ts` to validate and normalize the base64 payload as JSON, accepting UTF-8 or UTF-16LE input, stripping NULs, and always writing UTF-8 JSON to `storage.json`. Kept `scheduleState` string sanitization as a defensive guard and added regression coverage in `__tests__/server.test.ts`.
+
 ### 2026-04-12 — AI output should pass a lightweight quality gate before render and publish, not just schema validation
 
 Context: Audit task BIZ-06 reviewed why the pipeline would publish any structurally valid Gemini output regardless of engagement-readiness or obvious weakness.

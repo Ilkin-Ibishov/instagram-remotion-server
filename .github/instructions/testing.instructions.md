@@ -162,6 +162,8 @@ it('should return 202 and queue async render when webhookUrl is provided', async
 
 **Every new API parameter or endpoint must have corresponding test cases.**
 
+When startup helpers in `server.ts` change, add focused tests for those helpers in `__tests__/server.test.ts` rather than relying on scheduler or Playwright failures to expose regressions.
+
 ### Checklist for New Features
 
 - [ ] Unit test for valid input
@@ -170,6 +172,7 @@ it('should return 202 and queue async render when webhookUrl is provided', async
 - [ ] Integration test (if endpoint behavior depends on complex logic)
 - [ ] Error handling test (500, 503, etc.)
 - [ ] Documentation in `context/api-server.md`
+- [ ] For `bootstrapInstagramSession()` changes, direct coverage for encoding/normalization paths (for example UTF-8 vs UTF-16LE base64 session payloads)
 
 Example: Adding a `quality` parameter to `/api/render`
 

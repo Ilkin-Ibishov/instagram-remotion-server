@@ -16,6 +16,32 @@ import { closeTelemetryPool } from './src/pipeline/rssTelemetryStore';
 import { closeRedisClient } from './src/utils/redisClient';
 import { parseEnvInt } from './src/utils/env';
 
+function tryParseJson(value: string): boolean {
+    try {
+        JSON.parse(value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function decodeInstagramSessionJson(sessionBase64: string): string {
+    const rawBuffer = Buffer.from(sessionBase64.trim(), 'base64');
+
+    const utf8Candidate = rawBuffer.toString('utf-8').replace(/\u0000/g, '').trim();
+    if (utf8Candidate && tryParseJson(utf8Candidate)) {
+        return utf8Candidate;
+    }
+
+    const utf16Candidate = rawBuffer.toString('utf16le').replace(/\u0000/g, '').trim();
+    if (utf16Candidate && tryParseJson(utf16Candidate)) {
+        console.warn('[startup] INSTAGRAM_SESSION_B64 looked like UTF-16LE; normalized to UTF-8 JSON');
+        return utf16Candidate;
+    }
+
+    throw new Error('INSTAGRAM_SESSION_B64 is not valid JSON in UTF-8 or UTF-16LE');
+}
+
 export function bootstrapInstagramSession(
     sessionBase64 = process.env.INSTAGRAM_SESSION_B64,
     storageFilePath = path.join(process.cwd(), 'storage.json')
@@ -25,9 +51,16 @@ export function bootstrapInstagramSession(
         return false;
     }
 
-    fs.writeFileSync(storageFilePath, Buffer.from(sessionBase64.trim(), 'base64'));
-    console.log('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
-    return true;
+    try {
+        const normalizedSessionJson = decodeInstagramSessionJson(sessionBase64);
+        fs.writeFileSync(storageFilePath, normalizedSessionJson, 'utf-8');
+        console.log('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[startup] Failed to decode INSTAGRAM_SESSION_B64: ${message}`);
+        return false;
+    }
 }
 
 bootstrapInstagramSession();
@@ -379,10 +412,20 @@ function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }
 
+function exceedsMaxLength(value: unknown, max: number): boolean {
+    return typeof value === 'string' && value.trim().length > max;
+}
+
+function isQuestion(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().endsWith('?');
+}
+
 function validateSlideData(templateId: string, data: Record<string, unknown>, index: number): string | null {
     if (templateId === 'HOOK_A') {
         if (!isNonEmptyString(data.headline)) return `slide[${index}].data.headline must be a non-empty string`;
+        if (exceedsMaxLength(data.headline, 72)) return `slide[${index}].data.headline must be <= 72 characters`;
         if (!isNonEmptyString(data.subheadline)) return `slide[${index}].data.subheadline must be a non-empty string`;
+        if (exceedsMaxLength(data.subheadline, 120)) return `slide[${index}].data.subheadline must be <= 120 characters`;
         if (data.imageUrl !== undefined && data.imageUrl !== null && typeof data.imageUrl !== 'string') {
             return `slide[${index}].data.imageUrl must be string, null, or undefined`;
         }
@@ -391,23 +434,80 @@ function validateSlideData(templateId: string, data: Record<string, unknown>, in
 
     if (templateId === 'CONTENT_LISTICLE') {
         if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
+        if (exceedsMaxLength(data.title, 76)) return `slide[${index}].data.title must be <= 76 characters`;
         if (!Array.isArray(data.items) || data.items.length !== 4 || data.items.some((item) => !isNonEmptyString(item))) {
             return `slide[${index}].data.items must be an array of exactly 4 non-empty strings`;
         }
+        if ((data.items as unknown[]).some((item) => exceedsMaxLength(item, 60))) {
+            return `slide[${index}].data.items entries must be <= 60 characters each`;
+        }
         if (!isNonEmptyString(data.footnote)) return `slide[${index}].data.footnote must be a non-empty string`;
+        if (exceedsMaxLength(data.footnote, 84)) return `slide[${index}].data.footnote must be <= 84 characters`;
         return null;
     }
 
     if (templateId === 'CONTENT_GENERIC') {
         if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
+        if (exceedsMaxLength(data.title, 76)) return `slide[${index}].data.title must be <= 76 characters`;
         if (!isNonEmptyString(data.body)) return `slide[${index}].data.body must be a non-empty string`;
+        if (exceedsMaxLength(data.body, 260)) return `slide[${index}].data.body must be <= 260 characters`;
         if (!isNonEmptyString(data.highlight)) return `slide[${index}].data.highlight must be a non-empty string`;
+        if (exceedsMaxLength(data.highlight, 110)) return `slide[${index}].data.highlight must be <= 110 characters`;
+        return null;
+    }
+
+    if (templateId === 'CONTENT_STAT_SNAPSHOT') {
+        if (!isNonEmptyString(data.kicker)) return `slide[${index}].data.kicker must be a non-empty string`;
+        if (exceedsMaxLength(data.kicker, 36)) return `slide[${index}].data.kicker must be <= 36 characters`;
+        if (!isNonEmptyString(data.stat)) return `slide[${index}].data.stat must be a non-empty string`;
+        if (exceedsMaxLength(data.stat, 24)) return `slide[${index}].data.stat must be <= 24 characters`;
+        if (!isNonEmptyString(data.context)) return `slide[${index}].data.context must be a non-empty string`;
+        if (exceedsMaxLength(data.context, 120)) return `slide[${index}].data.context must be <= 120 characters`;
+        if (!isNonEmptyString(data.takeaway)) return `slide[${index}].data.takeaway must be a non-empty string`;
+        if (exceedsMaxLength(data.takeaway, 100)) return `slide[${index}].data.takeaway must be <= 100 characters`;
+        return null;
+    }
+
+    if (templateId === 'CONTENT_MYTH_VS_FACT') {
+        if (!isNonEmptyString(data.myth)) return `slide[${index}].data.myth must be a non-empty string`;
+        if (exceedsMaxLength(data.myth, 92)) return `slide[${index}].data.myth must be <= 92 characters`;
+        if (!isNonEmptyString(data.fact)) return `slide[${index}].data.fact must be a non-empty string`;
+        if (exceedsMaxLength(data.fact, 130)) return `slide[${index}].data.fact must be <= 130 characters`;
+        if (!isNonEmptyString(data.proof)) return `slide[${index}].data.proof must be a non-empty string`;
+        if (exceedsMaxLength(data.proof, 96)) return `slide[${index}].data.proof must be <= 96 characters`;
+        return null;
+    }
+
+    if (templateId === 'CONTENT_VIDEO') {
+        if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
+        if (exceedsMaxLength(data.title, 76)) return `slide[${index}].data.title must be <= 76 characters`;
+        if (data.videoUrl !== null && data.videoUrl !== undefined && typeof data.videoUrl !== 'string') {
+            return `slide[${index}].data.videoUrl must be string, null, or undefined`;
+        }
+        if (data.imageUrl !== null && data.imageUrl !== undefined && typeof data.imageUrl !== 'string') {
+            return `slide[${index}].data.imageUrl must be string, null, or undefined`;
+        }
+        if (data.caption !== undefined && data.caption !== null && !isNonEmptyString(data.caption)) {
+            return `slide[${index}].data.caption must be a non-empty string when provided`;
+        }
+        if (data.caption !== undefined && data.caption !== null && exceedsMaxLength(data.caption, 120)) {
+            return `slide[${index}].data.caption must be <= 120 characters when provided`;
+        }
+        if (data.source !== undefined && data.source !== null && !isNonEmptyString(data.source)) {
+            return `slide[${index}].data.source must be a non-empty string when provided`;
+        }
+        if (data.source !== undefined && data.source !== null && exceedsMaxLength(data.source, 70)) {
+            return `slide[${index}].data.source must be <= 70 characters when provided`;
+        }
         return null;
     }
 
     if (templateId === 'CTA_FINAL') {
         if (!isNonEmptyString(data.callToAction)) return `slide[${index}].data.callToAction must be a non-empty string`;
+        if (!isQuestion(data.callToAction)) return `slide[${index}].data.callToAction must end with a question mark`;
+        if (exceedsMaxLength(data.callToAction, 100)) return `slide[${index}].data.callToAction must be <= 100 characters`;
         if (!isNonEmptyString(data.subtext)) return `slide[${index}].data.subtext must be a non-empty string`;
+        if (exceedsMaxLength(data.subtext, 84)) return `slide[${index}].data.subtext must be <= 84 characters`;
         return null;
     }
 
@@ -593,7 +693,13 @@ app.post('/api/render', async (req, res) => {
         }
 
         const VALID_TEMPLATES = new Set([
-            'HOOK_A', 'CONTENT_LISTICLE', 'CONTENT_GENERIC', 'CONTENT_VIDEO', 'CTA_FINAL'
+            'HOOK_A',
+            'CONTENT_LISTICLE',
+            'CONTENT_GENERIC',
+            'CONTENT_STAT_SNAPSHOT',
+            'CONTENT_MYTH_VS_FACT',
+            'CONTENT_VIDEO',
+            'CTA_FINAL'
         ]);
 
         if (!globalBranding.accentColor || !globalBranding.handle) {

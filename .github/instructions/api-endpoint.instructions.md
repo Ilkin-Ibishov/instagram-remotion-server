@@ -156,6 +156,12 @@ GEMINI_API_KEY=<your-api-key>
 NODE_ENV=production
 ```
 
+### Hosted Instagram Session Bootstrap
+- `server.ts` bootstraps `storage.json` from `INSTAGRAM_SESSION_B64` when present.
+- The payload is expected to be JSON storage state encoded as base64, but production secrets may arrive as UTF-8 or UTF-16LE JSON bytes.
+- Preserve the normalization path: decode base64, strip embedded NUL characters, accept UTF-8 or UTF-16LE JSON, and write normalized UTF-8 JSON to `storage.json`.
+- Do not revert to writing raw decoded bytes directly; malformed session files can cascade into scheduler failures and Postgres UTF8 errors when failure text contains NULs.
+
 ## Error Handling
 
 ### Common Errors & Responses

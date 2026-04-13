@@ -12,15 +12,25 @@ afterEach(() => {
 });
 
 describe('Instagram session bootstrap', () => {
-    it('writes storage.json from INSTAGRAM_SESSION_B64 when provided', () => {
+    it('writes normalized UTF-8 JSON from INSTAGRAM_SESSION_B64 when provided', () => {
         const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
         const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
         const wroteSession = bootstrapInstagramSession('e30K', 'C:/tmp/storage.json');
 
         expect(wroteSession).toBe(true);
-        expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', Buffer.from('e30K', 'base64'));
+        expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', '{}', 'utf-8');
         expect(logSpy).toHaveBeenCalledWith('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+    });
+
+    it('accepts UTF-16LE encoded JSON payload and rewrites as UTF-8', () => {
+        const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
+
+        const utf16Payload = Buffer.from('{"cookies":[]}', 'utf16le').toString('base64');
+        const wroteSession = bootstrapInstagramSession(utf16Payload, 'C:/tmp/storage.json');
+
+        expect(wroteSession).toBe(true);
+        expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', '{"cookies":[]}', 'utf-8');
     });
 
     it('warns and does not write when INSTAGRAM_SESSION_B64 is absent', () => {
@@ -100,6 +110,99 @@ describe('POST /api/render', () => {
 
         expect(response.status).toBe(400);
         expect(response.body.error).toContain('slide[0].data.items');
+    });
+
+    it('should return 400 when CTA_FINAL callToAction is not a question', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'CTA_FINAL',
+                    data: {
+                        callToAction: 'Follow for more updates',
+                        subtext: 'Share your take below',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('callToAction must end with a question mark');
+    });
+
+    it('should return 400 for invalid CONTENT_STAT_SNAPSHOT payload', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'CONTENT_STAT_SNAPSHOT',
+                    data: {
+                        kicker: 'Signal',
+                        stat: '41%',
+                        context: 'Brief context',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('slide[0].data.takeaway');
+    });
+
+    it('should return 400 when CONTENT_MYTH_VS_FACT myth exceeds length limit', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'CONTENT_MYTH_VS_FACT',
+                    data: {
+                        myth: 'x'.repeat(93),
+                        fact: 'Concise fact.',
+                        proof: 'Source-backed proof.',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('slide[0].data.myth must be <= 92 characters');
+    });
+
+    it('should return 400 when CONTENT_VIDEO caption exceeds length limit', async () => {
+        const payload = {
+            globalBranding: { accentColor: '#000', handle: '@test', effects: [] },
+            carousel: [
+                {
+                    templateId: 'CONTENT_VIDEO',
+                    data: {
+                        title: 'Video proof',
+                        videoUrl: null,
+                        imageUrl: 'https://example.com/image.jpg',
+                        caption: 'c'.repeat(121),
+                        source: 'Source: Example',
+                    },
+                },
+            ],
+        };
+
+        const response = await request(app)
+            .post('/api/render')
+            .send(payload);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('slide[0].data.caption must be <= 120 characters');
     });
 });
 

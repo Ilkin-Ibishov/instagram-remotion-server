@@ -57,10 +57,11 @@ const prompt = `
   You are a professional Social Media Strategist...
   ARTICLE: ${article.title}, ${article.description}, ${article.content}
   CONSTRAINTS:
-  1. Use template IDs from: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CTA_FINAL
+  0. Respect CONTENT_INTENT goal (balanced/educate/debate/newsflash/visual_proof) when selecting sequence
+  1. Use template IDs from: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CONTENT_STAT_SNAPSHOT, CONTENT_MYTH_VS_FACT, CONTENT_VIDEO, CTA_FINAL
   2. Slide 1 MUST be HOOK_A: { headline, subheadline, imageUrl? }
   3. Last slide MUST be CTA_FINAL: { callToAction, subtext }
-  4. Middle slides can be CONTENT_LISTICLE and/or CONTENT_GENERIC (1-3 middle slides)
+  4. Middle slides must follow the selected template sequence and can include CONTENT_LISTICLE / CONTENT_GENERIC / CONTENT_STAT_SNAPSHOT / CONTENT_MYTH_VS_FACT / CONTENT_VIDEO
   ...
 `;
 ```
@@ -75,7 +76,7 @@ function validateGeneratedContent(payload: unknown): GeneratedContent {
   // - manifest/globalBranding structure
   // - request-specific required sequence (HOOK_A first, CTA_FINAL last, variable middle)
   // - per-template data constraints
-  // - non-empty caption and hashtags
+  // - caption/hashtag format and guardrails
 }
 ```
 

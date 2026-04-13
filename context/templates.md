@@ -9,6 +9,8 @@ All templates receive **`{ data, branding }`**. **`branding`** includes **`accen
 | `HOOK_A` | `HookA.tsx` | Opening “breaking” style hook with optional background image |
 | `CONTENT_GENERIC` | `ContentGeneric.tsx` | Title + body + optional highlight |
 | `CONTENT_LISTICLE` | `ContentListicle.tsx` | Numbered list with optional footnote |
+| `CONTENT_STAT_SNAPSHOT` | `ContentStatSnapshot.tsx` | Data-focused slide with kicker + stat + interpretation |
+| `CONTENT_MYTH_VS_FACT` | `ContentMythVsFact.tsx` | Contrast slide that debunks a myth with evidence |
 | `CONTENT_VIDEO` | `ContentVideo.tsx` | Embedded video frame with title overlay |
 | `CTA_FINAL` | `CtaFinal.tsx` | Closing CTA with social-style icons |
 
@@ -38,10 +40,25 @@ Adding a new slide type: implement a component, import it in `SlideComposition.t
 - **`videoUrl`:** string (remote mp4); if missing, placeholder UI
 - **`caption`**, **`source`:** optional strings
 
+### `CONTENT_STAT_SNAPSHOT`
+
+- **`kicker`:** short string label (context category)
+- **`stat`:** short metric string (for example `47%`, `2x`, `3 in 5`)
+- **`context`:** single concise line explaining the signal
+- **`takeaway`:** concise implication for the audience
+
+### `CONTENT_MYTH_VS_FACT`
+
+- **`myth`:** common claim or assumption
+- **`fact`:** grounded correction from the article
+- **`proof`:** short evidence/source-backed sentence
+
 ### `CTA_FINAL`
 
 - **`callToAction`:** string (main headline)
 - **`subtext`:** string
+
+Validation note: `CTA_FINAL.callToAction` is now expected to end with `?` so the final card invites an explicit audience response.
 
 ## Design notes
 

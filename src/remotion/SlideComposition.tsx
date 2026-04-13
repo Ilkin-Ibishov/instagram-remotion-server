@@ -2,6 +2,8 @@ import React from 'react';
 import HookA from '../templates/HookA';
 import ContentGeneric from '../templates/ContentGeneric';
 import ContentListicle from '../templates/ContentListicle';
+import ContentStatSnapshot from '../templates/ContentStatSnapshot';
+import ContentMythVsFact from '../templates/ContentMythVsFact';
 import ContentVideo from '../templates/ContentVideo';
 import CtaFinal from '../templates/CtaFinal';
 import { EffectsOverlay } from '../components/EffectsOverlay';
@@ -25,6 +27,8 @@ export const SlideComposition: React.FC<SlideProps> = ({
         HOOK_A: HookA,
         CONTENT_GENERIC: ContentGeneric,
         CONTENT_LISTICLE: ContentListicle,
+        CONTENT_STAT_SNAPSHOT: ContentStatSnapshot,
+        CONTENT_MYTH_VS_FACT: ContentMythVsFact,
         CONTENT_VIDEO: ContentVideo,
         CTA_FINAL: CtaFinal,
     };
