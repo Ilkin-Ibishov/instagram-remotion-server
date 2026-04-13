@@ -17,6 +17,77 @@ const CRITICAL_INSTAGRAM_COOKIES = new Set(['sessionid', 'csrftoken', 'ds_user_i
 const INSTAGRAM_CAPTION_LIMIT = 2200;
 const INSTAGRAM_HASHTAG_LIMIT = 30;
 
+export function resolveInstagramUsername(rawHandle: string | undefined): string | null {
+  if (!rawHandle) {
+    return null;
+  }
+
+  const normalized = rawHandle.trim().replace(/^@+/, '').replace(/^https?:\/\/www\.instagram\.com\//i, '').replace(/\/+$/, '');
+  if (!normalized || !/^[A-Za-z0-9._]+$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+export function findNewPublishedPermalink(beforeLinks: string[], afterLinks: string[]): string | null {
+  const previous = new Set(beforeLinks);
+  for (const link of afterLinks) {
+    if (!previous.has(link)) {
+      return link;
+    }
+  }
+  return null;
+}
+
+async function getRecentProfilePermalinks(page: Page, username: string): Promise<string[]> {
+  await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await delay(2500);
+
+  const links = await page
+    .locator('a[href^="/p/"], a[href^="/reel/"]')
+    .evaluateAll((nodes) => {
+      const hrefs = nodes
+        .map((node) => node.getAttribute('href'))
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+        .slice(0, 24);
+
+      const unique: string[] = [];
+      const seen = new Set<string>();
+      for (const href of hrefs) {
+        if (!seen.has(href)) {
+          seen.add(href);
+          unique.push(href);
+        }
+      }
+      return unique;
+    });
+
+  return links;
+}
+
+async function waitForNewProfilePermalink(
+  page: Page,
+  username: string,
+  baseline: string[],
+  timeoutMs = 90_000,
+  pollMs = 4_000
+): Promise<string | null> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const currentLinks = await getRecentProfilePermalinks(page, username);
+    const newLink = findNewPublishedPermalink(baseline, currentLinks);
+    if (newLink) {
+      return newLink;
+    }
+
+    await delay(pollMs);
+  }
+
+  return null;
+}
+
 async function dismissReelInfoModalIfPresent(
   page: Page,
   contextLabel: string,
@@ -193,6 +264,16 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     });
     const page = await context.newPage();
+    const verificationPage = await context.newPage();
+    const targetUsername = resolveInstagramUsername(process.env.BRAND_HANDLE);
+
+    let baselinePermalinks: string[] = [];
+    if (targetUsername) {
+      baselinePermalinks = await getRecentProfilePermalinks(verificationPage, targetUsername);
+      console.log(`[instagram] Baseline profile permalink count for @${targetUsername}: ${baselinePermalinks.length}`);
+    } else {
+      console.warn('[instagram] BRAND_HANDLE is not configured for strict publish verification; falling back to UI-only confirmation.');
+    }
 
     console.log('Navigating to Instagram...');
     // Replace networkidle with domcontentloaded to prevent hanging on medias streams
@@ -347,6 +428,22 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
 
     if (!publishConfirmed) {
       throw new Error('Instagram publish could not be confirmed — post may or may not have been published');
+    }
+
+    if (targetUsername) {
+      const publishedPermalink = await waitForNewProfilePermalink(
+        verificationPage,
+        targetUsername,
+        baselinePermalinks
+      );
+
+      if (!publishedPermalink) {
+        throw new Error(
+          `Instagram UI indicated success, but no new post/reel appeared on @${targetUsername} within verification timeout.`
+        );
+      }
+
+      console.log(`[instagram] Verified new published permalink: ${publishedPermalink}`);
     }
 
     console.log('Post successfully published!');
