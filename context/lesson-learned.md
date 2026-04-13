@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-13 — CONTENT_GENERIC limits must track real layout capacity, not theoretical text allowance
+
+Context: A published carousel rendered with visibly cut-off words on middle slides using `CONTENT_GENERIC`, even though payloads were still schema-valid.
+Mistake: Allowing `body <= 260` and `highlight <= 110` exceeded practical fit for the typography/spacing in `src/templates/ContentGeneric.tsx`, so copy could clip in production visuals.
+Correction: Reduced `CONTENT_GENERIC` limits to `body <= 220` and `highlight <= 90` in both AI normalization/validation and render validation (`src/pipeline/aiService.ts`, `src/render/renderService.ts`) and added explicit overflow-safe line clamping in the template.
+
 ### 2026-04-13 — Normalize overlength AI fields before strict slide validation
 
 Context: Production scheduler runs started failing when Gemini occasionally returned valid template IDs but text values slightly above per-field limits (for example `CONTENT_STAT_SNAPSHOT.context > 120`).

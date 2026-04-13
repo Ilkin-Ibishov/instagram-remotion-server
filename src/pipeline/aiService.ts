@@ -226,8 +226,8 @@ function normalizeSlideDataForTemplate(templateId: string, data: unknown): unkno
     return {
       ...data,
       title: clampString(data.title, 76),
-      body: clampString(data.body, 260),
-      highlight: clampString(data.highlight, 110),
+      body: clampString(data.body, 220),
+      highlight: clampString(data.highlight, 90),
     };
   }
 
@@ -572,13 +572,13 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
     }
     if (!isNonEmptyString(data.body)) {
       errors.push(`slide[${index}].data.body must be a non-empty string`);
-    } else if (exceedsMaxLength(data.body, 260)) {
-      errors.push(`slide[${index}].data.body must be <= 260 characters`);
+    } else if (exceedsMaxLength(data.body, 220)) {
+      errors.push(`slide[${index}].data.body must be <= 220 characters`);
     }
     if (!isNonEmptyString(data.highlight)) {
       errors.push(`slide[${index}].data.highlight must be a non-empty string`);
-    } else if (exceedsMaxLength(data.highlight, 110)) {
-      errors.push(`slide[${index}].data.highlight must be <= 110 characters`);
+    } else if (exceedsMaxLength(data.highlight, 90)) {
+      errors.push(`slide[${index}].data.highlight must be <= 90 characters`);
     }
   }
 
@@ -878,8 +878,8 @@ For every middle slide, use the template's role and field limits:
 2. CONTENT_GENERIC
 - Role: explanation + implication
 - title <= 76 chars
-- body <= 260 chars (no paragraph wall)
-- highlight <= 110 chars (memorable takeaway)
+- body <= 220 chars (no paragraph wall)
+- highlight <= 90 chars (memorable takeaway)
 
 3. CONTENT_STAT_SNAPSHOT
 - Role: credibility anchor with a concrete metric or directional signal

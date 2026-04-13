@@ -27,6 +27,7 @@ Adding a new slide type: implement a component, import it in `SlideComposition.t
 
 - **`title`**, **`body`:** strings
 - **`highlight`:** optional string (styled callout block)
+- Recommended limits: `title <= 76`, `body <= 220`, `highlight <= 90` to avoid text clipping in the 1080x1080 layout
 
 ### `CONTENT_LISTICLE`
 

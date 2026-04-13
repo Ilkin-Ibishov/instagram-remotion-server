@@ -71,9 +71,9 @@ function validateSlideData(templateId: string, data: Record<string, unknown>, in
     if (!isNonEmptyString(data.title)) return `slide[${index}].data.title must be a non-empty string`;
     if (exceedsMaxLength(data.title, 76)) return `slide[${index}].data.title must be <= 76 characters`;
     if (!isNonEmptyString(data.body)) return `slide[${index}].data.body must be a non-empty string`;
-    if (exceedsMaxLength(data.body, 260)) return `slide[${index}].data.body must be <= 260 characters`;
+    if (exceedsMaxLength(data.body, 220)) return `slide[${index}].data.body must be <= 220 characters`;
     if (!isNonEmptyString(data.highlight)) return `slide[${index}].data.highlight must be a non-empty string`;
-    if (exceedsMaxLength(data.highlight, 110)) return `slide[${index}].data.highlight must be <= 110 characters`;
+    if (exceedsMaxLength(data.highlight, 90)) return `slide[${index}].data.highlight must be <= 90 characters`;
     return null;
   }
 

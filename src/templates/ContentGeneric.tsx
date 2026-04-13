@@ -12,6 +12,7 @@ export default function ContentGeneric({
 
     const title = data.title || 'Details';
     const body = data.body || '';
+    const highlight = typeof data.highlight === 'string' ? data.highlight : '';
 
     // Top accent bar: scaleX 0→1, duration 0.8s (24 frames)
     const barScaleX = interpolate(frame, [0, 24], [0, 1], {
@@ -95,19 +96,27 @@ export default function ContentGeneric({
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
+                    paddingBottom: 120,
+                    width: '100%',
+                    maxWidth: 920,
                 }}
             >
                 {/* Title */}
                 <h2
                     style={{
-                        fontSize: 72,
+                        fontSize: 64,
                         fontWeight: 900,
                         color: 'white',
-                        marginBottom: 56,
-                        lineHeight: 1.3,
+                        marginBottom: 40,
+                        lineHeight: 1.15,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${titleY}px)`,
                         opacity: titleOpacity,
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
                     }}
                 >
                     {title}
@@ -128,41 +137,50 @@ export default function ContentGeneric({
                 {/* Body */}
                 <p
                     style={{
-                        fontSize: 40,
+                        fontSize: 34,
                         color: '#e5e7eb',
-                        lineHeight: 1.7,
+                        lineHeight: 1.5,
                         fontWeight: 500,
                         margin: 0,
                         transform: `translateY(${bodyY}px)`,
                         opacity: bodyOpacity,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 6,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
                     }}
                 >
                     {body}
                 </p>
 
                 {/* Highlight */}
-                {data.highlight && (
+                {highlight && (
                     <div
                         style={{
-                            marginTop: 48,
-                            padding: 32,
-                            borderLeft: `8px solid ${branding.accentColor}`,
+                            marginTop: 32,
+                            padding: 24,
+                            borderLeft: `6px solid ${branding.accentColor}`,
                             background: 'rgba(255,255,255,0.05)',
                             transform: `translateX(${highlightX}px)`,
                             opacity: highlightOpacity,
+                            overflow: 'hidden',
                         }}
                     >
                         <p
                             style={{
-                                fontSize: 32,
+                                fontSize: 28,
                                 fontWeight: 700,
                                 fontStyle: 'italic',
                                 color: 'white',
                                 margin: 0,
-                                lineHeight: 1.5,
+                                lineHeight: 1.35,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
                             }}
                         >
-                            {data.highlight}
+                            {highlight}
                         </p>
                     </div>
                 )}
