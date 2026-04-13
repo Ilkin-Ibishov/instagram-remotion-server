@@ -161,6 +161,17 @@ function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+const FALLBACK_HASHTAGS = [
+  "#technology",
+  "#softwareengineering",
+  "#developer",
+  "#devtools",
+  "#startup",
+  "#technews",
+  "#innovation",
+  "#automation",
+] as const;
+
 function clampString(value: unknown, maxLength: number): unknown {
   if (typeof value !== "string") {
     return value;
@@ -259,6 +270,38 @@ function normalizeSlideDataForTemplate(templateId: string, data: unknown): unkno
   return data;
 }
 
+function normalizeHashtags(value: unknown): string {
+  const raw = typeof value === "string" ? value : "";
+  const seen = new Set<string>();
+  const normalized = raw
+    .split(/\s+/)
+    .map((tag) => tag.trim().toLowerCase())
+    .filter((tag) => /^#[a-z0-9_]+$/.test(tag))
+    .filter((tag) => {
+      if (seen.has(tag)) {
+        return false;
+      }
+      seen.add(tag);
+      return true;
+    });
+
+  if (normalized.length >= 8) {
+    return normalized.slice(0, 12).join(" ");
+  }
+
+  for (const fallback of FALLBACK_HASHTAGS) {
+    if (normalized.length >= 8) {
+      break;
+    }
+    if (!seen.has(fallback)) {
+      normalized.push(fallback);
+      seen.add(fallback);
+    }
+  }
+
+  return normalized.slice(0, 12).join(" ");
+}
+
 export function normalizeGeneratedPayloadForValidation(
   payload: unknown,
   requiredTemplateSequence: readonly string[]
@@ -297,23 +340,7 @@ export function normalizeGeneratedPayloadForValidation(
     normalizedCaption = lines.join("\n").slice(0, 900);
   }
 
-  let normalizedHashtags = payload.hashtags;
-  if (typeof payload.hashtags === "string") {
-    const seen = new Set<string>();
-    const tags = payload.hashtags
-      .split(/\s+/)
-      .map((tag) => tag.trim())
-      .filter((tag) => /^#[A-Za-z0-9_]+$/.test(tag))
-      .filter((tag) => {
-        if (seen.has(tag)) {
-          return false;
-        }
-        seen.add(tag);
-        return true;
-      })
-      .slice(0, 12);
-    normalizedHashtags = tags.join(" ");
-  }
+  const normalizedHashtags = normalizeHashtags(payload.hashtags);
 
   return {
     ...payload,

@@ -82,4 +82,19 @@ describe('normalizeGeneratedPayloadForValidation', () => {
 
     expect(normalized.manifest.carousel[0].data.title).toHaveLength(100);
   });
+
+  it('fills hashtags with safe defaults when ai hashtags are empty or invalid', () => {
+    const payload = {
+      manifest: {
+        carousel: [],
+      },
+      hashtags: '### not-a-tag !@#',
+    };
+
+    const normalized = normalizeGeneratedPayloadForValidation(payload, []) as any;
+    const hashtags = normalized.hashtags.split(/\s+/).filter(Boolean);
+
+    expect(hashtags).toHaveLength(8);
+    expect(hashtags.every((tag: string) => /^#[a-z0-9_]+$/.test(tag))).toBe(true);
+  });
 });
