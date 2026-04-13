@@ -39,7 +39,7 @@ export default function ContentListicle({
 
     // Items: staggered spring entrance, starting at 0.6s (frame 18)
     const title = data.title || 'Key Points';
-    const items: string[] = data.items || [];
+    const items: string[] = Array.isArray(data.items) ? data.items : [];
 
     // Footnote: fade in at end, delay after last item
     const footnoteDelay = 18 + items.length * 8 + 10;
@@ -113,7 +113,19 @@ export default function ContentListicle({
                     gap: 28,
                 }}
             >
-                {items.map((item: string, index: number) => {
+                {items.length === 0 ? (
+                    <p
+                        style={{
+                            fontSize: 30,
+                            color: '#ef4444',
+                            lineHeight: 1.4,
+                            fontWeight: 700,
+                            margin: 0,
+                        }}
+                    >
+                        No list items provided
+                    </p>
+                ) : items.map((item: string, index: number) => {
                     const itemDelay = 18 + index * 8; // stagger by ~0.27s each
                     const s = spring({
                         frame: Math.max(0, frame - itemDelay),

@@ -5,9 +5,15 @@
  */
 import { createClient } from 'redis';
 
-let redisClientPromise: Promise<ReturnType<typeof createClient>> | null = null;
+type RedisClient = ReturnType<typeof createClient>;
 
-export async function getRedisClient(): Promise<ReturnType<typeof createClient>> {
+let redisClientPromise: Promise<RedisClient> | null = null;
+
+function resetCachedClient(): void {
+  redisClientPromise = null;
+}
+
+export async function getRedisClient(): Promise<RedisClient> {
   if (redisClientPromise) {
     return redisClientPromise;
   }
@@ -18,6 +24,46 @@ export async function getRedisClient(): Promise<ReturnType<typeof createClient>>
   }
 
   const client = createClient({ url: redisUrl });
-  redisClientPromise = client.connect().then(() => client as any);
+  redisClientPromise = client.connect()
+    .then(() => client as RedisClient)
+    .catch((error) => {
+      resetCachedClient();
+      try {
+        if (client.isOpen) {
+          client.disconnect();
+        }
+      } catch {
+        // Ignore cleanup errors after failed connect attempts.
+      }
+      throw error;
+    });
   return redisClientPromise;
 }
+
+export async function closeRedisClient(): Promise<void> {
+  if (!redisClientPromise) {
+    return;
+  }
+
+  try {
+    const client = await redisClientPromise;
+    if (client.isOpen) {
+      await client.quit();
+    }
+  } catch {
+    try {
+      const client = await redisClientPromise;
+      if (client.isOpen) {
+        client.disconnect();
+      }
+    } catch {
+      // Ignore cleanup errors during process shutdown.
+    }
+  } finally {
+    resetCachedClient();
+  }
+}
+
+export const __testing = {
+  resetCachedClient,
+};

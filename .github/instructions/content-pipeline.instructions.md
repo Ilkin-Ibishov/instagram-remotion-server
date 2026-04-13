@@ -57,9 +57,10 @@ const prompt = `
   You are a professional Social Media Strategist...
   ARTICLE: ${article.title}, ${article.description}, ${article.content}
   CONSTRAINTS:
-  1. Use template IDs: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CTA_FINAL
-  2. Slide 1 (HOOK_A): { headline, subheadline, imageUrl? }
-  3. Slide 2 (CONTENT_LISTICLE): { title, items[], footnote }
+  1. Use template IDs from: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CTA_FINAL
+  2. Slide 1 MUST be HOOK_A: { headline, subheadline, imageUrl? }
+  3. Last slide MUST be CTA_FINAL: { callToAction, subtext }
+  4. Middle slides can be CONTENT_LISTICLE and/or CONTENT_GENERIC (1-3 middle slides)
   ...
 `;
 ```
@@ -72,7 +73,7 @@ The service currently uses a strict runtime validator after JSON parse (instead 
 function validateGeneratedContent(payload: unknown): GeneratedContent {
   // validates:
   // - manifest/globalBranding structure
-  // - exact 4-slide sequence: HOOK_A, CONTENT_LISTICLE, CONTENT_GENERIC, CTA_FINAL
+  // - request-specific required sequence (HOOK_A first, CTA_FINAL last, variable middle)
   // - per-template data constraints
   // - non-empty caption and hashtags
 }

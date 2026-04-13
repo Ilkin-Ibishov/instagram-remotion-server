@@ -3,6 +3,7 @@ import type { NewsArticle } from './types';
 import { executeWithRetry } from './retryPolicy';
 import { Logger } from '../utils/logger';
 import { getRedisClient } from '../utils/redisClient';
+import { normalizeArticleUrl } from '../utils/normalizeUrl';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,11 +16,33 @@ const GNEWS_MAX_ARTICLES = Number(process.env.GNEWS_MAX_ARTICLES) || 10;
 // Cache TTL in seconds — controls how long GNews results are cached in Redis
 const GNEWS_CACHE_TTL_SECONDS = Number(process.env.GNEWS_CACHE_TTL_SECONDS) || 600; // 10 min default
 
+function parseRetryAfterMs(retryAfterHeader: string | null, nowMs: number = Date.now()): number | undefined {
+  if (!retryAfterHeader) {
+    return undefined;
+  }
+
+  const seconds = Number(retryAfterHeader);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.floor(seconds * 1000);
+  }
+
+  const retryAtMs = Date.parse(retryAfterHeader);
+  if (Number.isNaN(retryAtMs)) {
+    return undefined;
+  }
+
+  return Math.max(0, retryAtMs - nowMs);
+}
+
 /**
  * Cache GNews API results in Redis to avoid redundant API calls and respect rate limits.
  * Falls back gracefully when Redis is unavailable.
  */
-async function fetchWithCache<T>(cacheKey: string, fn: () => Promise<T>): Promise<T> {
+async function fetchWithCache<T>(
+  cacheKey: string,
+  fn: () => Promise<T>,
+  parseCached?: (cached: string, logger: Logger) => T | undefined,
+): Promise<T> {
   const logger = new Logger();
   if (!process.env.REDIS_URL) {
     // Redis not configured — skip cache, call live API directly
@@ -30,7 +53,15 @@ async function fetchWithCache<T>(cacheKey: string, fn: () => Promise<T>): Promis
     const cached = await redis.get(cacheKey);
     if (cached) {
       logger.debug('gnews-cache', `Cache hit for key: ${cacheKey}`);
-      return JSON.parse(cached) as T;
+      if (parseCached) {
+        const parsed = parseCached(cached, logger);
+        if (parsed !== undefined) {
+          return parsed;
+        }
+        logger.warn('gnews-cache', `Ignoring invalid cache entry for key: ${cacheKey}; fetching live`);
+      } else {
+        return JSON.parse(cached) as T;
+      }
     }
     const result = await fn();
     await redis.set(cacheKey, JSON.stringify(result), { EX: GNEWS_CACHE_TTL_SECONDS });
@@ -41,6 +72,39 @@ async function fetchWithCache<T>(cacheKey: string, fn: () => Promise<T>): Promis
     logger.warn('gnews-cache', 'Redis cache error, fetching live', { err: err instanceof Error ? err.message : err });
     return fn();
   }
+}
+
+function isValidCachedNewsArticle(value: unknown): value is NewsArticle {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const article = value as Partial<NewsArticle>;
+  return typeof article.title === 'string'
+    && article.title.trim().length > 0
+    && typeof article.url === 'string'
+    && article.url.startsWith('http');
+}
+
+function parseAndValidateCachedArticles(cached: string, logger: Logger): NewsArticle[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cached);
+  } catch {
+    logger.warn('gnews-cache', 'Cached value is not valid JSON; fetching live');
+    return undefined;
+  }
+
+  if (!Array.isArray(parsed)) {
+    logger.warn('gnews-cache', 'Cached value is not an article array; fetching live');
+    return undefined;
+  }
+
+  const valid = parsed.filter(isValidCachedNewsArticle);
+  if (valid.length !== parsed.length) {
+    logger.warn('gnews-cache', `Cache contained ${parsed.length - valid.length} invalid article(s); discarded`);
+  }
+
+  return valid;
 }
 
 /**
@@ -64,7 +128,7 @@ export async function fetchTopNews(category: string = 'technology'): Promise<New
   if (!process.env.GNEWS_URL) logger.warn('gnews-config', 'GNEWS_URL not set, defaulting to top-headlines endpoint');
 
   const cacheKey = `gnews:top:${category}:${GNEWS_LANG}:${GNEWS_COUNTRY}:${GNEWS_MAX_ARTICLES}`;
-  return fetchWithCache(cacheKey, () => _fetchTopNewsLive(category, logger));
+  return fetchWithCache(cacheKey, () => _fetchTopNewsLive(category, logger), parseAndValidateCachedArticles);
 }
 
 async function _fetchTopNewsLive(category: string, logger: Logger): Promise<NewsArticle[]> {
@@ -93,13 +157,10 @@ async function _fetchTopNewsLive(category: string, logger: Logger): Promise<News
       let retryAfterMs: number | undefined;
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After');
-        if (retryAfter) {
-          const retrySeconds = Number(retryAfter);
-          if (!isNaN(retrySeconds)) {
-            retryAfterMs = retrySeconds * 1000;
-            lastRetryDelay = retryAfterMs;
-            logger.warn('gnews', `Received 429. Using Retry-After: ${retryAfter}s`, { retryAfterMs });
-          }
+        retryAfterMs = parseRetryAfterMs(retryAfter);
+        if (retryAfterMs !== undefined) {
+          lastRetryDelay = retryAfterMs;
+          logger.warn('gnews', `Received 429. Using Retry-After header value: ${retryAfter}`, { retryAfterMs });
         }
       }
       logger.error('gnews', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url: safeUrl, retryAfterMs });
@@ -112,7 +173,7 @@ async function _fetchTopNewsLive(category: string, logger: Logger): Promise<News
     }
     return data.articles
       .map((article: any) => mapToNewsArticle(article))
-      .filter((a) => a.imageUrl && a.title); // reject articles without image — unusable for HOOK_A template
+      .filter((a: NewsArticle) => Boolean(a.title));
   };
 
   try {
@@ -156,7 +217,7 @@ export async function fetchSearchNews(
   const maxResults = options?.maxResults || GNEWS_MAX_ARTICLES;
   const sortby = options?.sortby || 'relevance';
   const cacheKey = `gnews:search:${query}:${GNEWS_LANG}:${GNEWS_COUNTRY}:${maxResults}:${sortby}:${options?.from ?? ''}:${options?.to ?? ''}`;
-  return fetchWithCache(cacheKey, () => _fetchSearchNewsLive(query, options, logger));
+  return fetchWithCache(cacheKey, () => _fetchSearchNewsLive(query, options, logger), parseAndValidateCachedArticles);
 }
 
 async function _fetchSearchNewsLive(
@@ -174,7 +235,7 @@ async function _fetchSearchNewsLive(
     country: GNEWS_COUNTRY,
     max: String(maxResults),
     sortby,
-    apikey: API_KEY,
+    apikey: API_KEY || '',
   });
 
   if (options?.from) params.append('from', options.from);
@@ -201,13 +262,10 @@ async function _fetchSearchNewsLive(
       let retryAfterMs: number | undefined;
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After');
-        if (retryAfter) {
-          const retrySeconds = Number(retryAfter);
-          if (!isNaN(retrySeconds)) {
-            retryAfterMs = retrySeconds * 1000;
-            lastRetryDelay = retryAfterMs;
-            logger.warn('gnews-search', `Received 429. Using Retry-After: ${retryAfter}s`, { retryAfterMs });
-          }
+        retryAfterMs = parseRetryAfterMs(retryAfter);
+        if (retryAfterMs !== undefined) {
+          lastRetryDelay = retryAfterMs;
+          logger.warn('gnews-search', `Received 429. Using Retry-After header value: ${retryAfter}`, { retryAfterMs });
         }
       }
       logger.error('gnews-search', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url: safeSearchUrl, retryAfterMs });
@@ -220,7 +278,7 @@ async function _fetchSearchNewsLive(
     }
     return data.articles
       .map((article: any) => mapToNewsArticle(article))
-      .filter((a) => a.imageUrl && a.title); // reject articles without image
+      .filter((a: NewsArticle) => Boolean(a.title));
   };
 
   try {
@@ -250,16 +308,18 @@ export function mergeAndDedupeArticles(headlines: NewsArticle[], search: NewsArt
 
   // Add all from search first (they're already sorted by relevance)
   for (const article of search) {
-    if (!seen.has(article.url)) {
-      seen.add(article.url);
+    const normalizedUrl = normalizeArticleUrl(article.url);
+    if (!seen.has(normalizedUrl)) {
+      seen.add(normalizedUrl);
       merged.push(article);
     }
   }
 
   // Add headlines that aren't duplicates
   for (const article of headlines) {
-    if (!seen.has(article.url)) {
-      seen.add(article.url);
+    const normalizedUrl = normalizeArticleUrl(article.url);
+    if (!seen.has(normalizedUrl)) {
+      seen.add(normalizedUrl);
       merged.push(article);
     }
   }
@@ -316,3 +376,8 @@ function mapToNewsArticle(raw: any): NewsArticle {
     source: raw.source?.name || 'Unknown Source'
   };
 }
+
+export const __testing = {
+  parseRetryAfterMs,
+  parseAndValidateCachedArticles,
+};

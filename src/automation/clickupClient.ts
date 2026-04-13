@@ -5,6 +5,20 @@
 
 const API_BASE = process.env.CLICKUP_API_BASE || 'https://api.clickup.com/api/v2';
 
+function getRateLimitDelayMs(retryAfterHeader: string | null): number {
+  const fallbackMs = 60_000;
+  if (!retryAfterHeader) {
+    return fallbackMs;
+  }
+
+  const seconds = Number(retryAfterHeader);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.floor(seconds * 1000);
+  }
+
+  return fallbackMs;
+}
+
 function getAuthHeaders() {
   const token = process.env.CLICKUP_TOKEN;
   if (!token) {
@@ -35,6 +49,8 @@ async function fetchJson(url: string, opts: any = {}) {
     err.status = res.status;
     // @ts-ignore
     err.body = body;
+    // @ts-ignore
+    err.retryAfter = res.headers.get('Retry-After');
     throw err;
   }
   return body;
@@ -62,8 +78,10 @@ export async function addComment(taskId: string, comment: string) {
       });
     } catch (err: any) {
       const status = err && err.status ? err.status : null;
-      if (status && status >= 500 && attempt < maxAttempts) {
-        const delayMs = 1000 * Math.pow(2, attempt - 1);
+      if (status && (status >= 500 || status === 429) && attempt < maxAttempts) {
+        const delayMs = status === 429
+          ? getRateLimitDelayMs(err?.retryAfter ?? null)
+          : 1000 * Math.pow(2, attempt - 1);
         // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, delayMs));
         continue;
@@ -85,8 +103,10 @@ export async function setTaskStatus(taskId: string, status: string) {
       });
     } catch (err: any) {
       const statusCode = err && err.status ? err.status : null;
-      if (statusCode && statusCode >= 500 && attempt < maxAttempts) {
-        const delayMs = 1000 * Math.pow(2, attempt - 1);
+      if (statusCode && (statusCode >= 500 || statusCode === 429) && attempt < maxAttempts) {
+        const delayMs = statusCode === 429
+          ? getRateLimitDelayMs(err?.retryAfter ?? null)
+          : 1000 * Math.pow(2, attempt - 1);
         // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, delayMs));
         continue;

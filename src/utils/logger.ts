@@ -21,6 +21,46 @@ interface LogEntry {
   data?: any;
 }
 
+const SENSITIVE_KEYS = new Set([
+  'sessionid',
+  'csrftoken',
+  'cookie',
+  'authorization',
+  'apikey',
+  'api_key',
+  'token',
+  'secret',
+  'password',
+  'passwd',
+  'credential',
+  'key',
+]);
+
+export function redactSensitiveFields(value: unknown, depth = 0): unknown {
+  if (depth > 5 || value === null || value === undefined) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveFields(item, depth + 1));
+  }
+
+  if (typeof value !== 'object') {
+    return value;
+  }
+
+  const input = value as Record<string, unknown>;
+  const entries = Object.entries(input).map(([key, nestedValue]) => {
+    const normalizedKey = key.toLowerCase();
+    if (SENSITIVE_KEYS.has(normalizedKey)) {
+      return [key, '[REDACTED]'];
+    }
+    return [key, redactSensitiveFields(nestedValue, depth + 1)];
+  });
+
+  return Object.fromEntries(entries);
+}
+
 function safeStringify(value: unknown): string {
   try {
     return JSON.stringify(value);
@@ -50,15 +90,17 @@ export class Logger {
       '\x1b[32m';
     
     console.log(`${color}${logMessage}\x1b[0m`);
+    const redactedData = entry.data !== undefined ? redactSensitiveFields(entry.data) : undefined;
     
-    if (entry.data !== undefined) {
-      console.log(`${color}[data] ${safeStringify(entry.data)}\x1b[0m`);
+    if (redactedData !== undefined) {
+      console.log(`${color}[data] ${safeStringify(redactedData)}\x1b[0m`);
     }
 
     // File output (JSON lines format)
     try {
       const logEntry = {
         ...entry,
+        data: redactedData,
         timestamp,
         runId: this.runId,
       };

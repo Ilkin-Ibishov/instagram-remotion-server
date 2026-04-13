@@ -15,6 +15,39 @@ export interface AccountProfile {
   effects: string[];
 }
 
+const ALLOWED_EFFECTS = new Set(['crt', 'noise', 'vignette', 'chromatic', 'halftone']);
+
+function parseNicheValues(raw: string): string[] {
+  const niche = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+
+  if (niche.length === 0) {
+    throw new Error('BRAND_NICHE must contain at least one non-empty value');
+  }
+
+  return niche;
+}
+
+function parseEffectValues(raw: string): string[] {
+  const candidates = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+
+  const invalid = candidates.filter((effect) => !ALLOWED_EFFECTS.has(effect));
+  if (invalid.length > 0) {
+    console.warn(
+      `[account-profile] Ignoring unknown BRAND_EFFECTS values: ${invalid.join(', ')}. Allowed: ${[
+        ...ALLOWED_EFFECTS,
+      ].join(', ')}`
+    );
+  }
+
+  return candidates.filter((effect) => ALLOWED_EFFECTS.has(effect));
+}
+
 /**
  * Load account profile from environment variables.
  * Allows runtime configuration without code changes.
@@ -27,15 +60,8 @@ export function loadAccountProfile(): AccountProfile {
   const accentColor = process.env.BRAND_ACCENT_COLOR || '#ef4444';
   const effectsString = process.env.BRAND_EFFECTS || 'vignette,chromatic,halftone';
 
-  const niche = nicheString
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(s => s.length > 0);
-
-  const effects = effectsString
-    .split(',')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
+  const niche = parseNicheValues(nicheString);
+  const effects = parseEffectValues(effectsString);
 
   return {
     handle,

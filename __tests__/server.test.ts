@@ -1,11 +1,38 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import fs from 'fs';
 import request from 'supertest';
 import * as schedulerRunner from '../src/pipeline/schedulerRunner';
-import { app } from '../server.ts';
+import { __testing as serverTesting, app, bootstrapInstagramSession, initializeBundleOrExit } from '../server.ts';
 
 afterEach(() => {
     vi.restoreAllMocks();
+    serverTesting.resetBundleState();
+    delete process.env.INSTAGRAM_SESSION_B64;
     delete process.env.SCHEDULE_RUN_SECRET;
+});
+
+describe('Instagram session bootstrap', () => {
+    it('writes storage.json from INSTAGRAM_SESSION_B64 when provided', () => {
+        const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        const wroteSession = bootstrapInstagramSession('e30K', 'C:/tmp/storage.json');
+
+        expect(wroteSession).toBe(true);
+        expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', Buffer.from('e30K', 'base64'));
+        expect(logSpy).toHaveBeenCalledWith('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+    });
+
+    it('warns and does not write when INSTAGRAM_SESSION_B64 is absent', () => {
+        const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        const wroteSession = bootstrapInstagramSession(undefined, 'C:/tmp/storage.json');
+
+        expect(wroteSession).toBe(false);
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith('[startup] INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
+    });
 });
 
 describe('POST /api/render', () => {
@@ -73,6 +100,41 @@ describe('POST /api/render', () => {
 
         expect(response.status).toBe(400);
         expect(response.body.error).toContain('slide[0].data.items');
+    });
+});
+
+describe('GET /health', () => {
+    it('should return 503 when the Remotion bundle is not ready', async () => {
+        const response = await request(app)
+            .get('/health');
+
+        expect(response.status).toBe(503);
+        expect(response.body).toEqual({ status: 'not_ready', bundle: false });
+    });
+
+    it('should return 200 when the Remotion bundle is ready', async () => {
+        serverTesting.setBundleLocation('/tmp/remotion-bundle');
+
+        const response = await request(app)
+            .get('/health');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ status: 'ok', bundle: true });
+    });
+});
+
+describe('bundle startup readiness', () => {
+    it('should exit when bundle initialization fails', async () => {
+        const exitSpy = vi.fn();
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        const ready = await initializeBundleOrExit(exitSpy, async () => {
+            throw new Error('bundle failed');
+        });
+
+        expect(ready).toBe(false);
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(errorSpy).toHaveBeenCalled();
     });
 });
 

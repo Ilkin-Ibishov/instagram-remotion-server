@@ -28,7 +28,9 @@ describe('rssSourceRegistry', () => {
   it('matches niche case-insensitively', () => {
     const lower = getSourcesForNiche(['technology']);
     const mixed = getSourcesForNiche(['TeChNoLoGy']);
+    const upper = getSourcesForNiche(['TECHNOLOGY']);
 
     expect(mixed.map((source) => source.id)).toEqual(lower.map((source) => source.id));
+    expect(upper.map((source) => source.id)).toEqual(lower.map((source) => source.id));
   });
 });

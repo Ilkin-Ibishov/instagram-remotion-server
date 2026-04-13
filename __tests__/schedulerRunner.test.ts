@@ -31,20 +31,29 @@ vi.mock('../src/pipeline/schedulerLock', () => ({
   acquireDistributedLock: vi.fn(),
   releaseDistributedLock: vi.fn(),
   // Pass-through: call the wrapped function immediately (no real Redis heartbeat in tests)
-  runWithLockHeartbeat: vi.fn((_handle: unknown, _ttl: unknown, fn: () => Promise<unknown>) => fn()),
+  runWithLockHeartbeat: vi.fn((_handle: unknown, _ttl: unknown, fn: (signal: AbortSignal) => Promise<unknown>) => {
+    const controller = new AbortController();
+    return fn(controller.signal);
+  }),
 }));
 
 vi.mock('../src/pipeline/retryPolicy', () => ({
   executeWithRetry: vi.fn(),
 }));
 
+vi.mock('../src/pipeline/rssTelemetryStore', () => ({
+  pruneTelemetry: vi.fn(),
+  closeTelemetryPool: vi.fn(),
+}));
+
 import { runPipeline } from '../src/pipelineRun';
-import { runScheduledPipeline } from '../src/pipeline/schedulerRunner';
+import { __testing as schedulerTesting, runScheduledPipeline } from '../src/pipeline/schedulerRunner';
 import { startSchedulerLoop, stopSchedulerLoop } from '../server';
 import { validateInstagramSessionExpiry } from '../src/automation/instagramPublisher';
 import { shouldRunNow, recordRunSuccess, recordRunFailure } from '../src/pipeline/scheduleState';
 import { acquireDistributedLock, releaseDistributedLock } from '../src/pipeline/schedulerLock';
 import { executeWithRetry } from '../src/pipeline/retryPolicy';
+import { pruneTelemetry } from '../src/pipeline/rssTelemetryStore';
 
 const mockedRunPipeline = vi.mocked(runPipeline);
 const mockedValidateSession = vi.mocked(validateInstagramSessionExpiry);
@@ -54,6 +63,7 @@ const mockedRecordRunFailure = vi.mocked(recordRunFailure);
 const mockedAcquireLock = vi.mocked(acquireDistributedLock);
 const mockedReleaseLock = vi.mocked(releaseDistributedLock);
 const mockedExecuteWithRetry = vi.mocked(executeWithRetry);
+const mockedPruneTelemetry = vi.mocked(pruneTelemetry);
 
 const baseState = {
   accountId: 'default',
@@ -66,13 +76,15 @@ const baseState = {
 
 describe('runScheduledPipeline', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    schedulerTesting.resetState();
     mockedShouldRunNow.mockResolvedValue({ allowed: true, state: baseState });
     mockedAcquireLock.mockResolvedValue({ key: 'pipeline:schedule:default', token: 'token-1' });
     mockedReleaseLock.mockResolvedValue(true);
     mockedValidateSession.mockReturnValue({ valid: true, expiresAt: '2026-12-31T00:00:00.000Z' });
     mockedExecuteWithRetry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
     mockedRunPipeline.mockResolvedValue(undefined);
+    mockedPruneTelemetry.mockResolvedValue(undefined);
     mockedRecordRunFailure.mockImplementation(async (_accountId, _now, nextRunAt, message) => ({
       ...baseState,
       nextRunAt,
@@ -83,12 +95,19 @@ describe('runScheduledPipeline', () => {
     delete process.env.SCHEDULE_ACCOUNT_ID;
     process.env.SCHEDULE_MIN_DELAY_HOURS = '3';
     process.env.SCHEDULE_MAX_DELAY_HOURS = '5';
+    process.env.POSTING_TIMEZONE = 'UTC';
+    process.env.POSTING_HOURS_START = '0';
+    process.env.POSTING_HOURS_END = '24';
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     delete process.env.SCHEDULE_MIN_DELAY_HOURS;
     delete process.env.SCHEDULE_MAX_DELAY_HOURS;
     delete process.env.SCHEDULE_ACCOUNT_ID;
+    delete process.env.POSTING_TIMEZONE;
+    delete process.env.POSTING_HOURS_START;
+    delete process.env.POSTING_HOURS_END;
   });
 
   it('applies deterministic minimum jitter when Math.random is 0', async () => {
@@ -190,6 +209,42 @@ describe('runScheduledPipeline', () => {
     const firstRunResult = await firstRunPromise;
     expect(firstRunResult.status).toBe('executed');
     expect(mockedReleaseLock).toHaveBeenCalled();
+  });
+
+  it('skips when outside configured posting window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-06T03:00:00.000Z'));
+    process.env.POSTING_TIMEZONE = 'UTC';
+    process.env.POSTING_HOURS_START = '8';
+    process.env.POSTING_HOURS_END = '21';
+    mockedAcquireLock.mockClear();
+    mockedRunPipeline.mockClear();
+
+    const result = await runScheduledPipeline();
+
+    expect(result.status).toBe('skipped_due_to_time');
+    expect(result.reason).toBe('outside_posting_window');
+    expect(mockedAcquireLock).not.toHaveBeenCalled();
+    expect(mockedRunPipeline).not.toHaveBeenCalled();
+  });
+
+  it('prunes telemetry once on weekly sunday runs after success', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-12T12:00:00.000Z'));
+
+    await runScheduledPipeline();
+    await runScheduledPipeline();
+
+    expect(mockedPruneTelemetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not prune telemetry outside the weekly prune window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-13T12:00:00.000Z'));
+
+    await runScheduledPipeline();
+
+    expect(mockedPruneTelemetry).not.toHaveBeenCalled();
   });
 });
 

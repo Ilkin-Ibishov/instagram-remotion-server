@@ -1,6 +1,64 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, Video } from 'remotion';
+import { useCurrentFrame, interpolate, Video, Img } from 'remotion';
 import { Play } from 'lucide-react';
+
+function VideoWithFallback({
+    videoUrl,
+    fallbackImageUrl,
+}: {
+    videoUrl?: string;
+    fallbackImageUrl?: string;
+}) {
+    const [hasError, setHasError] = React.useState(false);
+
+    if (!videoUrl || hasError) {
+        if (fallbackImageUrl) {
+            return (
+                <Img
+                    src={fallbackImageUrl}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                    }}
+                />
+            );
+        }
+
+        return (
+            <div
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(135deg, #1a1a2e 0%, #0a0a0a 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                <Play
+                    style={{
+                        color: 'rgba(255,255,255,0.2)',
+                        width: 80,
+                        height: 80,
+                    }}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <Video
+            src={videoUrl}
+            style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+            }}
+            onError={() => setHasError(true)}
+        />
+    );
+}
 
 /**
  * CONTENT_VIDEO — for news stories that include video footage.
@@ -110,37 +168,11 @@ export default function ContentVideo({
                     opacity: videoOpacity,
                 }}
             >
-                {/* Video element */}
-                {data.videoUrl ? (
-                    <Video
-                        src={data.videoUrl}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                        }}
-                    />
-                ) : (
-                    /* Fallback when no video URL provided — dark placeholder */
-                    <div
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            background: 'linear-gradient(135deg, #1a1a2e 0%, #0a0a0a 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <Play
-                            style={{
-                                color: 'rgba(255,255,255,0.2)',
-                                width: 80,
-                                height: 80,
-                            }}
-                        />
-                    </div>
-                )}
+                {/* Video element with runtime fallback on load/codec errors */}
+                <VideoWithFallback
+                    videoUrl={data.videoUrl}
+                    fallbackImageUrl={data.imageUrl}
+                />
 
                 {/* LIVE indicator (top-left corner of video) */}
                 <div

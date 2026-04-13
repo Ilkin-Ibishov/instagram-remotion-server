@@ -60,4 +60,50 @@ describe('validateInstagramSessionExpiry', () => {
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('expires too soon');
   });
+
+  it('returns invalid when cookie expires exactly at minimum threshold boundary', () => {
+    const minimumRemainingMs = 60 * 60 * 1000;
+    const thresholdSeconds = Date.now() / 1000 + minimumRemainingMs / 1000;
+    const sessionFile = writeSessionFile({
+      cookies: [{ name: 'sessionid', expires: thresholdSeconds }],
+    });
+
+    const result = validateInstagramSessionExpiry(sessionFile, minimumRemainingMs);
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain('expires too soon');
+  });
+
+  it('returns invalid when any critical cookie is expired even if others are valid', () => {
+    const farFutureSeconds = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const expiredSeconds = Math.floor(Date.now() / 1000) - 1;
+    const sessionFile = writeSessionFile({
+      cookies: [
+        { name: 'sessionid', expires: expiredSeconds },
+        { name: 'csrftoken', expires: farFutureSeconds },
+        { name: 'ds_user_id', expires: farFutureSeconds },
+      ],
+    });
+
+    const result = validateInstagramSessionExpiry(sessionFile, 60 * 60 * 1000);
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain('expires too soon');
+  });
+
+  it('returns valid when all critical cookies have sufficient remaining time', () => {
+    const farFutureSeconds = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const sessionFile = writeSessionFile({
+      cookies: [
+        { name: 'sessionid', expires: farFutureSeconds },
+        { name: 'csrftoken', expires: farFutureSeconds },
+        { name: 'ds_user_id', expires: farFutureSeconds },
+      ],
+    });
+
+    const result = validateInstagramSessionExpiry(sessionFile, 60 * 60 * 1000);
+
+    expect(result.valid).toBe(true);
+    expect(result.expiresAt).toBeTruthy();
+  });
 });

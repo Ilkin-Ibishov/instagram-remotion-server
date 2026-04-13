@@ -54,7 +54,7 @@ import { fetchTopNews, fetchSearchNews } from '../src/pipeline/newsService';
 import { fetchRssNews } from '../src/pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle } from '../src/pipeline/newsFiltering';
 import { loadAccountProfile, getAccountKeywords } from '../src/pipeline/accountProfile';
-import { generatePostContentAI } from '../src/pipeline/aiService';
+import { generateContent } from '../src/pipeline/contentGenerator';
 
 const mockedFetchTopNews = vi.mocked(fetchTopNews);
 const mockedFetchSearchNews = vi.mocked(fetchSearchNews);
@@ -64,7 +64,7 @@ const mockedSelectBestArticle = vi.mocked(selectBestArticle);
 const mockedLoadAccountProfile = vi.mocked(loadAccountProfile);
 const mockedGetAccountKeywords = vi.mocked(getAccountKeywords);
 const mockedPublishToInstagram = vi.mocked(publishToInstagram);
-const mockedGeneratePostContentAI = vi.mocked(generatePostContentAI);
+const mockedGenerateContent = vi.mocked(generateContent);
 
 describe('runPipeline', () => {
   const mockArticle = {
@@ -107,13 +107,13 @@ describe('runPipeline', () => {
     mockedFetchRssNews.mockResolvedValue([mockArticle]);
     mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
-    mockedGeneratePostContentAI.mockResolvedValue({
+    mockedGenerateContent.mockResolvedValue({
       manifest: {
         globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
         carousel: [],
       },
-      caption: 'Test caption',
-      hashtags: '#test',
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
     } as any);
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -142,13 +142,13 @@ describe('runPipeline', () => {
     mockedFilterAndRankArticles
       .mockReturnValueOnce([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
-    mockedGeneratePostContentAI.mockResolvedValue({
+    mockedGenerateContent.mockResolvedValue({
       manifest: {
         globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
         carousel: [],
       },
-      caption: 'Test caption',
-      hashtags: '#test',
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
     } as any);
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -178,13 +178,13 @@ describe('runPipeline', () => {
       .mockReturnValueOnce([])
       .mockReturnValueOnce([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
-    mockedGeneratePostContentAI.mockResolvedValue({
+    mockedGenerateContent.mockResolvedValue({
       manifest: {
         globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
         carousel: [],
       },
-      caption: 'Test caption',
-      hashtags: '#test',
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
     } as any);
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -212,13 +212,13 @@ describe('runPipeline', () => {
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
     mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
-    mockedGeneratePostContentAI.mockResolvedValue({
+    mockedGenerateContent.mockResolvedValue({
       manifest: {
         globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
         carousel: [],
       },
-      caption: 'Test caption',
-      hashtags: '#test',
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
     } as any);
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -240,7 +240,7 @@ describe('runPipeline', () => {
     await expect(runPipeline()).rejects.toThrow('No relevant articles found');
     expect(mockedFetchSearchNews).toHaveBeenCalledOnce();
     expect(mockedSelectBestArticle).not.toHaveBeenCalled();
-    expect(mockedGeneratePostContentAI).not.toHaveBeenCalled();
+    expect(mockedGenerateContent).not.toHaveBeenCalled();
     expect(mockedPublishToInstagram).not.toHaveBeenCalled();
   });
 
@@ -254,12 +254,13 @@ describe('runPipeline', () => {
       .mockReturnValueOnce([scoredArticle]);
     mockedFetchSearchNews.mockResolvedValue([mockArticle]);
     mockedSelectBestArticle.mockReturnValue(scoredArticle);
-    mockedGeneratePostContentAI.mockResolvedValue({
+    mockedGenerateContent.mockResolvedValue({
       manifest: {
         globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
         carousel: [],
       },
-      postCaption: 'Test caption',
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
     });
 
     // render + publish are not the focus here — mock them to avoid errors
@@ -277,5 +278,41 @@ describe('runPipeline', () => {
     );
     // filterAndRankArticles called twice: top-headlines fallback, then search fallback
     expect(mockedFilterAndRankArticles).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws a clear error when article selection returns null', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(null);
+
+    await expect(runPipeline()).rejects.toThrow('No articles available to post');
+    expect(mockedGenerateContent).not.toHaveBeenCalled();
+    expect(mockedPublishToInstagram).not.toHaveBeenCalled();
+  });
+
+  it('bubbles content quality gate failures before rendering or publishing', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGenerateContent.mockRejectedValue(new Error('Content quality score 2/5 below minimum 4'));
+
+    await expect(runPipeline()).rejects.toThrow('Content quality score 2/5 below minimum 4');
+    expect(mockedPublishToInstagram).not.toHaveBeenCalled();
   });
 });

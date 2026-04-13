@@ -22,6 +22,40 @@ interface ScoredArticle {
   };
 }
 
+function parsePositiveEnvInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function extractMatchedKeywords(text: string, accountKeywords: string[]): string[] {
+  const normalized = text.toLowerCase();
+  return accountKeywords.filter((keyword) => normalized.includes(keyword.toLowerCase()));
+}
+
+function countRecentSameTopicPosts(
+  article: NewsArticle,
+  accountKeywords: string[],
+  recentPosts: Array<{ articleTitle: string }>
+): number {
+  const articleKeywords = extractMatchedKeywords(
+    `${article.title || ''} ${article.description || ''}`,
+    accountKeywords
+  );
+
+  if (articleKeywords.length === 0) {
+    return 0;
+  }
+
+  return recentPosts.filter((record) => {
+    const title = (record.articleTitle || '').toLowerCase();
+    return articleKeywords.some((keyword) => title.includes(keyword.toLowerCase()));
+  }).length;
+}
+
 /**
  * Keyword specificity weights.
  * More specific keywords get higher weight to prefer them over generic matches.
@@ -69,7 +103,7 @@ function getKeywordWeight(keyword: string): number {
 export function scoreArticleRelevance(
   article: NewsArticle,
   accountKeywords: string[],
-  recentPostCount: number = 0
+  sameTopicRecentPostCount: number = 0
 ): {
   score: number;
   reasons: string[];
@@ -125,12 +159,18 @@ export function scoreArticleRelevance(
     score += 1;
   }
 
-  // If posting too frequently from same niche, apply mild penalty (not too aggressive)
-  // Only penalize if we have 5+ recent posts (threshold higher than before)
-  // And reduce penalty to -5 instead of -10 (prevent over-penalization)
-  if (recentPostCount >= 5) {
-    score = Math.max(baseScore, score - 5); // Never go below base score
-    reasons.push('⚠️ Many recent posts from this niche (-5)');
+  if (!article.imageUrl) {
+    score -= 5;
+    reasons.push('Missing imageUrl (-5)');
+  }
+
+  const repetitionThreshold = parsePositiveEnvInt('REPETITION_THRESHOLD', 3);
+  const repetitionPenalty = parsePositiveEnvInt('REPETITION_PENALTY', 20);
+  if (sameTopicRecentPostCount >= repetitionThreshold) {
+    score -= repetitionPenalty;
+    reasons.push(
+      `⚠️ Same-topic repetition (${sameTopicRecentPostCount} recent posts, -${repetitionPenalty})`
+    );
   }
 
   return {
@@ -158,12 +198,14 @@ export function filterAndRankArticles(
   logger?: Logger,
   minScore: number = 10
 ): ScoredArticle[] {
-  const recent = getRecentPosts(7); // Last 7 days
+  const repetitionWindowDays = parsePositiveEnvInt('REPETITION_WINDOW_DAYS', 7);
+  const recent = getRecentPosts(repetitionWindowDays);
   const recentCount = recent.length;
 
   if (logger) {
     logger.debug('filtering', `Starting filter with ${articles.length} articles`, {
       recentPostsCount: recentCount,
+      repetitionWindowDays,
       keywordCount: accountKeywords.length,
       minimumScoreThreshold: minScore,
     });
@@ -194,7 +236,8 @@ export function filterAndRankArticles(
       return true;
     })
     .map(article => {
-      const scored = scoreArticleRelevance(article, accountKeywords, recentCount);
+      const sameTopicRecentCount = countRecentSameTopicPosts(article, accountKeywords, recent);
+      const scored = scoreArticleRelevance(article, accountKeywords, sameTopicRecentCount);
       return {
         article,
         score: scored.score,
@@ -255,7 +298,8 @@ export function filterAndRankArticles(
 export function selectBestArticle(
   scoredArticles: ScoredArticle[],
   strategy: 'top' | 'diverse' = 'top',
-  logger?: Logger
+  logger?: Logger,
+  randomFn: () => number = Math.random
 ): ScoredArticle | null {
   if (scoredArticles.length === 0) {
     if (logger) {
@@ -283,7 +327,9 @@ export function selectBestArticle(
   } else {
     // Diverse strategy: pick from top 3 but with slight randomness
     const topN = Math.min(3, scoredArticles.length);
-    const selected = scoredArticles[Math.floor(Math.random() * topN)];
+    const rawIndex = Math.floor(randomFn() * topN);
+    const selectedIndex = Math.max(0, Math.min(topN - 1, rawIndex));
+    const selected = scoredArticles[selectedIndex];
     if (logger) {
       logger.debug('selection', `Selected from top ${topN} articles (strategy: ${strategy})`, {
         selectedTitle: selected.article.title.substring(0, 80),

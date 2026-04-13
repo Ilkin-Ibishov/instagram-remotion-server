@@ -8,7 +8,7 @@
   - **`component`:** `SlideComposition`
   - **Dimensions:** 1080×1080
   - **`fps`:** 30
-  - **`durationInFrames`:** 720 (24 seconds at 30 fps)
+  - **`durationInFrames`:** `COMPOSITION_DURATION_SECONDS * 30` (default 720 / 24 seconds)
   - **`defaultProps`:** Example `templateId`, `data`, `branding` for Studio preview
 
 ## Slide router

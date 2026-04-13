@@ -4,8 +4,11 @@
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `dev` / `start` | `tsx server.ts` | Run API server |
+| `dev` / `start` | `tsx server.ts` | Run API server in development |
+| `build` | `tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths` | Compile the production server bundle into `dist/` and rewrite runtime import specifiers |
+| `start:prod` | `node --experimental-specifier-resolution=node dist/server.js` | Run the compiled production server |
 | `preview` | `npx remotion studio src/remotion/index.tsx` | Remotion Studio (see [remotion.md](./remotion.md)) |
+| `test:integration` | `vitest run __tests__/integration` | Run integration-oriented tests (Railway test auto-skips without env) |
 
 ## Tests
 
@@ -18,6 +21,12 @@ Run (from project root):
 npx vitest run
 ```
 
+Integration tests only:
+
+```bash
+npm run test:integration
+```
+
 ## TypeScript
 
 - **`tsconfig.json`:** `module` / `moduleResolution` for bundler, `jsx: react-jsx`, `strict: true`.
@@ -26,6 +35,8 @@ npx vitest run
 ## Environment and paths
 
 - **`RENDER_DIR`** in `server.ts` is set to **`/tmp/renders`**. On **Linux/macOS** this is standard. On **Windows**, absolute POSIX-style paths can behave differently depending on Node version and environment; validate output directory when deploying to Windows or use a cross-platform `path.join` + `os.tmpdir()` if you change this in code.
+- **`GEMINI_TIMEOUT_MS`** controls the max wait time for a single Gemini generation call in `aiService.ts` (default: `60000`, minimum: `1`). Requests exceeding this budget fail with a descriptive timeout error instead of hanging indefinitely.
+- **`SERVER_MODE`** is set internally by `server.ts` for long-lived API/scheduler runs so shared resources remain available between requests. CLI execution via `pipelineRun.ts` leaves this unset and closes RSS telemetry pool on exit.
 - Chrome cleanup tuning in `server.ts` (optional):
 	- **`CHROME_CLEANUP_INTERVAL_MS`** (default: `3600000` = 1 hour)
 	- **`CHROME_CLEANUP_RETRIES`** (default: `3` retries after the initial cleanup attempt)
@@ -47,6 +58,9 @@ Optional (defaults in code):
 - `SCHEDULE_RUN_SECRET` (if set, must be provided as `x-scheduler-secret` header)
 - `SCHEDULE_MIN_DELAY_HOURS` (default: `3`)
 - `SCHEDULE_MAX_DELAY_HOURS` (default: `5`)
+- `POSTING_TIMEZONE` (default: `UTC`)
+- `POSTING_HOURS_START` (default: `8`, inclusive, 24h format)
+- `POSTING_HOURS_END` (default: `21`, exclusive, 24h format)
 - `SCHEDULE_LOCK_TTL_SECONDS` (default: `7200`)
 - `SCHEDULE_RETRY_COUNT` (default: `1`)
 - `SCHEDULE_RETRY_DELAY_MS` (default: `5000`)
@@ -69,17 +83,21 @@ RSS is now the primary ingest path for the pipeline when enabled, with GNews as 
 Optional (defaults in code):
 
 - `USE_RSS_FEEDS` (default: `true`; set to `false` to force GNews-only behavior)
+- `RSS_FETCH_TIMEOUT_MS` (default: `10000`; per-source RSS request timeout)
 - `RSS_TITLE_DEDUP_THRESHOLD` (default: `0.6`; Jaccard threshold for cross-source title dedup)
 - `RSS_CACHE_TTL_SECONDS` (optional global cache TTL override in seconds; if unset, per-source TTL is used)
-- `RSS_GLOBAL_TIMEOUT_MS` (default: `15000`; max time budget for parallel RSS fetch batch)
+- `RSS_GLOBAL_FETCH_TIMEOUT_MS` (default: `75000`; preferred env for total RSS fetch budget)
+- `RSS_GLOBAL_TIMEOUT_MS` (legacy alias; still supported for backward compatibility with the same default behavior)
 - `RSS_SOURCE_FAILURE_THRESHOLD` (default: `3`; consecutive per-source failures before cooldown is applied)
 - `RSS_SOURCE_COOLDOWN_SECONDS` (default: `3600`; cooldown duration for a source that crossed failure threshold)
 - `RSS_SOURCE_FAILURE_TTL_SECONDS` (default: `604800`; Redis TTL for source failure counters)
+- `RSS_TELEMETRY_RETENTION_DAYS` (default: `30`; retention window in days for Postgres RSS telemetry, pruned weekly after a successful scheduled run)
 
 Optional infrastructure:
 
 - `DATABASE_URL` enables durable RSS telemetry persistence in Postgres (`rss_source_telemetry`, `rss_run_telemetry`)
 - `REDIS_URL` enables source-health cooldown state (`rss:health:*` keys)
+- `INSTAGRAM_SESSION_B64` can supply Playwright storage state as base64; `server.ts` decodes it to `storage.json` at startup for hosted deployments
 
 ## Railway (CLI + MCP)
 

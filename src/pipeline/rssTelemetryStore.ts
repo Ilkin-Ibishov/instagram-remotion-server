@@ -42,6 +42,7 @@ const REDIS_KEY_PREFIX = 'rss:health';
 const DEFAULT_FAILURE_THRESHOLD = 3;
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 const DEFAULT_FAILURE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const DEFAULT_TELEMETRY_RETENTION_DAYS = 30;
 
 let pool: Pool | null = null;
 let schemaInitialized = false;
@@ -61,6 +62,10 @@ function getCooldownSeconds(): number {
 
 function getFailureTtlSeconds(): number {
   return parsePositiveInt(process.env.RSS_SOURCE_FAILURE_TTL_SECONDS, DEFAULT_FAILURE_TTL_SECONDS);
+}
+
+function getTelemetryRetentionDays(): number {
+  return parsePositiveInt(process.env.RSS_TELEMETRY_RETENTION_DAYS, DEFAULT_TELEMETRY_RETENTION_DAYS);
 }
 
 function keyForConsecutiveFailures(sourceId: string): string {
@@ -114,6 +119,18 @@ async function ensureSchema(): Promise<void> {
       )
     `);
     await client.query(`
+      ALTER TABLE rss_source_telemetry
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rss_source_tel_run_id
+      ON rss_source_telemetry(run_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rss_source_tel_created
+      ON rss_source_telemetry(created_at)
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS rss_run_telemetry (
         run_id TEXT PRIMARY KEY,
         niches TEXT[] NOT NULL,
@@ -127,6 +144,14 @@ async function ensureSchema(): Promise<void> {
         duration_ms INTEGER NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE rss_run_telemetry
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rss_run_tel_created
+      ON rss_run_telemetry(created_at)
     `);
     schemaInitialized = true;
   } finally {
@@ -317,16 +342,7 @@ export async function recordRssRunTelemetry(input: RssRunTelemetryInput, logger?
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (run_id)
-        DO UPDATE SET
-          niches = EXCLUDED.niches,
-          total_sources = EXCLUDED.total_sources,
-          fulfilled_sources = EXCLUDED.fulfilled_sources,
-          failed_sources = EXCLUDED.failed_sources,
-          skipped_sources = EXCLUDED.skipped_sources,
-          merged_count = EXCLUDED.merged_count,
-          deduped_count = EXCLUDED.deduped_count,
-          global_timeout_triggered = EXCLUDED.global_timeout_triggered,
-          duration_ms = EXCLUDED.duration_ms
+        DO NOTHING
         `,
         [
           input.runId,
@@ -351,6 +367,42 @@ export async function recordRssRunTelemetry(input: RssRunTelemetryInput, logger?
   }
 }
 
+export async function pruneTelemetry(retentionDays = getTelemetryRetentionDays(), logger?: Logger): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+
+  try {
+    await ensureSchema();
+    const client = await getPool().connect();
+    try {
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+      const sourceResult = await client.query(
+        'DELETE FROM rss_source_telemetry WHERE created_at < $1',
+        [cutoff]
+      );
+      const runResult = await client.query(
+        'DELETE FROM rss_run_telemetry WHERE created_at < $1',
+        [cutoff]
+      );
+
+      logger?.info('rss-telemetry', 'Pruned expired RSS telemetry rows', {
+        retentionDays,
+        cutoff,
+        deletedSourceRows: sourceResult.rowCount ?? 0,
+        deletedRunRows: runResult.rowCount ?? 0,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger?.warn('rss-telemetry', 'Failed to prune RSS telemetry rows', {
+      error: error instanceof Error ? error.message : error,
+      retentionDays,
+    });
+  }
+}
+
 export async function closeTelemetryPool(): Promise<void> {
   if (!pool) {
     return;
@@ -364,6 +416,7 @@ export async function closeTelemetryPool(): Promise<void> {
 
 export const __testing = {
   classifyRssErrorType,
+  getTelemetryRetentionDays,
   keyForConsecutiveFailures,
   keyForCooldownUntil,
   keyForLastErrorType,

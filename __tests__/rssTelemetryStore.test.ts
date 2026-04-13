@@ -12,9 +12,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('pg', () => ({
-  Pool: vi.fn(() => ({
-    connect: mocks.pgConnect,
-  })),
+  Pool: vi.fn(function MockPool() {
+    return {
+      connect: mocks.pgConnect,
+    };
+  }),
 }));
 
 vi.mock('../src/utils/redisClient', () => ({
@@ -32,6 +34,7 @@ import {
   classifyRssErrorType,
   noteSourceFetchFailure,
   noteSourceFetchSuccess,
+  pruneTelemetry,
   recordRssRunTelemetry,
   recordRssSourceTelemetry,
   shouldSkipSourceByCooldown,
@@ -47,8 +50,9 @@ describe('rssTelemetryStore', () => {
     delete process.env.RSS_SOURCE_FAILURE_THRESHOLD;
     delete process.env.RSS_SOURCE_COOLDOWN_SECONDS;
     delete process.env.RSS_SOURCE_FAILURE_TTL_SECONDS;
+    delete process.env.RSS_TELEMETRY_RETENTION_DAYS;
 
-    mocks.pgQuery.mockResolvedValue({ rows: [] });
+    mocks.pgQuery.mockResolvedValue({ rows: [], rowCount: 0 });
     mocks.pgRelease.mockReturnValue(undefined);
     mocks.pgConnect.mockResolvedValue({
       query: mocks.pgQuery,
@@ -157,5 +161,29 @@ describe('rssTelemetryStore', () => {
       globalTimeoutTriggered: false,
       durationMs: 789,
     })).resolves.toBeUndefined();
+
+    const queries = mocks.pgQuery.mock.calls.map(([sql]) => String(sql));
+    expect(queries.some((sql) => sql.includes('CREATE INDEX IF NOT EXISTS idx_rss_source_tel_run_id'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('CREATE INDEX IF NOT EXISTS idx_rss_source_tel_created'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('CREATE INDEX IF NOT EXISTS idx_rss_run_tel_created'))).toBe(true);
+  });
+
+  it('prunes telemetry rows older than the configured retention window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-12T00:00:00.000Z'));
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/db';
+    process.env.RSS_TELEMETRY_RETENTION_DAYS = '14';
+
+    await expect(pruneTelemetry()).resolves.toBeUndefined();
+
+    expect(__testing.getTelemetryRetentionDays()).toBe(14);
+    expect(mocks.pgQuery).toHaveBeenCalledWith(
+      'DELETE FROM rss_source_telemetry WHERE created_at < $1',
+      ['2026-03-29T00:00:00.000Z']
+    );
+    expect(mocks.pgQuery).toHaveBeenCalledWith(
+      'DELETE FROM rss_run_telemetry WHERE created_at < $1',
+      ['2026-03-29T00:00:00.000Z']
+    );
   });
 });

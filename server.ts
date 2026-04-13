@@ -13,6 +13,26 @@ import type { Server } from 'http';
 import { runScheduledPipeline, type SchedulerOutcome } from './src/pipeline/schedulerRunner';
 import { readScheduleState } from './src/pipeline/scheduleState';
 import { closeTelemetryPool } from './src/pipeline/rssTelemetryStore';
+import { closeRedisClient } from './src/utils/redisClient';
+import { parseEnvInt } from './src/utils/env';
+
+export function bootstrapInstagramSession(
+    sessionBase64 = process.env.INSTAGRAM_SESSION_B64,
+    storageFilePath = path.join(process.cwd(), 'storage.json')
+): boolean {
+    if (!sessionBase64) {
+        console.warn('[startup] INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
+        return false;
+    }
+
+    fs.writeFileSync(storageFilePath, Buffer.from(sessionBase64.trim(), 'base64'));
+    console.log('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+    return true;
+}
+
+bootstrapInstagramSession();
+
+process.env.SERVER_MODE = 'true';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
@@ -182,6 +202,8 @@ periodicCleanupInterval.unref();
 // ─── Internal Scheduler Loop ─────────────────────────────
 let schedulerInterval: NodeJS.Timeout | null = null;
 let schedulerStartupRetryTimeout: NodeJS.Timeout | null = null;
+let schedulerTickRunning = false;
+let schedulerLoopStopped = false;
 
 async function runSchedulerTick(trigger: 'startup' | 'startup_retry' | 'interval'): Promise<SchedulerOutcome | null> {
     try {
@@ -220,6 +242,8 @@ function scheduleStartupRetry(attempt: number) {
 }
 
 export function startSchedulerLoop() {
+    schedulerLoopStopped = false;
+    schedulerTickRunning = false;
     console.log(
         `[scheduler] Internal scheduler enabled, running once on startup and polling every ${SCHEDULER_POLL_INTERVAL_MS}ms`
     );
@@ -231,15 +255,42 @@ export function startSchedulerLoop() {
             scheduleStartupRetry(1);
         }
     });
-    schedulerInterval = setInterval(async () => {
-        await runSchedulerTick('interval');
-    }, SCHEDULER_POLL_INTERVAL_MS);
-    schedulerInterval.unref();
+
+    const scheduleNextTick = () => {
+        if (schedulerLoopStopped) {
+            return;
+        }
+
+        schedulerInterval = setTimeout(async () => {
+            if (schedulerLoopStopped) {
+                return;
+            }
+
+            if (schedulerTickRunning) {
+                console.warn('[scheduler] Tick skipped — previous interval tick still running');
+                scheduleNextTick();
+                return;
+            }
+
+            schedulerTickRunning = true;
+            try {
+                await runSchedulerTick('interval');
+            } finally {
+                schedulerTickRunning = false;
+                scheduleNextTick();
+            }
+        }, SCHEDULER_POLL_INTERVAL_MS);
+        schedulerInterval.unref();
+    };
+
+    scheduleNextTick();
 }
 
 export function stopSchedulerLoop() {
+    schedulerLoopStopped = true;
+    schedulerTickRunning = false;
     if (schedulerInterval) {
-        clearInterval(schedulerInterval);
+        clearTimeout(schedulerInterval);
         schedulerInterval = null;
     }
     if (schedulerStartupRetryTimeout) {
@@ -250,24 +301,59 @@ export function stopSchedulerLoop() {
 
 // ─── Bundle cache (created once, reused for all renders) ─
 let bundleLocation: string | null = null;
+let bundleInitPromise: Promise<string> | null = null;
 
 async function ensureBundle(): Promise<string> {
     if (bundleLocation) {
         return bundleLocation;
     }
 
-    console.log('[bundle] Creating Remotion bundle (one-time)...');
-    const startTime = Date.now();
+    if (bundleInitPromise) {
+        return bundleInitPromise;
+    }
 
-    bundleLocation = await bundle({
-        entryPoint: path.resolve('./src/remotion/index.tsx'),
-        webpackOverride: (config) => config,
-    });
+    bundleInitPromise = (async () => {
+        console.log('[bundle] Creating Remotion bundle (one-time)...');
+        const startTime = Date.now();
 
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[bundle] ✓ Bundle ready in ${elapsed}s`);
+        bundleLocation = await bundle({
+            entryPoint: path.resolve('./src/remotion/index.tsx'),
+            webpackOverride: (config) => config,
+        });
 
-    return bundleLocation;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`[bundle] ✓ Bundle ready in ${elapsed}s`);
+
+        return bundleLocation;
+    })();
+
+    try {
+        return await bundleInitPromise;
+    } finally {
+        bundleInitPromise = null;
+    }
+}
+
+export function getBundleHealth(): { status: 'ok' | 'not_ready'; bundle: boolean } {
+    const bundleReady = Boolean(bundleLocation);
+    return {
+        status: bundleReady ? 'ok' : 'not_ready',
+        bundle: bundleReady,
+    };
+}
+
+export async function initializeBundleOrExit(
+    exitFn: (code: number) => void = process.exit,
+    ensureBundleFn: () => Promise<string> = ensureBundle
+): Promise<boolean> {
+    try {
+        await ensureBundleFn();
+        return true;
+    } catch (err) {
+        console.error('[bundle] FATAL: Remotion bundle failed - server will not start:', err);
+        exitFn(1);
+        return false;
+    }
 }
 
 // ─── Server ──────────────────────────────────────────────
@@ -285,7 +371,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 
 // Use Railway's PORT env var or default to 3000
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = parseEnvInt('PORT', 3000, 1, 65535);
 let httpServer: Server | null = null;
 let shutdownInProgress = false;
 
@@ -333,12 +419,13 @@ app.use('/api/renders', express.static(RENDER_DIR));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const health = getBundleHealth();
+    res.status(health.bundle ? 200 : 503).json(health);
 });
 
 // Scheduler status endpoint — returns last success, next run, and last error
 app.get('/api/status', async (req, res) => {
-    const accountId = process.env.ACCOUNT_ID ?? 'default';
+    const accountId = process.env.ACCOUNT_ID ?? process.env.SCHEDULE_ACCOUNT_ID ?? 'default';
     try {
         const state = await readScheduleState(accountId);
         if (!state) {
@@ -370,8 +457,19 @@ app.post('/api/schedule/run', async (req, res) => {
 
     const configuredSecret = process.env.SCHEDULE_RUN_SECRET;
     if (configuredSecret) {
-        const providedSecret = req.header('x-scheduler-secret');
-        if (!providedSecret || providedSecret !== configuredSecret) {
+        const providedSecret = req.header('x-scheduler-secret') ?? '';
+        const expectedBuf = Buffer.from(configuredSecret, 'utf8');
+        const providedRawBuf = Buffer.from(providedSecret, 'utf8');
+        const providedBuf = Buffer.alloc(expectedBuf.length);
+        providedRawBuf.copy(providedBuf, 0, 0, Math.min(providedRawBuf.length, expectedBuf.length));
+
+        const equalLength = providedRawBuf.length === expectedBuf.length;
+        const secretMatches =
+            expectedBuf.length > 0 &&
+            crypto.timingSafeEqual(expectedBuf, providedBuf) &&
+            equalLength;
+
+        if (!secretMatches) {
             return res.status(401).json({
                 success: false,
                 status: 'unauthorized',
@@ -411,10 +509,10 @@ export async function startServer() {
         `[cleanup] Config: interval=${CHROME_CLEANUP_INTERVAL_MS}ms, retries=${CHROME_CLEANUP_RETRIES}, retryDelay=${CHROME_CLEANUP_RETRY_DELAY_MS}ms`
     );
     
-    // Pre-warm the bundle on server start.
-    ensureBundle().catch((err) => {
-        console.error('[bundle] Failed to create bundle:', err);
-    });
+    const bundleReady = await initializeBundleOrExit();
+    if (!bundleReady) {
+        return;
+    }
 
     return new Promise<void>((resolve) => {
         httpServer = app.listen(PORT, '0.0.0.0', () => {
@@ -467,7 +565,11 @@ function gracefulShutdown(signal: NodeJS.Signals) {
             return;
         }
 
-        void closeTelemetryPool()
+        void closeRedisClient()
+            .catch((redisError) => {
+                console.error('[shutdown] Error while closing Redis client:', redisError);
+            })
+            .then(() => closeTelemetryPool())
             .catch((poolError) => {
                 console.error('[shutdown] Error while closing telemetry pool:', poolError);
             })
@@ -555,16 +657,16 @@ app.post('/api/render', async (req, res) => {
                         inputProps,
                         // Reduced concurrency for stability (x264 memory errors with concurrency > 1)
                         // Set RENDER_CONCURRENCY env var to override (e.g., 2 or 3 on high-RAM systems)
-                        concurrency: parseInt(process.env.RENDER_CONCURRENCY || '1', 10),
+                        concurrency: parseEnvInt('RENDER_CONCURRENCY', 1, 1, 8),
                         timeoutInMilliseconds: 60000, // Increased from default 33s to 60s
                         // Use 'veryfast' preset to reduce x264 memory usage and thread count
                         // Also reduces CPU strain and encoding time
                         x264Preset: 'veryfast',
                         chromiumOptions: {
-                            disableWebSecurity: true,
                             gl: 'angle',
                             // @ts-ignore - Remotion typings don't expose args but puppeteer accepts it
                             args: [
+                                // Required in many containerized environments where Chromium sandbox cannot initialize.
                                 '--no-sandbox',
                                 '--disable-setuid-sandbox',
                                 '--disable-dev-shm-usage',
@@ -588,10 +690,10 @@ app.post('/api/render', async (req, res) => {
                         frame: composition.durationInFrames - 1,
                         timeoutInMilliseconds: 60000, // Increased from default 33s to 60s
                         chromiumOptions: {
-                            disableWebSecurity: true,
                             gl: 'angle',
                             // @ts-ignore - Remotion typings don't expose args but puppeteer accepts it
                             args: [
+                                // Required in many containerized environments where Chromium sandbox cannot initialize.
                                 '--no-sandbox',
                                 '--disable-setuid-sandbox',
                                 '--disable-dev-shm-usage',
@@ -695,3 +797,13 @@ if (!isTestMode) {
         }
     })();
 }
+
+export const __testing = {
+    resetBundleState(): void {
+        bundleLocation = null;
+        bundleInitPromise = null;
+    },
+    setBundleLocation(nextBundleLocation: string | null): void {
+        bundleLocation = nextBundleLocation;
+    },
+};

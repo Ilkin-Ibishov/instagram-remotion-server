@@ -65,6 +65,6 @@ export function getSourcesForNiche(niches: string[]): RssSource[] {
   }
 
   const nicheSet = new Set(niches.map((niche) => niche.toLowerCase()));
-  const matched = activeSources.filter((source) => source.niches.some((niche) => nicheSet.has(niche)));
+  const matched = activeSources.filter((source) => source.niches.some((niche) => nicheSet.has(niche.toLowerCase())));
   return matched.length > 0 ? matched : activeSources;
 }

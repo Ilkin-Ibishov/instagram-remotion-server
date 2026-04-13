@@ -1,4 +1,6 @@
 import Parser from 'rss-parser';
+import sanitizeHtml from 'sanitize-html';
+import he from 'he';
 
 import type { NewsArticle } from './types';
 import { getSourcesForNiche, type RssSource } from './rssSourceRegistry';
@@ -14,6 +16,8 @@ import {
 import { normalizeArticleUrl } from '../utils/normalizeUrl';
 import { getRedisClient } from '../utils/redisClient';
 import Logger from '../utils/logger';
+
+const { decode: decodeHtmlEntities } = he;
 
 type RssMediaNode = {
   url?: string;
@@ -58,20 +62,34 @@ type SourceFetchResult = {
   errorMessage?: string;
 };
 
-const FETCH_TIMEOUT_MS = 10_000;
-const GLOBAL_FETCH_TIMEOUT_MS = Number(process.env.RSS_GLOBAL_TIMEOUT_MS) || 15_000;
+export class RssGlobalTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`RSS global fetch timeout after ${timeoutMs}ms`);
+    this.name = 'RssGlobalTimeoutError';
+  }
+}
+
+function resolveRssFetchTimeoutMs(): number {
+  return Number(process.env.RSS_FETCH_TIMEOUT_MS ?? 10_000);
+}
+
+function resolveGlobalFetchTimeoutMs(): number {
+  return Number(process.env.RSS_GLOBAL_FETCH_TIMEOUT_MS ?? process.env.RSS_GLOBAL_TIMEOUT_MS ?? 75_000);
+}
 const EPOCH_FALLBACK_DATE = '1970-01-01T00:00:00Z';
 const TITLE_SIMILARITY_THRESHOLD = Number(process.env.RSS_TITLE_DEDUP_THRESHOLD || '0.6');
-const parser = new Parser({
-  timeout: FETCH_TIMEOUT_MS,
-  customFields: {
-    item: [
-      ['media:content', 'mediaContent', { keepArray: false }],
-      ['media:thumbnail', 'mediaThumbnail', { keepArray: false }],
-      ['itunes:image', 'itunesImage', { keepArray: false }],
-    ],
-  },
-});
+function createParser(): Parser {
+  return new Parser({
+    timeout: resolveRssFetchTimeoutMs(),
+    customFields: {
+      item: [
+        ['media:content', 'mediaContent', { keepArray: false }],
+        ['media:thumbnail', 'mediaThumbnail', { keepArray: false }],
+        ['itunes:image', 'itunesImage', { keepArray: false }],
+      ],
+    },
+  });
+}
 
 function resolveRssImage(item: RssItem): string | undefined {
   const candidates = [
@@ -93,22 +111,20 @@ function resolveRssImage(item: RssItem): string | undefined {
 }
 
 function stripHtml(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&[^;]+;/g, ' ')
+  const decodedInput = decodeHtmlEntities(value);
+  const sanitized = sanitizeHtml(decodedInput, {
+    allowedTags: [],
+    allowedAttributes: {},
+  });
+
+  return decodeHtmlEntities(sanitized)
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function normalizeDescription(raw: RssItem): string {
-  const fallback = stripHtml(raw.summary || raw.description || raw.content || '');
-  const value = raw.contentSnippet || fallback;
+  const preferred = raw.contentSnippet || raw.summary || raw.description || raw.content || '';
+  const value = stripHtml(preferred);
   const clipped = value.substring(0, 500).trim();
   if (!clipped) {
     return '';
@@ -157,18 +173,39 @@ function titleWordSet(title: string): Set<string> {
     'with', 'are', 'was', 'by', 'as', 'be', 'or', 'from', 'has', 'have', 'not', 'but', 'your',
   ]);
 
+  const normalized = normalizeTitle(title);
+
   return new Set(
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
+    normalized
       .split(/\s+/)
       .filter((word) => word.length > 2 && !stopWords.has(word))
   );
 }
 
+function normalizeTitle(title: string): string {
+  return title
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function titleFingerprint(title: string): string {
+  return normalizeTitle(title)
+    .split(' ')
+    .filter((word) => word.length > 3)
+    .slice(0, 6)
+    .join(' ');
+}
+
 function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 && b.size === 0) {
-    return 1;
+    return 0;
+  }
+
+  if (a.size === 0 || b.size === 0) {
+    return 0;
   }
 
   const intersection = [...a].filter((word) => b.has(word)).length;
@@ -178,10 +215,10 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
 
 export function crossSourceDedup(articles: NewsArticle[], logger: Logger): NewsArticle[] {
   const seenUrls = new Set<string>();
-  const seenTitleSets: Set<string>[] = [];
+  const seenTitleFingerprints = new Set<string>();
   const deduped: NewsArticle[] = [];
   let droppedByUrl = 0;
-  let droppedByTitleSimilarity = 0;
+  let droppedByTitleFingerprint = 0;
 
   logger.info('rss-dedup', 'Starting cross-source deduplication', {
     totalInput: articles.length,
@@ -195,36 +232,38 @@ export function crossSourceDedup(articles: NewsArticle[], logger: Logger): NewsA
       continue;
     }
 
-    const currentTitleSet = titleWordSet(article.title);
-    const isTitleDuplicate = seenTitleSets.some(
-      (existingTitleSet) => jaccardSimilarity(existingTitleSet, currentTitleSet) >= TITLE_SIMILARITY_THRESHOLD
-    );
+    seenUrls.add(normalizedUrl);
 
-    if (isTitleDuplicate) {
-      droppedByTitleSimilarity += 1;
+    const fingerprint = titleFingerprint(article.title);
+    if (fingerprint && seenTitleFingerprints.has(fingerprint)) {
+      droppedByTitleFingerprint += 1;
       logger.debug('rss-dedup', `Dropped cross-source duplicate: ${article.title.substring(0, 60)}`);
       continue;
     }
 
-    seenUrls.add(normalizedUrl);
-    seenTitleSets.push(currentTitleSet);
+    if (fingerprint) {
+      seenTitleFingerprints.add(fingerprint);
+    }
+
     deduped.push(article);
   }
 
   logger.info('rss-dedup', 'Cross-source deduplication complete', {
     kept: deduped.length,
     droppedByUrl,
-    droppedByTitleSimilarity,
-    totalDropped: droppedByUrl + droppedByTitleSimilarity,
+    droppedByTitleFingerprint,
+    totalDropped: droppedByUrl + droppedByTitleFingerprint,
   });
 
   return deduped;
 }
 
 async function fetchFeedLive(source: RssSource, logger: Logger): Promise<FeedLiveResult> {
+  const fetchTimeoutMs = resolveRssFetchTimeoutMs();
+  const parser = createParser();
   logger.info('rss-fetch', `Fetching live RSS feed: ${source.id}`, {
     feedUrl: source.feedUrl,
-    timeoutMs: FETCH_TIMEOUT_MS,
+    timeoutMs: fetchTimeoutMs,
   });
 
   const startedAt = Date.now();
@@ -406,13 +445,14 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
   const runStartedAt = Date.now();
   const runId = `rss-${runStartedAt}-${Math.random().toString(16).slice(2, 8)}`;
   const sources = getSourcesForNiche(niches);
+  const globalFetchTimeoutMs = resolveGlobalFetchTimeoutMs();
   let globalTimeoutTriggered = false;
 
   logger.info('rss', 'Starting RSS workflow', {
     runId,
     niches,
     threshold: TITLE_SIMILARITY_THRESHOLD,
-    globalTimeoutMs: GLOBAL_FETCH_TIMEOUT_MS,
+    globalTimeoutMs: globalFetchTimeoutMs,
     redisEnabled: Boolean(process.env.REDIS_URL),
     ttlOverride: process.env.RSS_CACHE_TTL_SECONDS || null,
   });
@@ -453,19 +493,23 @@ export async function fetchRssNews(niches: string[]): Promise<NewsArticle[]> {
     sourceTasks
   );
   let timeoutId: NodeJS.Timeout | null = null;
-  const timeoutPromise = new Promise<PromiseSettledResult<SourceFetchResult>[]>((resolve) => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       globalTimeoutTriggered = true;
       logger.warn('rss', 'RSS global timeout reached before all sources settled', {
-        globalTimeoutMs: GLOBAL_FETCH_TIMEOUT_MS,
+        globalTimeoutMs: globalFetchTimeoutMs,
       });
-      resolve([]);
-    }, GLOBAL_FETCH_TIMEOUT_MS);
+      reject(new RssGlobalTimeoutError(globalFetchTimeoutMs));
+    }, globalFetchTimeoutMs);
   });
 
-  const settledResults = await Promise.race([allSettledPromise, timeoutPromise]);
-  if (timeoutId) {
-    clearTimeout(timeoutId);
+  let settledResults: PromiseSettledResult<SourceFetchResult>[];
+  try {
+    settledResults = await Promise.race([allSettledPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
   const merged: NewsArticle[] = [];
   let fulfilledSources = 0;

@@ -8,7 +8,7 @@ import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfil
 import type { NewsArticle, PublishablePost } from './pipeline/types';
 import path from 'path';
 import Logger from './utils/logger';
-import { generatePostContentAI } from './pipeline/aiService';
+import { closeTelemetryPool } from './pipeline/rssTelemetryStore';
 import * as dotenv from 'dotenv';
 import { pathToFileURL } from 'url';
 
@@ -49,7 +49,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
   return result.images;
 }
 
-export async function runPipeline() {
+export async function runPipeline(signal?: AbortSignal) {
   const logger = new Logger();
   const accountProfile = loadAccountProfile();
   const accountKeywords = getAccountKeywords(accountProfile);
@@ -103,8 +103,8 @@ export async function runPipeline() {
       printScoringResults(scoredArticles, logger);
     }
 
-    // RSS returned articles but none were relevant: retry with top-headlines before search fallback.
-    if (useRssFeeds && scoredArticles.length === 0) {
+    // Trigger top-headlines fallback when RSS failed entirely or produced no relevant articles.
+    if (useRssFeeds && (rssFetchFailed || scoredArticles.length === 0)) {
       logger.info(
         'pipeline',
         `--- Step 0c: Top-Headlines Fallback (${rssFetchFailed ? 'RSS fetch failed' : 'no relevant articles from RSS'}) ---`
@@ -151,7 +151,7 @@ export async function runPipeline() {
     logger.info('pipeline', `Selected article (score: ${selectedArticleItem.score}): "${article.title}"`);
 
     logger.info('pipeline', '--- Step 1: AI Content Generation ---');
-    const aiData = await generatePostContentAI(article, accountProfile);
+    const aiData = await generateContent(article, accountProfile);
     logger.info('ai-generation', `Generated ${aiData.manifest.carousel.length} slides with account context`, {
       account: accountProfile.handle,
       slideCount: aiData.manifest.carousel.length,
@@ -204,6 +204,9 @@ export async function runPipeline() {
     logger.debug('assembly', 'Assembled post:', post);
 
     logger.info('pipeline', '--- Step 4: Publishing to Instagram ---');
+    if (signal?.aborted) {
+      throw new Error(`Pipeline aborted before publish: ${String(signal.reason || 'lock lost')}`);
+    }
     // Uncomment this line to actually publish to Instagram.
     // Make sure storage.json has valid session!
     await publishToInstagram(post);
@@ -218,6 +221,16 @@ export async function runPipeline() {
   } catch (error) {
     logger.error('pipeline', 'Pipeline failed', error);
     throw error;
+  } finally {
+    if (process.env.SERVER_MODE !== 'true') {
+      try {
+        await closeTelemetryPool();
+      } catch (closeError) {
+        logger.warn('rss-telemetry', 'Failed to close telemetry pool after pipeline run', {
+          error: closeError instanceof Error ? closeError.message : closeError,
+        });
+      }
+    }
   }
 }
 

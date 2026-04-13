@@ -9,7 +9,13 @@
 ## Bundle cache
 
 - **`ensureBundle()`** calls `@remotion/bundler` **`bundle()`** once with entry **`./src/remotion/index.tsx`** and caches the result for all subsequent renders.
-- **`startServer()`** pre-warms the bundle asynchronously (failures log to console).
+- **`startServer()`** blocks on bundle creation before listening; if bundling fails, startup exits instead of serving a broken render path.
+
+## Health endpoint
+
+- **`GET /health`** reports Remotion readiness, not just process liveness.
+- Returns **`200`** with `{ "status": "ok", "bundle": true }` once the bundle is ready.
+- Returns **`503`** with `{ "status": "not_ready", "bundle": false }` before bundle initialization succeeds.
 
 ## POST `/api/render`
 

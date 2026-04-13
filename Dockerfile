@@ -44,8 +44,9 @@ RUN npm ci
 RUN npx playwright install chromium
 
 COPY . .
+RUN npm run build
 
 # Expose port for Railway
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "start:prod"]

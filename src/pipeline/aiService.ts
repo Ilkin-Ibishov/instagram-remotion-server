@@ -4,6 +4,7 @@ import type { AccountProfile } from "./accountProfile";
 import { config as brandConfig } from "./config";
 import * as dotenv from "dotenv";
 import fs from "fs";
+import path from "path";
 import { Logger } from "../utils/logger";
 
 dotenv.config();
@@ -60,12 +61,24 @@ const model = genAI.getGenerativeModel({
   },
 });
 
-const REQUIRED_TEMPLATE_SEQUENCE = [
-  "HOOK_A",
-  "CONTENT_LISTICLE",
-  "CONTENT_GENERIC",
-  "CTA_FINAL",
+const DEFAULT_MIN_SLIDES = 3;
+const DEFAULT_MAX_SLIDES = 5;
+const DEFAULT_GEMINI_TIMEOUT_MS = 60000;
+
+const TEMPLATE_PLANS = [
+  ["HOOK_A", "CONTENT_LISTICLE", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_VIDEO", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_VIDEO", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_VIDEO", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CONTENT_GENERIC", "CTA_FINAL"],
+  ["HOOK_A", "CONTENT_VIDEO", "CONTENT_GENERIC", "CONTENT_LISTICLE", "CTA_FINAL"],
 ] as const;
+
+type TemplatePlan = (typeof TEMPLATE_PLANS)[number];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -73,6 +86,155 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+export function sanitizeForPrompt(value: string | undefined | null, maxLength = 500): string {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .replace(/`/g, "'")
+    .replace(/\\/g, "\\\\")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function parseSlideBoundEnv(raw: string | undefined, fallback: number): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+export function resolveGeminiTimeoutMs(raw: string | undefined = process.env.GEMINI_TIMEOUT_MS): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_GEMINI_TIMEOUT_MS;
+  }
+
+  return Math.max(1, Math.floor(parsed));
+}
+
+export async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+export function resolveSlideBoundsFromEnv(): { minSlides: number; maxSlides: number } {
+  let minSlides = parseSlideBoundEnv(process.env.MIN_SLIDES, DEFAULT_MIN_SLIDES);
+  let maxSlides = parseSlideBoundEnv(process.env.MAX_SLIDES, DEFAULT_MAX_SLIDES);
+
+  minSlides = Math.max(3, Math.min(5, minSlides));
+  maxSlides = Math.max(3, Math.min(5, maxSlides));
+
+  if (minSlides > maxSlides) {
+    [minSlides, maxSlides] = [maxSlides, minSlides];
+  }
+
+  return { minSlides, maxSlides };
+}
+
+export function buildRequiredTemplateSequence(
+  minSlides: number,
+  maxSlides: number,
+  randomFn: () => number = Math.random
+): TemplatePlan {
+  const candidates = TEMPLATE_PLANS.filter((plan) => plan.length >= minSlides && plan.length <= maxSlides);
+  const pool = candidates.length > 0 ? candidates : TEMPLATE_PLANS;
+  const index = Math.floor(randomFn() * pool.length);
+  return pool[Math.max(0, Math.min(pool.length - 1, index))];
+}
+
+function createSlideTemplateSpec(templateId: string, article: NewsArticle): Record<string, unknown> {
+  if (templateId === "HOOK_A") {
+    return {
+      headline: "...",
+      subheadline: "...",
+      imageUrl: article.imageUrl ?? null,
+    };
+  }
+
+  if (templateId === "CONTENT_LISTICLE") {
+    return {
+      title: "...",
+      items: ["...", "...", "...", "..."],
+      footnote: `Source: ${article.source}`,
+    };
+  }
+
+  if (templateId === "CONTENT_GENERIC") {
+    return {
+      title: "...",
+      body: "...",
+      highlight: "...",
+    };
+  }
+
+  if (templateId === "CONTENT_VIDEO") {
+    return {
+      title: "...",
+      caption: "...",
+      videoUrl: null,
+      imageUrl: article.imageUrl ?? null,
+      source: `Source: ${article.source}`,
+    };
+  }
+
+  return {
+    callToAction: "...",
+    subtext: "Reply in comments",
+  };
+}
+
+function buildPromptOutputExample(sequence: readonly string[], article: NewsArticle): string {
+  const carousel = sequence.map((templateId) => ({
+    templateId,
+    data: createSlideTemplateSpec(templateId, article),
+  }));
+
+  return JSON.stringify(
+    {
+      manifest: {
+        format: "instagram_carousel",
+        globalBranding: {
+          accentColor: brandConfig.brandAccentColor,
+          handle: brandConfig.brandHandle,
+          effects: brandConfig.brandEffects,
+        },
+        carousel,
+      },
+      caption: "...",
+      hashtags: "...",
+    },
+    null,
+    2
+  );
+}
+
+export function ensureParentDirectoryExists(filePath: string): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
 }
 
 function validateSlideData(templateId: string, data: unknown, index: number): string[] {
@@ -119,6 +281,24 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
     }
   }
 
+  if (templateId === "CONTENT_VIDEO") {
+    if (!isNonEmptyString(data.title)) {
+      errors.push(`slide[${index}].data.title must be a non-empty string`);
+    }
+    if (data.videoUrl !== null && data.videoUrl !== undefined && typeof data.videoUrl !== "string") {
+      errors.push(`slide[${index}].data.videoUrl must be string, null, or undefined`);
+    }
+    if (data.imageUrl !== null && data.imageUrl !== undefined && typeof data.imageUrl !== "string") {
+      errors.push(`slide[${index}].data.imageUrl must be string, null, or undefined`);
+    }
+    if (data.caption !== undefined && data.caption !== null && !isNonEmptyString(data.caption)) {
+      errors.push(`slide[${index}].data.caption must be a non-empty string when provided`);
+    }
+    if (data.source !== undefined && data.source !== null && !isNonEmptyString(data.source)) {
+      errors.push(`slide[${index}].data.source must be a non-empty string when provided`);
+    }
+  }
+
   if (templateId === "CTA_FINAL") {
     if (!isNonEmptyString(data.callToAction)) {
       errors.push(`slide[${index}].data.callToAction must be a non-empty string`);
@@ -131,7 +311,7 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
   return errors;
 }
 
-function validateGeneratedContent(payload: unknown): GeneratedContent {
+function validateGeneratedContent(payload: unknown, requiredTemplateSequence: readonly string[]): GeneratedContent {
   if (!isRecord(payload)) {
     throw new Error("Gemini response root must be an object");
   }
@@ -161,13 +341,13 @@ function validateGeneratedContent(payload: unknown): GeneratedContent {
     throw new Error("manifest.carousel must be an array");
   }
 
-  if (manifest.carousel.length !== REQUIRED_TEMPLATE_SEQUENCE.length) {
-    throw new Error(`manifest.carousel must contain exactly ${REQUIRED_TEMPLATE_SEQUENCE.length} slides`);
+  if (manifest.carousel.length !== requiredTemplateSequence.length) {
+    throw new Error(`manifest.carousel must contain exactly ${requiredTemplateSequence.length} slides`);
   }
 
   const validationErrors: string[] = [];
-  for (let i = 0; i < REQUIRED_TEMPLATE_SEQUENCE.length; i += 1) {
-    const expectedTemplateId = REQUIRED_TEMPLATE_SEQUENCE[i];
+  for (let i = 0; i < requiredTemplateSequence.length; i += 1) {
+    const expectedTemplateId = requiredTemplateSequence[i];
     const slide = manifest.carousel[i];
 
     if (!isRecord(slide)) {
@@ -221,12 +401,20 @@ export async function generatePostContentAI(
   }
 
   const account = accountProfile || brandConfig.accountProfile;
+  const { minSlides, maxSlides } = resolveSlideBoundsFromEnv();
+  const geminiTimeoutMs = resolveGeminiTimeoutMs();
+  const requiredTemplateSequence = buildRequiredTemplateSequence(minSlides, maxSlides);
+  const outputExample = buildPromptOutputExample(requiredTemplateSequence, article);
+  const sanitizedHandle = sanitizeForPrompt(account.handle, 50);
+  const sanitizedDisplayName = sanitizeForPrompt(account.displayName, 100);
+  const sanitizedBio = sanitizeForPrompt(account.bio, 300);
+  const sanitizedNiche = sanitizeForPrompt(account.niche.join(", "), 200);
 
   // Build relevance instruction if account context is available
   const relevanceCheck = account
-    ? `\nRELEVANCE NOTE: This content is for ${account.handle} (${account.displayName}).
-Account focus: ${account.bio}.
-Account niche: ${account.niche.join(", ")}.
+    ? `\nRELEVANCE NOTE: This content is for ${sanitizedHandle} (${sanitizedDisplayName}).
+Account focus: ${sanitizedBio}.
+Account niche: ${sanitizedNiche}.
 Ensure the content aligns with this audience and tone.`
     : '';
 
@@ -330,6 +518,17 @@ Rules:
 
 ---
 
+## TEMPLATE SEQUENCE RULES (MANDATORY)
+
+- Produce EXACTLY ${requiredTemplateSequence.length} slides for this request.
+- Slide 1 must be HOOK_A.
+- Last slide must be CTA_FINAL.
+- Middle slides must follow this exact templateId order:
+${requiredTemplateSequence.map((templateId, index) => `${index + 1}. ${templateId}`).join("\n")}
+- Do not add extra slides, do not reorder template IDs.
+
+---
+
 ## CAPTION RULES
 
 - First line = strong hook
@@ -401,64 +600,20 @@ Before returning output, check:
 ## INPUT
 
 ACCOUNT:
-Handle: ${account.handle}
-Name: ${account.displayName}
-Bio: ${account.bio}${relevanceCheck}
+Handle: ${sanitizedHandle}
+Name: ${sanitizedDisplayName}
+Bio: ${sanitizedBio}${relevanceCheck}
 
 ARTICLE:
-Title: ${article.title}
-Source: ${article.source}
-${/* NOTE: We use `description` (max ~300 chars) instead of `content` because GNews free tier truncates `content` at ~260 chars with a "[chars]" suffix. The description field reliably contains the full editorial summary. */""}Description: ${article.description}
+Title: ${sanitizeForPrompt(article.title, 200)}
+Source: ${sanitizeForPrompt(article.source, 100)}
+${/* NOTE: We use `description` (max ~300 chars) instead of `content` because GNews free tier truncates `content` at ~260 chars with a "[chars]" suffix. The description field reliably contains the full editorial summary. */""}Description: ${sanitizeForPrompt(article.description, 500)}
 
 ---
 
 ## OUTPUT FORMAT
 
-{
-  "manifest": {
-    "format": "instagram_carousel",
-    "globalBranding": {
-      "accentColor": "${brandConfig.brandAccentColor}",
-      "handle": "${brandConfig.brandHandle}",
-      "effects": ${JSON.stringify(brandConfig.brandEffects)}
-    },
-    "carousel": [
-      {
-        "templateId": "HOOK_A",
-        "data": {
-          "headline": "...",
-          "subheadline": "...",
-          "imageUrl": ${article.imageUrl ? `"${article.imageUrl}"` : 'null'}
-        }
-      },
-      {
-        "templateId": "CONTENT_LISTICLE",
-        "data": {
-          "title": "...",
-          "items": ["...", "...", "...", "..."],
-          "footnote": "Source: ${article.source}"
-        }
-      },
-      {
-        "templateId": "CONTENT_GENERIC",
-        "data": {
-          "title": "...",
-          "body": "...",
-          "highlight": "..."
-        }
-      },
-      {
-        "templateId": "CTA_FINAL",
-        "data": {
-          "callToAction": "...",
-          "subtext": "Reply in comments"
-        }
-      }
-    ]
-  },
-  "caption": "...",
-  "hashtags": "..."
-}
+${outputExample}
 
 ---
 
@@ -474,7 +629,11 @@ RETURN ONLY JSON.`;
 
   const aiLogger = new Logger();
   try {
-    const result = await model.generateContent(prompt);
+    const result = await withTimeout(
+      model.generateContent(prompt),
+      geminiTimeoutMs,
+      `Gemini API timeout after ${geminiTimeoutMs}ms`
+    );
     const response = await result.response;
     let responseText = response.text();
     
@@ -494,6 +653,7 @@ RETURN ONLY JSON.`;
       const parseErrorMessage = parseError instanceof Error ? parseError.message : String(parseError);
       // Write full response to a debug file for post-mortem analysis
       const debugPath = `./logs/gemini-response-${Date.now()}.txt`;
+      ensureParentDirectoryExists(debugPath);
       fs.writeFileSync(debugPath, responseText);
       aiLogger.error('ai-service', `Failed to parse Gemini response as JSON. Full response saved to ${debugPath}`, {
         rawPreview: responseText.substring(0, 1000),
@@ -502,7 +662,7 @@ RETURN ONLY JSON.`;
       throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseErrorMessage}`);
     }
 
-    return validateGeneratedContent(json);
+    return validateGeneratedContent(json, requiredTemplateSequence);
   } catch (error) {
     aiLogger.error('ai-service', 'Gemini generation error', error);
     throw error;

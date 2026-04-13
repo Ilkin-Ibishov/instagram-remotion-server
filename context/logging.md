@@ -195,8 +195,9 @@ Look for:
 2. Compare to registered templates in `src/remotion/SlideComposition.tsx`
 
 **Fix:**
-- Ensure Gemini only uses: `HOOK_A`, `CONTENT_LISTICLE`, `CONTENT_GENERIC`, `CTA_FINAL`
-- Update prompt if Gemini is generating custom template names
+- Ensure Gemini keeps `HOOK_A` as first slide and `CTA_FINAL` as last slide
+- Ensure middle slides only use `CONTENT_LISTICLE` and/or `CONTENT_GENERIC`
+- Update prompt if Gemini is generating custom template names or wrong order
 
 ## Command Reference
 

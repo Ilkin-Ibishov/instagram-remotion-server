@@ -40,4 +40,51 @@ describe('executeWithRetry', () => {
 
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it('throws after max retries are exhausted for retryable errors', async () => {
+    const fn = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(new Error('ECONNRESET persistent error'));
+
+    const onRetry = vi.fn();
+
+    await expect(
+      executeWithRetry(fn, {
+        maxRetries: 2,
+        retryDelayMs: 1,
+        onRetry,
+      })
+    ).rejects.toThrow('ECONNRESET persistent error');
+
+    // Initial attempt + 2 retries
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(onRetry).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for retryDelayMs before the next retry attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      const fn = vi
+        .fn<() => Promise<string>>()
+        .mockRejectedValueOnce(new Error('network timeout'))
+        .mockResolvedValueOnce('ok');
+
+      const resultPromise = executeWithRetry(fn, {
+        maxRetries: 1,
+        retryDelayMs: 50,
+      });
+
+      await Promise.resolve();
+      expect(fn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(49);
+      expect(fn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(resultPromise).resolves.toBe('ok');
+      expect(fn).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -24,6 +24,264 @@ Correction: …
 
 ## Entries
 
+### 2026-04-12 — AI output should pass a lightweight quality gate before render and publish, not just schema validation
+
+Context: Audit task BIZ-06 reviewed why the pipeline would publish any structurally valid Gemini output regardless of engagement-readiness or obvious weakness.
+Mistake: Treating schema-valid output as automatically publishable lets empty/weak slide data, very short captions, or poor hashtag sets flow straight into render and Instagram posting.
+Correction: Added a small pre-publish content quality score in `src/pipeline/contentGenerator.ts` covering slide population, template variety, caption shape, and hashtag validity; `runPipeline()` now goes through that wrapper so low-quality AI output fails before rendering or publishing, with focused content-generator and pipeline tests.
+
+### 2026-04-12 — Template registries should stay aligned with AI sequence generation, not leave render-only slide types orphaned
+
+Context: Audit task BIZ-04 reviewed why `CONTENT_VIDEO` existed in render/template registries but never appeared in AI-generated carousel plans.
+Mistake: Keeping a slide type renderable but unreachable from the generation pipeline turns it into maintenance-only dead code and drifts prompt examples away from the real template surface area.
+Correction: Added `CONTENT_VIDEO`-inclusive AI template plans, taught prompt examples to emit the correct video slide shape, extended validation for `CONTENT_VIDEO` data, and added sequence tests proving the planner can now select video-inclusive manifests.
+
+### 2026-04-12 — Shared connection singletons must clear cached failures so later calls can recover
+
+Context: Audit task SRV-08 reviewed the shared Redis helper used by caches, scheduler locking, and RSS telemetry state.
+Mistake: Caching a rejected `connect()` promise permanently poisons all future callers because the singleton keeps returning the same failure with no retry path.
+Correction: Updated `src/utils/redisClient.ts` to clear the cached promise on connect failure before rethrowing, and added a direct unit test proving a second call can create a fresh client and recover.
+
+### 2026-04-12 — Selection helpers should clamp boundary randomness and callers should keep explicit null guards
+
+Context: Audit task RSS-17 reviewed article selection null-safety around `selectBestArticle()` and `runPipeline()`.
+Mistake: Even when the pipeline guards against a null selected article, a selection helper that can produce an out-of-range index from injected randomness leaves an avoidable undefined/dereference edge case in the selection layer itself.
+Correction: Clamped the diverse-strategy index to a valid top-N range, kept the pipeline's explicit null guard as the caller-side safety net, and added tests for both the random boundary case and the null-selection pipeline error path.
+
+### 2026-04-12 — RSS title dedup normalization must preserve Unicode letters and numbers
+
+Context: Audit task RSS-12 reviewed cross-source title dedup behavior for non-English headlines.
+Mistake: Regexes built around `[a-z0-9]` strip accented and non-Latin characters before tokenization, which distorts title fingerprints and dedup similarity for international content.
+Correction: Switched RSS title normalization to Unicode-aware character classes with `NFKC` normalization, reused that normalized form for token sets, and added regression coverage for accented Turkish titles and distinct Unicode titles that should not dedup.
+
+### 2026-04-12 — Persisted history corruption should hard-stop writes, not fall back to empty state
+
+Context: Audit task PIPE-05 reviewed how `src/pipeline/postHistory.ts` behaves when `post-history.json` contains invalid JSON.
+Mistake: Treating parse failures as an empty history lets the next `recordPost()` call overwrite the corrupted file and permanently erase recoverable history.
+Correction: Changed history loading to surface corruption state explicitly, made `recordPost()` refuse destructive writes while logging an actionable error, and added a temp-file regression test that preserves the corrupted file contents.
+
+### 2026-04-12 — Debug file writes should ensure parent directory existence first
+
+Context: Audit task AI-05 reviewed parse-failure logging in Gemini response handling.
+Mistake: Writing debug output directly to a relative logs path can fail when the directory is absent, masking the original parse error.
+Correction: Added parent-directory creation helper and call before `writeFileSync`, with focused unit coverage for recursive directory creation.
+
+### 2026-04-12 — Account profile env parsing should enforce non-empty niches and filter unknown effects
+
+Context: Audit task AI-07 reviewed startup config validation for branding niche/effects values.
+Mistake: Passing split/trimmed env arrays through without validation allowed empty niche sets and unsupported effect tokens to silently degrade behavior.
+Correction: Added strict niche validation (must contain at least one non-empty value), filtered effects against allowed tokens, and logged warnings for ignored effect values.
+
+### 2026-04-12 — Composition duration should be configurable, not fixed in code
+
+Context: Audit task TPL-05 reviewed fixed 720-frame registration in Remotion root.
+Mistake: Hardcoding duration can silently truncate longer visual narratives and makes environment-specific tuning harder.
+Correction: Switched composition duration to `COMPOSITION_DURATION_SECONDS * 30` with safe default/fallback behavior, and documented the env variable in project context.
+
+### 2026-04-12 — Frame-invariant overlay styles should be hoisted out of render functions
+
+Context: Audit task TPL-06 reviewed rendering overhead in `EffectsOverlay` during Remotion encoding.
+Mistake: Recreating large inline style objects for static overlays on each render frame adds avoidable allocation/reconciliation overhead.
+Correction: Hoisted CRT/noise/vignette/chromatic/halftone style objects to module-level constants so frame rendering reuses stable objects with no visual behavior changes.
+
+### 2026-04-12 — One-shot modal checks are fragile in Instagram SPA transitions
+
+Context: Audit task IG-04 reviewed Reels informational modal timing during upload/edit transitions.
+Mistake: Checking modal visibility only once can miss delayed modal appearance and let overlays block subsequent button clicks.
+Correction: Replaced one-shot check with short polling-based modal dismissal and re-checks before critical `Next` transitions to absorb delayed render timing.
+
+### 2026-04-12 — Session validation must hard-gate publish flow before browser launch
+
+Context: Audit task IG-05 reviewed why expired Instagram sessions still progressed into Playwright automation.
+Mistake: Validating session expiry without enforcing the result leads to late-stage DOM failures that hide the real root cause.
+Correction: Added an explicit pre-publish session guard that throws on invalid session state before browser launch, with actionable re-auth context and configurable minimum remaining session time via env.
+
+### 2026-04-12 — Instagram publish automation should verify authenticated UI state immediately after landing
+
+Context: Audit task IG-06 reviewed failure modes where expired sessions surfaced later as generic selector errors.
+Mistake: Relying on URL checks alone after `instagram.com` load can miss unauthenticated states in SPA flows and delay root-cause detection.
+Correction: Added explicit post-load auth signal checks (login-form presence vs feed/create UI), capture screenshot on auth failure, and throw a clear re-authentication error pointing to `scripts/saveSession.ts`.
+
+### 2026-04-12 — Repetition penalties should target same-topic recurrence, not total posting volume
+
+Context: Audit task BIZ-02 reviewed why repeated topics could still win article selection.
+Mistake: Applying a small penalty based only on total recent post count does not reliably suppress repeated-topic candidates and can behave like a no-op.
+Correction: Switched anti-repetition scoring to use same-topic recent post counts (keyword overlap against recent post titles) with configurable controls (`REPETITION_WINDOW_DAYS`, `REPETITION_THRESHOLD`, `REPETITION_PENALTY`), and added ranking regression coverage.
+
+### 2026-04-12 — Carousel variety should be controlled by explicit sequence plans, not unconstrained AI ordering
+
+Context: Audit task BIZ-03 found repetitive fixed carousel structure and poor format diversity.
+Mistake: Forcing a single hardcoded template sequence on every post causes repetitive output, while fully unconstrained ordering risks invalid slide contracts.
+Correction: Added env-bounded sequence selection (`MIN_SLIDES`, `MAX_SLIDES`, 3-5 range) using predefined valid plans with `HOOK_A` always first and `CTA_FINAL` always last; middle slides vary between `CONTENT_LISTICLE` and `CONTENT_GENERIC`. Validation now enforces the request-specific chosen sequence.
+
+### 2026-04-12 — Random scheduler jitter should still respect a timezone-aware posting window
+
+Context: Audit task BIZ-05 reviewed schedule timing quality for audience reach optimization.
+Mistake: Jittered delay scheduling had no time-of-day guard, allowing runs during low-engagement hours.
+Correction: Added posting-window checks in `runScheduledPipeline` using `POSTING_TIMEZONE`, `POSTING_HOURS_START`, and `POSTING_HOURS_END`; scheduler now skips outside the window with explicit reason logging. Added coverage in `__tests__/schedulerRunner.test.ts` and documented vars in `.env.example` and `context/development.md`.
+
+### 2026-04-12 — Integration clients should treat 429 as retryable and honor Retry-After
+
+Context: Audit task INT-02 reviewed ClickUp API retry behavior in `src/automation/clickupClient.ts`.
+Mistake: Retry loops only handled `>=500`, so rate-limit (`429`) responses failed immediately during burst operations.
+Correction: Added `429` retry handling to ClickUp comment/status operations, propagated `Retry-After` from failed responses, used header-based delay when available, and defaulted to 60s when absent. Added dedicated unit tests for header delay, default delay, and exhausted retry failure.
+
+### 2026-04-12 — Retry policy tests should validate delay timing, not only retry counts
+
+Context: Audit task TEST-03 reviewed `executeWithRetry` test coverage around retry backoff behavior.
+Mistake: Existing tests asserted retry attempts but did not prove that `retryDelayMs` actually delayed the subsequent retry call.
+Correction: Added a fake-timer test that confirms no second attempt occurs before the configured delay and that retry proceeds immediately after delay expiration.
+
+### 2026-04-12 — Retry policy tests must assert exhausted-retry failure behavior explicitly
+
+Context: Audit task TEST-04 reviewed `__tests__/retryPolicy.test.ts` coverage for terminal retry outcomes.
+Mistake: Tests covered immediate success, single retry success, and non-retryable fast-fail, but did not assert behavior when retryable errors persist until retries are exhausted.
+Correction: Added a dedicated test that forces persistent retryable failure, verifies final throw message, and asserts exact attempt counts (`initial + maxRetries`) and `onRetry` invocation count.
+
+### 2026-04-12 — Cache-enabled modules need explicit hit/miss/fallback tests, not just no-cache behavior
+
+Context: Audit task TEST-06 reviewed GNews Redis cache coverage in `__tests__/newsService.test.ts`.
+Mistake: Existing tests mocked Redis as permanently unavailable, so cache-hit and cache-write behavior could regress without test failures.
+Correction: Added focused tests for Redis cache hit (no fetch call), cache miss (live fetch + set), and Redis read failure fallback (live fetch path), with `REDIS_URL` toggled per test.
+
+### 2026-04-12 — Graceful shutdown should explicitly close Redis clients before process exit
+
+Context: Audit task SRV-06 reviewed infrastructure cleanup on `SIGTERM`/`SIGINT`.
+Mistake: The process shutdown path closed telemetry resources but did not explicitly close the shared Redis client connection, leaving connection cleanup to server-side timeouts.
+Correction: Added `closeRedisClient()` in `src/utils/redisClient.ts` with graceful `quit()` and `disconnect()` fallback behavior, and invoked it in `server.ts` graceful shutdown before telemetry pool close and process exit.
+
+### 2026-04-12 — Scheduler polling loops should chain with timeout scheduling to avoid async overlap
+
+Context: Audit task SRV-05 reviewed interval-based scheduler polling.
+Mistake: Using `setInterval` with async work can trigger overlapping ticks when execution time exceeds interval period.
+Correction: Replaced interval polling with recursive `setTimeout` scheduling plus a running-flag/stop-flag guard, and updated stop logic to clear timeout handles safely.
+
+### 2026-04-12 — Numeric env vars should be strictly parsed and range-validated, not leniently parsed
+
+Context: Audit task SRV-04 reviewed server configuration parsing for `PORT` and `RENDER_CONCURRENCY`.
+Mistake: Lenient integer parsing accepts malformed inputs and can silently bind to unintended ports or invalid concurrency values.
+Correction: Added strict `parseEnvInt` utility with integer + range validation, applied it to server port and render concurrency, and added focused parsing tests for valid/default/non-integer/out-of-range cases.
+
+### 2026-04-12 — Deduplication sets must use canonicalized URLs, not raw URL strings
+
+Context: Audit task NEWS-01 reviewed article merge/dedup logic for top-headlines + search result pools.
+Mistake: Raw URL string comparison misses canonical-equivalent variants (scheme, www, trailing slash, tracking params), allowing duplicate content through.
+Correction: Updated `mergeAndDedupeArticles` to use `normalizeArticleUrl` for both candidate pools and added regression test for URL variant deduplication.
+
+### 2026-04-12 — Lock heartbeat renewal failures should be observable and treated as lock-loss signals
+
+Context: Audit task PIPE-03 reviewed distributed lock renewal behavior during scheduler runs.
+Mistake: Silently swallowing heartbeat renewal exceptions hides lock-loss conditions and increases concurrent-run risk.
+Correction: Added explicit error logging with lock key and error context in `runWithLockHeartbeat`, set `lockLost = true` on renewal exceptions, and clear heartbeat interval immediately to prevent futile retries.
+
+### 2026-04-12 — Persistence file paths should be module-relative or env-configured, never cwd-dependent
+
+Context: Audit task PIPE-04 reviewed post-history storage path behavior across different launch directories.
+Mistake: Building persistence paths from `process.cwd()` can split reads/writes across unintended files when process launch directory changes.
+Correction: Switched post-history default path to module-relative project path with optional `POST_HISTORY_PATH` override, and added path-resolution tests for both override and default behavior.
+
+### 2026-04-12 — Thin AI wrapper layers should add article-context error messages before bubbling failures
+
+Context: Audit task AI-06 reviewed `contentGenerator.ts` behavior when Gemini generation fails.
+Mistake: Directly rethrowing upstream AI exceptions without article context makes pipeline failure triage slower and ambiguous.
+Correction: Added try/catch context wrapping in `generateContent` with article title/URL and a null-result guard; added focused tests for throw and null-return paths.
+
+### 2026-04-12 — Template list rendering should validate array shape, not just fallback on falsy values
+
+Context: Audit task TPL-02 reviewed listicle rendering for malformed AI payloads.
+Mistake: Using `data.items || []` does not protect against truthy non-array values and can still crash at `.map()`.
+Correction: Switched to `Array.isArray(data.items)` guard in `ContentListicle.tsx` and added explicit empty-state fallback rendering so malformed payloads degrade gracefully instead of crashing render jobs.
+
+### 2026-04-12 — Remotion rendering does not require disabling browser web security for local compositions
+
+Context: Audit task SEC-05 reviewed Chromium options used by `renderMedia`/`renderStill` in `server.ts`.
+Mistake: Enabling `disableWebSecurity` unnecessarily weakens browser isolation for renderer execution.
+Correction: Removed `disableWebSecurity` from both render paths, kept container-required sandbox flags (`--no-sandbox`, `--disable-setuid-sandbox`) with explicit rationale comments, and validated server tests + compile.
+
+### 2026-04-12 — Logger pipelines should redact sensitive keys before both console and file writes
+
+Context: Audit task SEC-06 reviewed logging of arbitrary `data` payloads.
+Mistake: Raw serialization of log payloads can persist credentials/secrets in plaintext logs.
+Correction: Added recursive `redactSensitiveFields` in `src/utils/logger.ts` with depth guard and key-based masking, and applied it consistently to console `[data]` output and JSON log-file writes.
+
+### 2026-04-12 — Secret checks on scheduler endpoints should use timing-safe comparison
+
+Context: Audit task SEC-04 reviewed `/api/schedule/run` secret verification.
+Mistake: Direct string equality on secrets can leak comparison timing characteristics.
+Correction: Switched to normalized-buffer comparison with `crypto.timingSafeEqual`, preserving 401 behavior for invalid/missing secrets while reducing timing side-channel risk.
+
+### 2026-04-12 — Instagram publish confirmation should use layered signals, not a single race
+
+Context: Audit task IG-01 found false publish failures from strict `Promise.race` success detection in SPA transitions.
+Mistake: Racing transient DOM signals can reject on normal UI transitions and incorrectly classify successful posts as failures.
+Correction: Replaced race with sequential multi-signal confirmation (`Close` dialog presence, shared text variants, success checkmark, URL pattern fallback), and explicit ambiguous-failure error when confirmation cannot be established.
+
+### 2026-04-12 — Instagram automation should sanitize captions before UI typing
+
+Context: Audit task IG-02 identified that raw AI captions were inserted into Instagram without platform-limit checks.
+Mistake: Skipping pre-validation can exceed Instagram limits (2,200 chars / 30 hashtags), causing truncation ambiguity or publish instability in UI automation.
+Correction: Added `sanitizeInstagramCaption` in `instagramPublisher.ts` to cap hashtags at 30, truncate captions to 2,200 chars with ellipsis, and log warnings when modifications occur. Wired sanitized caption into `page.keyboard.insertText` and added focused unit tests.
+
+### 2026-04-12 — Distributed lock heartbeat cadence should leave multiple renewal attempts before TTL expiry
+
+Context: Audit task PIPE-02 reviewed lock-renewal timing in scheduler lock heartbeat.
+Mistake: Renewing at `TTL/2` left too little recovery margin for delayed renewals under transient load or Redis jitter.
+Correction: Changed heartbeat interval to `TTL/3` in `schedulerLock.ts` (plus doc comments), providing additional renewal opportunities before lock expiration.
+
+### 2026-04-12 — Video templates need runtime media-failure fallback, not only missing-URL fallback
+
+Context: Audit task TPL-03 found `CONTENT_VIDEO` only handled empty `videoUrl`, but not unreachable/invalid video media during render.
+Mistake: Rendering assumed a provided `videoUrl` is always playable; when media fails, output can degrade to a black frame without explicit fallback.
+Correction: Added `VideoWithFallback` in `ContentVideo.tsx` with `onError` handling to switch from `Video` to fallback `Img`, and final gradient placeholder when neither valid video nor fallback image is available.
+
+### 2026-04-12 — Redis news cache reads must validate article schema before reuse
+
+Context: Audit task NEWS-03 found cached GNews payloads were trusted after `JSON.parse`, allowing malformed or stale-shape entries to flow into scoring and prompts.
+Mistake: Returning parsed cache data without shape checks let non-array payloads, corrupt JSON, and invalid article objects silently bypass runtime safeguards.
+Correction: Added cache parsing + validation in `src/pipeline/newsService.ts` (`parseAndValidateCachedArticles`) to reject corrupt/non-array cache entries (forcing live fetch), filter invalid article objects (`title` + `url` checks), and emit warning logs when invalid cached entries are discarded.
+
+### 2026-04-12 — Retry-After handling must support both numeric seconds and HTTP-date formats
+
+Context: Audit task NEWS-02 identified that GNews 429 retries only parsed numeric `Retry-After` values, while RFC-compliant servers can return HTTP-date strings.
+Mistake: Parsing `Retry-After` with `Number()` alone ignored valid date headers, causing fallback delays and less predictable retry timing.
+Correction: Added shared `parseRetryAfterMs()` in `src/pipeline/newsService.ts` that supports numeric seconds and RFC 1123 dates, wired it into both top-headlines and search retry paths, and added regression tests in `__tests__/newsService.test.ts`.
+
+### 2026-04-12 — Randomized selection logic should expose injectable randomness for deterministic tests
+
+Context: Audit task TEST-10 targeted missing coverage in the `selectBestArticle` diverse strategy branch.
+Mistake: Using `Math.random()` directly in branching logic made deterministic assertions difficult and left critical selection behavior under-tested.
+Correction: Added optional `randomFn` parameter (defaulting to `Math.random`) in `selectBestArticle` and added tests proving diverse mode selects only from top-3, returns null for empty input, and yields deterministic picks for fixed random values.
+
+### 2026-04-12 — Global fetch test isolation requires per-test spies, not direct global assignment
+
+Context: Audit task TEST-07 addressed cross-test pollution risk in `__tests__/newsService.test.ts`.
+Mistake: Direct `global.fetch = vi.fn()` mutation and a one-time spy can leak or stop intercepting after `vi.restoreAllMocks()`, which leads to flaky tests and accidental real network calls.
+Correction: Use `vi.spyOn(global, 'fetch')` with a fresh spy created in `beforeEach`, then restore in `afterEach` via `vi.restoreAllMocks()` so each test has isolated fetch behavior.
+
+### 2026-04-12 — Scheduler account env var names must stay aligned across code and `.env.example`
+
+Context: Audit task SRV-03 identified mismatch between runtime code and documented scheduler account env configuration.
+Mistake: `server.ts` status endpoint used `process.env.ACCOUNT_ID`, while environment contract uses `SCHEDULE_ACCOUNT_ID`, causing silent fallback to `default` and breaking intended multi-account scoping.
+Correction: Replaced the remaining `ACCOUNT_ID` read with `SCHEDULE_ACCOUNT_ID` in `server.ts` and verified no other `process.env.ACCOUNT_ID` reads remain.
+
+### 2026-04-12 — Image presence should affect ranking, not ingestion eligibility
+
+Context: Audit task NEWS-04 found GNews top-headlines and search flows were still hard-filtering out imageless articles in `newsService.ts`.
+Mistake: Rejecting items with `!imageUrl` at ingest stage over-constrained candidate pools for niche topics and could cause no-article failures before scoring.
+Correction: Removed hard image filters from `fetchTopNews` and `fetchSearchNews`, added a `-5` scoring penalty in `scoreArticleRelevance` for missing images, and added regression tests to ensure imageless articles remain eligible but rank lower.
+
+### 2026-04-12 — Session validity must be based on the earliest critical cookie expiry
+
+Context: Audit task TEST-08 expanded session validation coverage for boundary and multi-cookie cases in Instagram auth storage.
+Mistake: Validation used the maximum cookie expiry and strict `<` comparison, which could mark sessions valid when one critical cookie was already expired and could miss exact-threshold expiry cases.
+Correction: Updated `validateInstagramSessionExpiry` to prioritize critical cookies (`sessionid`, `csrftoken`, `ds_user_id`), validate against the minimum expiry among those cookies, and treat boundary equality as invalid (`<=`). Added boundary and multi-cookie tests in `__tests__/sessionValidation.test.ts`.
+
+### 2026-04-12 — Manual verification scripts must be migrated into Vitest to be CI-enforced
+
+Context: Audit task TEST-09 required converting ad-hoc verification scripts into maintainable tests that run inside CI and local test workflows.
+Mistake: Keeping `src/pipeline/testMock.ts` and `test-railway-endpoint.ts` as standalone scripts meant their checks were never executed by `vitest`, so regressions could ship without detection.
+Correction: Replaced both with integration tests under `__tests__/integration/` (`mockValidation.test.ts`, `railwayEndpoint.test.ts`), made Railway test conditional via `describe.skipIf(!RAILWAY_TEST_URL || !SCHEDULER_SECRET)`, removed manual scripts, and added `test:integration` script to `package.json`.
+
 ### 2026-04-11 — RSS telemetry must be non-blocking and source-health checks must fail open
 
 Context: Added Postgres RSS telemetry persistence and Redis source cooldown guardrails to improve RSS operational visibility and source reliability handling.
@@ -292,6 +550,207 @@ Correction: Keep [templates.md](./templates.md) as the single source of truth fo
 Context: `preview` script pointed at `src/remotion/index.ts`.  
 Mistake: The Remotion root file is `index.tsx`; a wrong extension breaks `npm run preview`.  
 Correction: `package.json` `preview` script updated to `src/remotion/index.tsx`.
+
+### 2026-04-12 - Gemini call timeout guard for hung upstream requests [RESOLVED]
+
+Context: AI generation could hang indefinitely when Gemini requests stalled, leaving pipeline runs blocked until external lock expiry.
+Symptom: `generatePostContentAI()` awaited `model.generateContent(prompt)` without a bounded wait.
+Cause: No request timeout boundary existed for the Gemini call path.
+Fix:
+   1. Added `GEMINI_TIMEOUT_MS` configuration (default `60000`, minimum `1`).
+   2. Wrapped Gemini generation in a `withTimeout(...)` Promise race with descriptive timeout errors.
+   3. Added unit coverage for timeout parsing and timeout rejection behavior.
+
+Reference: `src/pipeline/aiService.ts` (`resolveGeminiTimeoutMs`, `withTimeout`, `generatePostContentAI`), `__tests__/aiServiceTimeout.test.ts`, `.env.example`.
+
+### 2026-04-12 - Fallback flags must influence control flow, not just log labels [RESOLVED]
+
+Context: RSS-first pipeline already tracked `rssFetchFailed`, but top-headlines fallback execution depended only on `scoredArticles.length === 0`.
+Symptom: Failure flags were reflected in logs yet not explicitly encoded in fallback condition.
+Cause: `rssFetchFailed` was only used in message text, creating implicit behavior coupling to empty article arrays.
+Fix:
+   1. Updated top-headlines fallback condition to `useRssFeeds && (rssFetchFailed || scoredArticles.length === 0)`.
+   2. Added explicit comment documenting fallback intent for throw and no-relevance paths.
+
+Reference: `src/pipelineRun.ts` (Step 0c fallback condition), `__tests__/pipelineRun.test.ts`.
+
+### 2026-04-12 - CLI and server resource lifecycles must be handled separately [RESOLVED]
+
+Context: RSS telemetry pool was only closed via server shutdown handlers, leaving CLI pipeline executions without deterministic pool teardown.
+Symptom: One-off pipeline runs could keep Node alive due to open Postgres pool resources.
+Cause: `runPipeline()` lacked a non-server cleanup path for telemetry resources.
+Fix:
+   1. Added `runPipeline()` finally cleanup for `closeTelemetryPool()` when `SERVER_MODE !== 'true'`.
+   2. Set `process.env.SERVER_MODE = 'true'` in `server.ts` so long-lived server/scheduler paths retain server-managed lifecycle.
+   3. Added cleanup warning logging to avoid masking primary pipeline failures.
+
+Reference: `src/pipelineRun.ts`, `server.ts`, `context/development.md`.
+
+### 2026-04-12 - Sanitization must handle encoded tags and entity decoding in RSS text [RESOLVED]
+
+Context: RSS descriptions can contain direct HTML, encoded tags (for example `&#x3C;script&#x3E;`), and entity-encoded plain text.
+Symptom: Regex-based stripping left bypass gaps and inconsistent decoded output in normalized article text.
+Cause: Custom `stripHtml` logic was not a robust sanitizer and did not safely normalize encoded-tag cases.
+Fix:
+   1. Replaced custom strip logic with `sanitize-html` using no allowed tags/attributes.
+   2. Added explicit HTML entity decode before sanitize (to neutralize encoded-tag payloads) and after sanitize (to produce readable text).
+   3. Added regression test for script stripping + escaped entity decoding path.
+
+Reference: `src/pipeline/rssService.ts`, `__tests__/rssService.test.ts`, `package.json`.
+
+### 2026-04-12 - Empty token sets should not imply semantic duplicate titles [RESOLVED]
+
+Context: Cross-source dedup uses Jaccard similarity on tokenized article titles.
+Symptom: Two titles reduced to empty token sets were treated as perfect matches and one article was dropped.
+Cause: Similarity logic returned `1` for empty-vs-empty sets.
+Fix:
+   1. Updated Jaccard helper to return `0` when both sets are empty.
+   2. Added explicit `one empty set => 0` guard for clarity.
+   3. Added unit tests for empty-empty and empty-nonempty cases.
+
+Reference: `src/pipeline/rssService.ts`, `__tests__/rssService.test.ts`.
+
+### 2026-04-12 - Telemetry conflict policy should preserve first-write evidence [RESOLVED]
+
+Context: RSS run telemetry records are used for debugging retries and failure progression.
+Symptom: Re-insert on the same `run_id` could silently replace prior metrics, erasing first-attempt evidence.
+Cause: `ON CONFLICT (run_id) DO UPDATE` mutated existing rows.
+Fix:
+   1. Switched conflict handling to `ON CONFLICT (run_id) DO NOTHING` for run telemetry inserts.
+   2. Kept unique run IDs in RSS workflow (`rss-{timestamp}-{random}`), so natural collisions remain unlikely while preserving idempotent safety.
+
+Reference: `src/pipeline/rssTelemetryStore.ts`, `src/pipeline/rssService.ts`.
+
+### 2026-04-12 - Prompt context should sanitize untrusted article fields before interpolation [RESOLVED]
+
+Context: News article metadata comes from external RSS/GNews sources and is untrusted input.
+Symptom: Raw article fields could be embedded directly into prompt text, increasing prompt-structure manipulation risk.
+Cause: Prompt interpolation previously accepted unsanitized `title`, `source`, and `description` values.
+Fix:
+   1. Added `sanitizeForPrompt(...)` helper in `aiService.ts` to strip control chars, normalize whitespace, replace backticks, escape backslashes, and enforce max length.
+   2. Applied sanitization to article `title`, `source`, and `description` prompt fields.
+   3. Added dedicated unit tests for prompt sanitization behavior.
+
+Reference: `src/pipeline/aiService.ts`, `__tests__/aiServicePromptSanitization.test.ts`.
+
+### 2026-04-12 - Configuration-derived prompt fields also need sanitization [RESOLVED]
+
+Context: Account profile fields are environment-derived but still untrusted from a prompt-safety perspective.
+Symptom: Handle/displayName/bio/niche values could be interpolated raw into Gemini prompt text.
+Cause: Prompt hardening focused initially on article payload fields only.
+Fix:
+   1. Applied `sanitizeForPrompt(...)` to account `handle`, `displayName`, `bio`, and joined `niche` string before prompt injection.
+   2. Reused sanitized values in both account block and relevance-note block.
+
+Reference: `src/pipeline/aiService.ts`.
+
+### 2026-04-12 - Distributed lock loss must abort before publish boundary [RESOLVED]
+
+Context: Scheduler lock heartbeat previously detected lock loss but only raised after pipeline completion.
+Symptom: A run could proceed through Instagram publish even after lock ownership was lost mid-execution.
+Cause: Lock-loss state was checked after awaited work instead of being propagated during execution.
+Fix:
+   1. Updated `runWithLockHeartbeat(...)` to pass an `AbortSignal` to the protected function.
+   2. Heartbeat now aborts the signal when lock renewal fails or ownership is lost.
+   3. `runPipeline(...)` now accepts optional signal and abort-checks right before `publishToInstagram(...)`.
+   4. Added scheduler lock unit tests covering abort-on-loss and success path.
+
+Reference: `src/pipeline/schedulerLock.ts`, `src/pipeline/schedulerRunner.ts`, `src/pipelineRun.ts`, `__tests__/schedulerLock.test.ts`.
+
+### 2026-04-12 - Global RSS timeout should fail loudly, not masquerade as empty data [RESOLVED]
+
+Context: Parallel RSS fetches can exceed the global timeout budget even when feeds would otherwise return articles later.
+Symptom: Timeout path returned an empty settled-results array, making the caller treat timeout as "no articles" instead of fetch failure.
+Cause: Global timeout branch resolved `[]` instead of rejecting with an explicit timeout error.
+Fix:
+   1. Added `RssGlobalTimeoutError` in `rssService.ts`.
+   2. Changed the global timeout race branch to reject with the typed error.
+   3. Updated timeout test to assert explicit failure instead of silent empty fallback.
+
+Reference: `src/pipeline/rssService.ts`, `__tests__/rssService.test.ts`.
+
+### 2026-04-12 - Cross-source dedup should use cheap fingerprints, not quadratic title-set scans [RESOLVED]
+
+Context: RSS aggregation can grow across multiple sources and retries, making pairwise near-duplicate checks expensive.
+Symptom: Cross-source title dedup previously compared each article against all previously seen title word-sets.
+Cause: Dedup used an O(n^2) Jaccard scan over an unbounded seen-title array.
+Fix:
+   1. Kept URL dedup as the first linear pass.
+   2. Replaced title-set pairwise comparison with a normalized title fingerprint set.
+   3. Preserved correctness for empty/short titles by skipping fingerprint dedup when no meaningful fingerprint exists.
+
+Reference: `src/pipeline/rssService.ts`, `__tests__/rssService.test.ts`.
+
+### 2026-04-12 - Timeout configuration must be resolved at runtime, not frozen at import [RESOLVED]
+
+Context: RSS timeout budgets are environment-driven operational controls and are frequently overridden in tests and deployments.
+Symptom: Import-time constants froze timeout values before env overrides could take effect.
+Cause: RSS timeout defaults were read once during module initialization.
+Fix:
+   1. Added runtime timeout resolvers for per-source and global RSS budgets.
+   2. Switched parser creation to use current runtime timeout values.
+   3. Raised default global RSS budget to 75s and documented both preferred and legacy env names.
+
+Reference: `src/pipeline/rssService.ts`, `.env.example`, `context/development.md`.
+
+### 2026-04-12 - Case-insensitive matching should normalize both lookup and source values [RESOLVED]
+
+Context: Registry-driven niche filtering is intended to be case-insensitive.
+Symptom: Caller inputs were normalized to lowercase, but source niche values were compared as stored.
+Cause: Matching logic normalized only one side of the comparison.
+Fix:
+   1. Lowercased `source.niches` values during comparison in `getSourcesForNiche(...)`.
+   2. Added explicit uppercase input coverage in registry tests.
+
+Reference: `src/pipeline/rssSourceRegistry.ts`, `__tests__/rssSourceRegistry.test.ts`.
+
+### 2026-04-12 - Durable telemetry needs retention and prune-friendly indexes [RESOLVED]
+
+Context: RSS telemetry is durable Postgres data, so unlike Redis cooldown keys it does not expire automatically.
+Symptom: Source/run telemetry could grow without bound and future prune or lookup queries would get progressively slower.
+Cause: Schema setup created the tables but did not add prune logic or the supporting indexes for `run_id` and `created_at`.
+Fix:
+   1. Backfilled `created_at` columns defensively for older tables and added indexes on `rss_source_telemetry.run_id`, `rss_source_telemetry.created_at`, and `rss_run_telemetry.created_at`.
+   2. Added `pruneTelemetry()` with a configurable 30-day default retention window.
+   3. Triggered pruning once per week after a successful scheduled run so retention stays bounded without a separate cron path.
+
+Reference: `src/pipeline/rssTelemetryStore.ts`, `src/pipeline/schedulerRunner.ts`, `__tests__/rssTelemetryStore.test.ts`, `__tests__/schedulerRunner.test.ts`.
+
+### 2026-04-12 - Hosted Instagram publishing should bootstrap session state from env, not git [RESOLVED]
+
+Context: Playwright publishing needs a valid Instagram session, but committing `storage.json` exposes account cookies and tokens.
+Symptom: Runtime session state was tracked in git with no hosted bootstrap path for replacing it from secrets.
+Cause: The repo relied on a checked-in `storage.json` instead of decoding session state from deployment config.
+Fix:
+   1. Added `.gitignore` entries for `storage.json` and `post-history.json`.
+   2. Added `bootstrapInstagramSession()` in `server.ts` to decode `INSTAGRAM_SESSION_B64` into `storage.json` at startup.
+   3. Added server tests covering both the write and warning paths.
+
+Reference: `.gitignore`, `server.ts`, `__tests__/server.test.ts`.
+
+### 2026-04-12 - Production containers should run compiled JavaScript, not tsx [RESOLVED]
+
+Context: Railway and Docker start the long-lived API server on every deploy and restart.
+Symptom: The production path invoked `tsx server.ts`, which adds runtime transpilation overhead to every cold start.
+Cause: Package scripts and Docker CMD pointed production startup at the development TypeScript runner.
+Fix:
+   1. Added a dedicated `build` script and `start:prod` script in `package.json`.
+   2. Updated the Dockerfile to compile with `npm run build` during image creation.
+   3. Switched the production container CMD to `node dist/server.js`.
+
+Reference: `package.json`, `Dockerfile`, `context/development.md`.
+
+### 2026-04-12 - Render server readiness must block on bundle creation [RESOLVED]
+
+Context: The API server depends on a valid Remotion bundle before it can serve `/api/render` successfully.
+Symptom: Startup previously swallowed bundle-prewarm failures and still accepted traffic, leaving render requests to fail later against an uninitialized bundle.
+Cause: `startServer()` kicked off `ensureBundle()` asynchronously and ignored the rejection.
+Fix:
+   1. Made startup await bundle initialization and exit with code `1` on failure.
+   2. Added a bundle-aware `/health` response so readiness reflects actual render capability.
+   3. Added tests covering both the fatal bundle failure path and the ready/not-ready health responses.
+
+Reference: `server.ts`, `__tests__/server.test.ts`, `context/api-server.md`.
 
 ---
 

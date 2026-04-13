@@ -36,7 +36,7 @@ vi.mock('../src/pipeline/rssTelemetryStore', () => ({
   recordRssRunTelemetry: mocks.recordRssRunTelemetry,
 }));
 
-import { __testing, crossSourceDedup, fetchRssNews, normalizeItem } from '../src/pipeline/rssService';
+import { __testing, crossSourceDedup, fetchRssNews, normalizeItem, RssGlobalTimeoutError } from '../src/pipeline/rssService';
 import Logger from '../src/utils/logger';
 
 describe('rssService', () => {
@@ -250,6 +250,29 @@ describe('rssService', () => {
     expect(normalized.description).not.toContain('<');
   });
 
+  it('normalizeItem sanitizes scripts and decodes escaped HTML entities', () => {
+    const normalized = normalizeItem(
+      {
+        title: 'Entity sanitize test',
+        link: 'https://example.com/entities',
+        contentSnippet: '<script>alert(1)</script>Hello &amp; World &#x3C;b&#x3E;bold&#x3C;/b&#x3E;',
+        enclosure: { url: 'https://example.com/image.jpg' },
+      },
+      {
+        id: 'x',
+        name: 'X Source',
+        feedUrl: 'https://x.test/feed',
+        niches: ['technology'],
+        cacheTtlSeconds: 900,
+        enabled: true,
+      }
+    );
+
+    expect(normalized.description).toBe('Hello & World bold');
+    expect(normalized.description).not.toContain('<script');
+    expect(normalized.description).not.toContain('&amp;');
+  });
+
   it('normalizeItem resolves image from nested media fields', () => {
     const normalized = normalizeItem(
       {
@@ -301,6 +324,14 @@ describe('rssService', () => {
     expect(__testing.jaccardSimilarity(a, b)).toBeGreaterThan(0.6);
   });
 
+  it('titleWordSet preserves non-ASCII words for dedup tokenization', () => {
+    const words = __testing.titleWordSet('Türkiye girişimi yapay zekâ yatırımı büyütüyor');
+
+    expect(words.has('türkiye')).toBe(true);
+    expect(words.has('girişimi')).toBe(true);
+    expect(words.has('zekâ')).toBe(true);
+  });
+
   it('jaccard helper captures boundary behavior around dedup threshold', () => {
     const highA = __testing.titleWordSet('Nvidia announces next gen AI chip roadmap datacenter launch');
     const highB = __testing.titleWordSet('Nvidia announces next gen AI chip roadmap datacenter rollout');
@@ -309,6 +340,15 @@ describe('rssService', () => {
 
     expect(__testing.jaccardSimilarity(highA, highB)).toBeGreaterThanOrEqual(0.6);
     expect(__testing.jaccardSimilarity(lowA, lowB)).toBeLessThan(0.6);
+  });
+
+  it('jaccard helper returns 0 for two empty sets', () => {
+    expect(__testing.jaccardSimilarity(new Set(), new Set())).toBe(0);
+  });
+
+  it('jaccard helper returns 0 when one set is empty', () => {
+    expect(__testing.jaccardSimilarity(new Set(['ai']), new Set())).toBe(0);
+    expect(__testing.jaccardSimilarity(new Set(), new Set(['ai']))).toBe(0);
   });
 
   it('crossSourceDedup removes near-duplicate titles across sources', () => {
@@ -340,21 +380,76 @@ describe('rssService', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('returns on global timeout when source fetches hang', async () => {
+  it('crossSourceDedup keeps URL-unique articles when title fingerprints are empty', () => {
+    const logger = new Logger('test-run');
+    const result = crossSourceDedup(
+      [
+        {
+          title: 'AI',
+          description: 'desc',
+          content: 'desc',
+          url: 'https://a.example.com/ai',
+          imageUrl: 'https://a.example.com/image.jpg',
+          publishedAt: '2026-04-10T10:00:00.000Z',
+          source: 'A',
+        },
+        {
+          title: 'VR',
+          description: 'desc',
+          content: 'desc',
+          url: 'https://b.example.com/vr',
+          imageUrl: 'https://b.example.com/image.jpg',
+          publishedAt: '2026-04-10T09:00:00.000Z',
+          source: 'B',
+        },
+      ],
+      logger
+    );
+
+    expect(result).toHaveLength(2);
+  });
+
+  it('crossSourceDedup keeps distinct Unicode titles that only share generic ASCII scaffolding', () => {
+    const logger = new Logger('test-run');
+    const result = crossSourceDedup(
+      [
+        {
+          title: 'Startup Türkiye girişimi büyük yatırım aldı',
+          description: 'desc',
+          content: 'desc',
+          url: 'https://a.example.com/turkiye-startup',
+          imageUrl: 'https://a.example.com/image.jpg',
+          publishedAt: '2026-04-10T10:00:00.000Z',
+          source: 'A',
+        },
+        {
+          title: 'Startup Japonya girişimi büyük yatırım aldı',
+          description: 'desc',
+          content: 'desc',
+          url: 'https://b.example.com/japonya-startup',
+          imageUrl: 'https://b.example.com/image.jpg',
+          publishedAt: '2026-04-10T09:00:00.000Z',
+          source: 'B',
+        },
+      ],
+      logger
+    );
+
+    expect(result).toHaveLength(2);
+  });
+
+  it('throws explicit timeout error when source fetches exceed the global timeout', async () => {
     vi.useFakeTimers();
     try {
       process.env.RSS_GLOBAL_TIMEOUT_MS = '15000';
       mocks.parseURL.mockImplementation(() => new Promise(() => {}));
 
       const pending = fetchRssNews(['technology']);
+      const rejectionExpectation = expect(pending).rejects.toBeInstanceOf(RssGlobalTimeoutError);
       await vi.advanceTimersByTimeAsync(15_000);
 
-      const result = await pending;
-      expect(result).toEqual([]);
-      expect(mocks.recordRssRunTelemetry).toHaveBeenCalledWith(
-        expect.objectContaining({ globalTimeoutTriggered: true }),
-        expect.anything()
-      );
+      await rejectionExpectation;
+      expect(mocks.recordRssRunTelemetry).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

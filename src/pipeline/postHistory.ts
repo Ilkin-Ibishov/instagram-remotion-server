@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { Logger } from '../utils/logger';
 import { normalizeArticleUrl } from '../utils/normalizeUrl';
 
@@ -15,21 +16,38 @@ export interface PostRecord {
   batchId: string;
 }
 
-const HISTORY_FILE = path.join(process.cwd(), 'post-history.json');
+type HistoryLoadResult =
+  | { ok: true; history: PostRecord[] }
+  | { ok: false; history: PostRecord[]; reason: 'corrupted' };
+
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_HISTORY_FILE = path.resolve(MODULE_DIR, '../../post-history.json');
+const HISTORY_FILE = process.env.POST_HISTORY_PATH || DEFAULT_HISTORY_FILE;
+
+export function getHistoryPath(): string {
+  return HISTORY_FILE;
+}
 
 /**
  * Load post history from JSON file.
  */
-function loadHistory(): PostRecord[] {
+function loadHistory(): HistoryLoadResult {
   try {
     if (fs.existsSync(HISTORY_FILE)) {
       const data = fs.readFileSync(HISTORY_FILE, 'utf8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return { ok: true, history: parsed as PostRecord[] };
+      }
+
+      new Logger().warn('history', 'Post history file is not an array; refusing to use corrupted history');
+      return { ok: false, history: [], reason: 'corrupted' };
     }
   } catch (e) {
     new Logger().warn('history', `Failed to load post history: ${e}`);
+    return { ok: false, history: [], reason: 'corrupted' };
   }
-  return [];
+  return { ok: true, history: [] };
 }
 
 /**
@@ -37,7 +55,7 @@ function loadHistory(): PostRecord[] {
  */
 export function hasBeenPosted(articleUrl: string): boolean {
   const normalised = normalizeArticleUrl(articleUrl);
-  const history = loadHistory();
+  const { history } = loadHistory();
   return history.some(record => normalizeArticleUrl(record.articleUrl) === normalised);
 }
 
@@ -45,7 +63,17 @@ export function hasBeenPosted(articleUrl: string): boolean {
  * Record a newly posted article.
  */
 export function recordPost(article: { title: string; url: string }, batchId: string): void {
-  const history = loadHistory();
+  const historyResult = loadHistory();
+  const logger = new Logger();
+  if (!historyResult.ok) {
+    logger.error(
+      'history',
+      'Refusing to overwrite corrupted post history. Fix or replace the history file before recording new posts.'
+    );
+    return;
+  }
+
+  const history = historyResult.history;
   const record: PostRecord = {
     articleTitle: article.title,
     articleUrl: normalizeArticleUrl(article.url),
@@ -60,7 +88,6 @@ export function recordPost(article: { title: string; url: string }, batchId: str
     history.splice(0, history.length - 500);
   }
 
-  const logger = new Logger();
   try {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
     logger.info('history', `Recorded post: "${article.title}"`);
@@ -73,7 +100,7 @@ export function recordPost(article: { title: string; url: string }, batchId: str
  * Get all posted articles in the last N days.
  */
 export function getRecentPosts(days: number = 7): PostRecord[] {
-  const history = loadHistory();
+  const { history } = loadHistory();
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
 
