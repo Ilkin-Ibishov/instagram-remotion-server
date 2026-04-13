@@ -15,50 +15,47 @@ export default function HookA({
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';
 
-    // Background image: scale 1.1→1, opacity 0→0.4 over 2s starting at frame 0
+    // Background image: keep a visible base at frame 0 for non-black poster frames.
     const imgScale = interpolate(frame, [0, 2 * fps], [1.1, 1], {
         extrapolateRight: 'clamp',
     });
-    const imgOpacity = interpolate(frame, [0, 2 * fps], [0, 0.4], {
+    const imgOpacity = interpolate(frame, [0, 2 * fps], [0.15, 0.4], {
         extrapolateRight: 'clamp',
     });
 
-    // BREAKING badge: y -20→0, opacity 0→1, delay 0.2s (6 frames), duration 0.6s (18 frames)
-    const badgeY = interpolate(frame, [6, 24], [-20, 0], {
+    // Keep core content visible from frame 0 while preserving motion.
+    const badgeY = interpolate(frame, [0, 18], [-8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const badgeOpacity = interpolate(frame, [6, 24], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-
-    // Headline: y 30→0, opacity 0→1, delay 0.4s (12 frames), duration 0.8s (24 frames)
-    const headlineY = interpolate(frame, [12, 36], [30, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const headlineOpacity = interpolate(frame, [12, 36], [0, 1], {
+    const badgeOpacity = interpolate(frame, [0, 18], [0.45, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Subheadline: y 20→0, opacity 0→1, delay 0.7s (21 frames), duration 0.8s (24 frames)
-    const subY = interpolate(frame, [21, 45], [20, 0], {
+    const headlineY = interpolate(frame, [0, 24], [12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const subOpacity = interpolate(frame, [21, 45], [0, 1], {
+    const headlineOpacity = interpolate(frame, [0, 24], [0.55, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Brand handle: x -30→0, opacity 0→1, delay 1s (30 frames), duration 0.6s (18 frames)
-    const brandX = interpolate(frame, [30, 48], [-30, 0], {
+    const subY = interpolate(frame, [0, 30], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const brandOpacity = interpolate(frame, [30, 48], [0, 1], {
+    const subOpacity = interpolate(frame, [0, 30], [0.45, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandX = interpolate(frame, [0, 24], [-10, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const brandOpacity = interpolate(frame, [0, 24], [0.35, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -74,7 +71,7 @@ export default function HookA({
                 alignItems: 'center',
                 padding: 64,
                 position: 'relative',
-                background: '#0a0a0a',
+                background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}2e 0%, transparent 45%), #0a0f16`,
                 overflow: 'hidden',
             }}
         >
@@ -83,7 +80,7 @@ export default function HookA({
                 style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.8))',
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.65))',
                     zIndex: 10,
                 }}
             />

@@ -21,18 +21,16 @@ export default function ContentListicle({
     const frame = useCurrentFrame();
     const fps = 30;
 
-    // Title: slide up + fade in, delay 0s, duration 0.8s
-    const titleY = interpolate(frame, [0, 24], [30, 0], {
+    const titleY = interpolate(frame, [0, 24], [12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const titleOpacity = interpolate(frame, [0, 24], [0, 1], {
+    const titleOpacity = interpolate(frame, [0, 24], [0.55, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Accent line under title: scaleX, delay 0.4s
-    const lineScaleX = interpolate(frame, [12, 30], [0, 1], {
+    const lineScaleX = interpolate(frame, [0, 18], [0.35, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -46,7 +44,7 @@ export default function ContentListicle({
     const footnoteOpacity = interpolate(
         frame,
         [footnoteDelay, footnoteDelay + 20],
-        [0, 0.6],
+        [0.2, 0.6],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
     );
 
@@ -59,7 +57,7 @@ export default function ContentListicle({
                 flexDirection: 'column',
                 padding: 80,
                 position: 'relative',
-                background: '#0a0a0a',
+                background: `radial-gradient(circle at 14% 16%, ${branding.accentColor}22 0%, transparent 42%), #0b1118`,
                 overflow: 'hidden',
             }}
         >
@@ -132,8 +130,8 @@ export default function ContentListicle({
                         fps,
                         config: { stiffness: 120, damping: 18 },
                     });
-                    const itemX = interpolate(s, [0, 1], [-30, 0]);
-                    const itemOpacity = interpolate(s, [0, 1], [0, 1]);
+                    const itemX = interpolate(s, [0, 1], [-12, 0]);
+                    const itemOpacity = interpolate(s, [0, 1], [0.4, 1]);
 
                     return (
                         <div
@@ -203,7 +201,7 @@ export default function ContentListicle({
                     position: 'absolute',
                     bottom: 40,
                     right: 48,
-                    opacity: interpolate(frame, [50, 70], [0, 0.5], {
+                    opacity: interpolate(frame, [0, 24], [0.3, 0.5], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),

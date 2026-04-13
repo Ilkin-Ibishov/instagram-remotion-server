@@ -14,15 +14,15 @@ export default function ContentMythVsFact({
     const fact = data.fact || 'Fact';
     const proof = data.proof || '';
 
-    const leftX = interpolate(frame, [0, 20], [-40, 0], {
+    const leftX = interpolate(frame, [0, 20], [-14, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const rightX = interpolate(frame, [8, 28], [40, 0], {
+    const rightX = interpolate(frame, [0, 20], [14, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const proofOpacity = interpolate(frame, [26, 46], [0, 1], {
+    const proofOpacity = interpolate(frame, [0, 24], [0.4, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -149,7 +149,7 @@ export default function ContentMythVsFact({
                     fontSize: 22,
                     fontWeight: 700,
                     letterSpacing: '0.05em',
-                    opacity: interpolate(frame, [36, 58], [0, 0.75], {
+                    opacity: interpolate(frame, [0, 24], [0.3, 0.75], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),

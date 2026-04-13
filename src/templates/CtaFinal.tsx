@@ -15,32 +15,30 @@ export default function CtaFinal({
     const callToAction = data.callToAction || 'Follow for More';
     const subtext = data.subtext || '';
 
-    // Bookmark icon: spring scale 0→1, rotate -180→0, delay 0.2s (6 frames)
+    // Keep frame 0 readable while retaining entrance motion.
     const iconFrame = Math.max(0, frame - 6);
     const iconSpring = spring({
         frame: iconFrame,
         fps,
         config: { stiffness: 100, damping: 15 },
     });
-    const iconScale = interpolate(iconSpring, [0, 1], [0, 1]);
-    const iconRotate = interpolate(iconSpring, [0, 1], [-180, 0]);
+    const iconScale = interpolate(iconSpring, [0, 1], [0.65, 1]);
+    const iconRotate = interpolate(iconSpring, [0, 1], [-20, 0]);
 
-    // CTA headline: y 20→0, opacity 0→1, delay 0.4s (12 frames), duration 0.6s (18 frames)
-    const ctaY = interpolate(frame, [12, 30], [20, 0], {
+    const ctaY = interpolate(frame, [0, 24], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const ctaOpacity = interpolate(frame, [12, 30], [0, 1], {
+    const ctaOpacity = interpolate(frame, [0, 24], [0.55, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Subtext: y 20→0, opacity 0→1, delay 0.6s (18 frames), duration 0.6s (18 frames)
-    const subY = interpolate(frame, [18, 36], [20, 0], {
+    const subY = interpolate(frame, [0, 24], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const subOpacity = interpolate(frame, [18, 36], [0, 1], {
+    const subOpacity = interpolate(frame, [0, 24], [0.4, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -63,7 +61,7 @@ export default function CtaFinal({
                 alignItems: 'center',
                 padding: 64,
                 position: 'relative',
-                background: '#050505',
+                background: `radial-gradient(circle at 18% 16%, ${branding.accentColor}24 0%, transparent 45%), #0a0f16`,
                 overflow: 'hidden',
             }}
         >
@@ -132,9 +130,9 @@ export default function CtaFinal({
                             fps,
                             config: { stiffness: 100, damping: 14 },
                         });
-                        const y = interpolate(s, [0, 1], [20, 0]);
-                        const opacity = interpolate(s, [0, 1], [0, 1]);
-                        const scale = interpolate(s, [0, 1], [0.8, 1]);
+                        const y = interpolate(s, [0, 1], [10, 0]);
+                        const opacity = interpolate(s, [0, 1], [0.35, 1]);
+                        const scale = interpolate(s, [0, 1], [0.9, 1]);
 
                         return (
                             <div

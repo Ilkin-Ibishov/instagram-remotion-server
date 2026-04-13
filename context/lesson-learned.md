@@ -24,6 +24,12 @@ Correction: …
 
 ## Entries
 
+### 2026-04-13 — MP4 templates must be readable at frame 0 for Instagram grid previews
+
+Context: Published MP4 carousel posts appeared as black tiles on profile grid despite valid renders.
+Mistake: Several templates animated from fully transparent foreground over near-black backgrounds, making frame 0 effectively blank.
+Correction: Updated all active templates to use non-zero baseline foreground visibility and non-flat dark backgrounds at frame 0; documented the rule in `context/remotion.md`, `context/templates.md`, and `.github/instructions/remotion-templates.instructions.md`.
+
 ### 2026-04-13 — CONTENT_GENERIC limits must track real layout capacity, not theoretical text allowance
 
 Context: A published carousel rendered with visibly cut-off words on middle slides using `CONTENT_GENERIC`, even though payloads were still schema-valid.

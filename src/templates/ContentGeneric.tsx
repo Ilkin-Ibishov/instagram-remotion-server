@@ -14,49 +14,44 @@ export default function ContentGeneric({
     const body = data.body || '';
     const highlight = typeof data.highlight === 'string' ? data.highlight : '';
 
-    // Top accent bar: scaleX 0→1, duration 0.8s (24 frames)
-    const barScaleX = interpolate(frame, [0, 24], [0, 1], {
+    // Keep a visible baseline on frame 0 for reliable Instagram thumbnails.
+    const barScaleX = interpolate(frame, [0, 24], [0.25, 1], {
         extrapolateRight: 'clamp',
     });
 
-    // Title: y 30→0, opacity 0→1, delay 0.2s (6 frames), duration 0.8s (24 frames)
-    const titleY = interpolate(frame, [6, 30], [30, 0], {
+    const titleY = interpolate(frame, [0, 24], [12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const titleOpacity = interpolate(frame, [6, 30], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-
-    // Divider line: scaleX 0→1, delay 0.5s (15 frames), duration 0.6s (18 frames)
-    const dividerScaleX = interpolate(frame, [15, 33], [0, 1], {
+    const titleOpacity = interpolate(frame, [0, 24], [0.55, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Body text: y 20→0, opacity 0→1, delay 0.7s (21 frames), duration 0.8s (24 frames)
-    const bodyY = interpolate(frame, [21, 45], [20, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const bodyOpacity = interpolate(frame, [21, 45], [0, 1], {
+    const dividerScaleX = interpolate(frame, [0, 24], [0.35, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Highlight: x -20→0, opacity 0→1, delay 1.2s (36 frames), duration 0.6s (18 frames)
-    const highlightX = interpolate(frame, [36, 54], [-20, 0], {
+    const bodyY = interpolate(frame, [0, 30], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const highlightOpacity = interpolate(frame, [36, 54], [0, 1], {
+    const bodyOpacity = interpolate(frame, [0, 30], [0.42, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Brand handle: opacity 0→0.5, delay 1.5s (45 frames), duration 1s (30 frames)
-    const brandOpacity = interpolate(frame, [45, 75], [0, 0.5], {
+    const highlightX = interpolate(frame, [0, 24], [-8, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const highlightOpacity = interpolate(frame, [0, 24], [0.4, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandOpacity = interpolate(frame, [0, 30], [0.3, 0.5], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -70,7 +65,7 @@ export default function ContentGeneric({
                 flexDirection: 'column',
                 padding: 80,
                 position: 'relative',
-                background: '#0f0f0f',
+                background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}22 0%, transparent 42%), #0f1217`,
                 overflow: 'hidden',
             }}
         >

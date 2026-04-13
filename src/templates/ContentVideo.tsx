@@ -86,35 +86,30 @@ export default function ContentVideo({
 
     const title = data.title || 'Video Details';
 
-    // Frame border reveal: scaleY 0→1 over 0.6s
-    const frameBorderScale = interpolate(frame, [0, 18], [0, 1], {
+    const frameBorderScale = interpolate(frame, [0, 18], [0.35, 1], {
         extrapolateRight: 'clamp',
     });
 
-    // Video container opacity: fade in at 0.3s
-    const videoOpacity = interpolate(frame, [9, 24], [0, 1], {
+    const videoOpacity = interpolate(frame, [0, 18], [0.5, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Title bar: slide up from bottom of video frame, delay 0.5s
-    const titleY = interpolate(frame, [15, 33], [40, 0], {
+    const titleY = interpolate(frame, [0, 24], [12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const titleOpacity = interpolate(frame, [15, 33], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-
-    // Caption: fade in at 1.2s
-    const captionOpacity = interpolate(frame, [36, 54], [0, 1], {
+    const titleOpacity = interpolate(frame, [0, 24], [0.5, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Source credit: fade in at 1.5s
-    const sourceOpacity = interpolate(frame, [45, 60], [0, 0.6], {
+    const captionOpacity = interpolate(frame, [0, 24], [0.3, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const sourceOpacity = interpolate(frame, [0, 30], [0.25, 0.6], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -138,7 +133,7 @@ export default function ContentVideo({
                 alignItems: 'center',
                 padding: 60,
                 position: 'relative',
-                background: '#050505',
+                background: `radial-gradient(circle at 20% 14%, ${branding.accentColor}24 0%, transparent 44%), #091018`,
                 overflow: 'hidden',
             }}
         >

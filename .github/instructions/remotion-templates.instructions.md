@@ -130,6 +130,13 @@ useEffect(() => {
 - Avoid rendering hundreds of child elements
 - Use `display: none` or conditional rendering to hide expensive subtrees
 
+## MP4 Thumbnail Safety
+
+- Assume Instagram grid previews may display frame 0 as the thumbnail.
+- Do not start all key foreground elements at `opacity: 0` on frame 0.
+- Keep frame 0 readable: show a baseline title/card/video frame and avoid a fully black opening state.
+- Entrance animation is still encouraged, but use non-zero baseline opacity and smaller initial offsets for text/cards.
+
 ## Template Lifecycle
 
 ### Slide Composition Route
@@ -156,6 +163,7 @@ See existing templates for reference:
 | Render times out (>30s) | Component has expensive calculations or large DOM tree |
 | Images don't appear | Using external URLs; pass as base64 or pre-downloaded |
 | Text gets cut off | Forgot to set explicit width/height or overflow handling |
+| Instagram grid tile looks black for MP4 | Frame 0 starts with black background and fully transparent foreground |
 
 ## Testing Templates
 

@@ -15,7 +15,7 @@ export default function ContentStatSnapshot({
     const context = data.context || '';
     const takeaway = data.takeaway || '';
 
-    const cardOpacity = interpolate(frame, [0, 20], [0, 1], {
+    const cardOpacity = interpolate(frame, [0, 20], [0.55, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -23,7 +23,7 @@ export default function ContentStatSnapshot({
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const textOpacity = interpolate(frame, [22, 42], [0, 1], {
+    const textOpacity = interpolate(frame, [0, 30], [0.45, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -126,7 +126,7 @@ export default function ContentStatSnapshot({
                     fontSize: 22,
                     fontWeight: 700,
                     letterSpacing: '0.05em',
-                    opacity: interpolate(frame, [36, 58], [0, 0.75], {
+                    opacity: interpolate(frame, [0, 24], [0.3, 0.75], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),

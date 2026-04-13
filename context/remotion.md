@@ -33,3 +33,4 @@
 
 - Templates use **`useCurrentFrame`**, **`interpolate`**, and sometimes **`spring`** / **`Video`** / **`Img`** from `remotion`.
 - Timing assumes **30 fps** unless a template defines its own constant.
+- For MP4 posts, frame 0 must show readable foreground content (text or card UI) and should not start from fully black/fully transparent states, because Instagram grid previews frequently use the first frame as the visible thumbnail.

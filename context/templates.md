@@ -65,3 +65,4 @@ Validation note: `CTA_FINAL.callToAction` is now expected to end with `?` so the
 
 - Layouts are **fixed 1080×1080** with inline styles; typography often references **Montserrat** (ensure webfonts if rendering off a machine without them — not configured in-repo).
 - **HookA** uses **`Img`** for remote images; **ContentVideo** uses **`Video`** for remote video — both require reachable URLs at render time.
+- For MP4 publishing, keep frame 0 visually informative: avoid fully black opening frames and avoid starting all foreground layers at `opacity: 0`.
