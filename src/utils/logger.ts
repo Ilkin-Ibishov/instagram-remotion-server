@@ -34,7 +34,27 @@ const SENSITIVE_KEYS = new Set([
   'passwd',
   'credential',
   'key',
+  'access_token',
+  'refresh_token',
 ]);
+
+const SENSITIVE_QUERY_KEYS = new Set([
+  'apikey',
+  'api_key',
+  'key',
+  'token',
+  'access_token',
+  'refresh_token',
+  'secret',
+  'password',
+  'auth',
+  'authorization',
+]);
+
+const SECRET_TEXT_PATTERNS = [
+  /((?:apikey|api_key|access_token|refresh_token|token|secret|password|authorization)=)([^&\s]+)/gi,
+  /(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi,
+];
 
 export function redactSensitiveFields(value: unknown, depth = 0): unknown {
   if (depth > 5 || value === null || value === undefined) {
@@ -61,6 +81,27 @@ export function redactSensitiveFields(value: unknown, depth = 0): unknown {
   return Object.fromEntries(entries);
 }
 
+export function redactSensitiveText(value: string): string {
+  return SECRET_TEXT_PATTERNS.reduce(
+    (text, pattern) => text.replace(pattern, (_match, prefix) => `${prefix}[REDACTED]`),
+    value
+  );
+}
+
+export function sanitizeUrlForLogging(value: string): string {
+  try {
+    const parsed = new URL(value);
+    for (const key of Array.from(parsed.searchParams.keys())) {
+      if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+        parsed.searchParams.set(key, '[REDACTED]');
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return redactSensitiveText(value);
+  }
+}
+
 function safeStringify(value: unknown): string {
   try {
     return JSON.stringify(value);
@@ -69,41 +110,56 @@ function safeStringify(value: unknown): string {
   }
 }
 
+function shouldUseJsonConsole(): boolean {
+  return process.env.LOG_FORMAT === 'json'
+    || process.env.NODE_ENV === 'production'
+    || Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
+}
+
 export class Logger {
   private runId: string;
   private logFile: string;
+  private context: Record<string, unknown>;
 
-  constructor(runId?: string) {
+  constructor(runId?: string, context: Record<string, unknown> = {}) {
     this.runId = runId || `run-${Date.now()}`;
     this.logFile = path.join(LOG_DIR, `${this.runId}.log.json`);
+    this.context = context;
   }
 
   private write(entry: LogEntry) {
     const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [${entry.level}] [${entry.step}] ${entry.message}`;
+    const redactedMessage = redactSensitiveText(entry.message);
+    const logMessage = `[${timestamp}] [${entry.level}] [${this.runId}] [${entry.step}] ${redactedMessage}`;
+    const redactedData = entry.data !== undefined ? redactSensitiveFields(entry.data) : undefined;
+    const logEntry = {
+      ...entry,
+      message: redactedMessage,
+      data: redactedData,
+      timestamp,
+      runId: this.runId,
+      ...this.context,
+    };
 
     // Console output
-    const color =
-      entry.level === 'ERROR' ? '\x1b[31m' :
-      entry.level === 'WARN' ? '\x1b[33m' :
-      entry.level === 'DEBUG' ? '\x1b[36m' :
-      '\x1b[32m';
-    
-    console.log(`${color}${logMessage}\x1b[0m`);
-    const redactedData = entry.data !== undefined ? redactSensitiveFields(entry.data) : undefined;
-    
-    if (redactedData !== undefined) {
-      console.log(`${color}[data] ${safeStringify(redactedData)}\x1b[0m`);
+    if (shouldUseJsonConsole()) {
+      console.log(JSON.stringify(logEntry));
+    } else {
+      const color =
+        entry.level === 'ERROR' ? '\x1b[31m' :
+        entry.level === 'WARN' ? '\x1b[33m' :
+        entry.level === 'DEBUG' ? '\x1b[36m' :
+        '\x1b[32m';
+
+      console.log(`${color}${logMessage}\x1b[0m`);
+
+      if (redactedData !== undefined) {
+        console.log(`${color}[data] ${safeStringify(redactedData)}\x1b[0m`);
+      }
     }
 
     // File output (JSON lines format)
     try {
-      const logEntry = {
-        ...entry,
-        data: redactedData,
-        timestamp,
-        runId: this.runId,
-      };
       fs.appendFileSync(this.logFile, JSON.stringify(logEntry) + '\n');
     } catch (err) {
       console.error('Failed to write to log file:', err);

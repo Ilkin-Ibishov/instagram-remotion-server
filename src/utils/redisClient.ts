@@ -4,10 +4,12 @@
  * getRedisClient from here rather than creating their own connection.
  */
 import { createClient } from 'redis';
+import Logger from './logger';
 
 type RedisClient = ReturnType<typeof createClient>;
 
 let redisClientPromise: Promise<RedisClient> | null = null;
+const redisLogger = new Logger('redis-client');
 
 function resetCachedClient(): void {
   redisClientPromise = null;
@@ -33,6 +35,7 @@ export async function getRedisClient(): Promise<RedisClient> {
     .then(() => client as RedisClient)
     .catch((error) => {
       resetCachedClient();
+      redisLogger.error('redis', 'Redis client connection failed', error);
       try {
         if (client.isOpen) {
           client.disconnect();

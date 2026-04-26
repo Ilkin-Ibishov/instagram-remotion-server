@@ -3,9 +3,11 @@ import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import Logger from '../utils/logger';
 
 const RENDER_DIR = '/tmp/renders';
 const COMPOSITION_ID = 'Slide';
+const renderLogger = new Logger('render-service');
 
 if (!fs.existsSync(RENDER_DIR)) {
   fs.mkdirSync(RENDER_DIR, { recursive: true });
@@ -215,7 +217,7 @@ export async function ensureBundle(): Promise<string> {
   }
 
   bundleInitPromise = (async () => {
-    console.log('[bundle] Creating Remotion bundle (one-time)...');
+    renderLogger.info('bundle', 'Creating Remotion bundle');
     const startTime = Date.now();
 
     bundleLocation = await bundle({
@@ -224,7 +226,7 @@ export async function ensureBundle(): Promise<string> {
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[bundle] ✓ Bundle ready in ${elapsed}s`);
+    renderLogger.info('bundle', 'Bundle ready', { durationMs: Date.now() - startTime, durationSeconds: elapsed });
 
     return bundleLocation;
   })();
@@ -259,7 +261,15 @@ export async function renderManifest(
 
   for (const [i, slide] of input.carousel.entries()) {
     signal?.throwIfAborted();
-    console.log(`[render] slide ${i + 1}/${input.carousel.length} (${slide.templateId}, ${format})`);
+    const slideStartTime = Date.now();
+    renderLogger.info('render-slide', 'Rendering slide', {
+      batchId,
+      slideIndex: i,
+      slideNumber: i + 1,
+      slideCount: input.carousel.length,
+      templateId: slide.templateId,
+      format,
+    });
 
     const inputProps = {
       templateId: slide.templateId,
@@ -295,7 +305,11 @@ export async function renderManifest(
         },
         onProgress: ({ progress }) => {
           if (Math.round(progress * 100) % 25 === 0) {
-            console.log(`  [video ${i + 1}] ${Math.round(progress * 100)}%`);
+            renderLogger.info('render-progress', 'Video render progress', {
+              batchId,
+              slideIndex: i,
+              progressPercent: Math.round(progress * 100),
+            });
           }
         },
       });
@@ -316,7 +330,12 @@ export async function renderManifest(
       });
     }
 
-    console.log(`[render] ✓ ${filename}`);
+    renderLogger.info('render-slide', 'Slide rendered', {
+      batchId,
+      slideIndex: i,
+      filename,
+      durationMs: Date.now() - slideStartTime,
+    });
     outputUrls.push(`/api/renders/${filename}`);
     signal?.throwIfAborted();
   }

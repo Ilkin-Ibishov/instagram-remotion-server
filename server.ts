@@ -9,6 +9,7 @@ import { readScheduleState } from './src/pipeline/scheduleState';
 import { closeTelemetryPool } from './src/pipeline/rssTelemetryStore';
 import { closeRedisClient } from './src/utils/redisClient';
 import { parseEnvInt } from './src/utils/env';
+import Logger, { sanitizeUrlForLogging } from './src/utils/logger';
 import {
     __testing as renderTesting,
     ensureBundle,
@@ -48,28 +49,40 @@ export function bootstrapInstagramSession(
     storageFilePath = path.join(process.cwd(), 'storage.json')
 ): boolean {
     if (!sessionBase64) {
-        console.warn('[startup] INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
+        serverLogger.warn('startup', 'INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
         return false;
     }
 
     try {
         const normalizedSessionJson = decodeInstagramSessionJson(sessionBase64);
         fs.writeFileSync(storageFilePath, normalizedSessionJson, 'utf-8');
-        console.log('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+        serverLogger.info('startup', 'Instagram session written from INSTAGRAM_SESSION_B64');
         return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[startup] Failed to decode INSTAGRAM_SESSION_B64: ${message}`);
+        serverLogger.error('startup', 'Failed to decode INSTAGRAM_SESSION_B64', { error: { message } });
         return false;
     }
 }
-
-bootstrapInstagramSession();
 
 process.env.SERVER_MODE = 'true';
 
 // ─── Config ──────────────────────────────────────────────
 const RENDER_DIR = '/tmp/renders';
+const serverLogger = new Logger('server');
+
+bootstrapInstagramSession();
+
+function getRequestId(req: express.Request): string {
+    const incoming = req.header('x-request-id') || req.header('x-correlation-id');
+    return incoming?.trim() || crypto.randomUUID();
+}
+
+function serializeError(error: unknown): Record<string, unknown> {
+    return error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) };
+}
 
 function parseIntEnv(name: string, defaultValue: number, minValue = 0): number {
     const raw = process.env[name];
@@ -351,9 +364,25 @@ export const app = express();
 
 // MUST be before any routes - logs ALL incoming requests
 app.use((req, res, next) => {
-    console.log(`\n[INCOMING] ${new Date().toISOString()} | ${req.method} ${req.path} | Content-Type: ${req.headers['content-type']}`);
+    const requestId = getRequestId(req);
+    const startedAt = Date.now();
+    res.locals.requestId = requestId;
+    res.setHeader('x-request-id', requestId);
+    serverLogger.info('http-request', 'Incoming request', {
+        requestId,
+        method: req.method,
+        path: req.path,
+        contentType: req.headers['content-type'] ?? null,
+    });
     res.on('finish', () => {
-        console.log(`[OUTGOING] ${req.method} ${req.path} -> ${res.statusCode} ${res.statusMessage}`);
+        serverLogger.info('http-response', 'Request completed', {
+            requestId,
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            statusMessage: res.statusMessage,
+            durationMs: Date.now() - startedAt,
+        });
     });
     next();
 });
@@ -396,6 +425,11 @@ app.get('/api/status', async (req, res) => {
             last_run_at: state.lastRunAt?.toISOString() ?? null,
         });
     } catch (err) {
+        serverLogger.error('api-status', 'Schedule state database unavailable', {
+            requestId: res.locals.requestId,
+            accountId,
+            error: serializeError(err),
+        });
         return res.status(503).json({
             status: 'unavailable',
             message: 'Schedule state database unavailable',
@@ -404,7 +438,8 @@ app.get('/api/status', async (req, res) => {
 });
 
 app.post('/api/schedule/run', async (req, res) => {
-    console.log('[api/schedule/run] POST request received');
+    const requestId = res.locals.requestId;
+    serverLogger.info('scheduler-api', 'Manual scheduler trigger received', { requestId });
 
     const configuredSecret = process.env.SCHEDULE_RUN_SECRET;
     if (configuredSecret) {
@@ -421,6 +456,7 @@ app.post('/api/schedule/run', async (req, res) => {
             equalLength;
 
         if (!secretMatches) {
+            serverLogger.warn('scheduler-api', 'Rejected scheduler trigger with invalid secret', { requestId });
             return res.status(401).json({
                 success: false,
                 status: 'unauthorized',
@@ -431,6 +467,13 @@ app.post('/api/schedule/run', async (req, res) => {
 
     try {
         const outcome = await runScheduledPipeline();
+        serverLogger.info('scheduler-api', 'Scheduler trigger completed', {
+            requestId,
+            status: outcome.status,
+            accountId: outcome.accountId,
+            reason: outcome.reason,
+            nextRunAt: outcome.nextRunAt,
+        });
 
         if (outcome.status === 'failed') {
             return res.status(500).json({
@@ -444,7 +487,10 @@ app.post('/api/schedule/run', async (req, res) => {
             ...outcome,
         });
     } catch (error) {
-        console.error('[api/schedule/run] Unexpected error:', error);
+        serverLogger.error('scheduler-api', 'Unexpected scheduler trigger error', {
+            requestId,
+            error: serializeError(error),
+        });
         return res.status(500).json({
             success: false,
             status: 'failed',
@@ -454,12 +500,14 @@ app.post('/api/schedule/run', async (req, res) => {
 });
 
 export async function startServer() {
-    console.log(`[startup] PORT env var: "${process.env.PORT}" (typeof: ${typeof process.env.PORT})`);
-    console.log(`[startup] Resolved PORT: ${PORT}`);
-    console.log(
-        `[cleanup] Config: interval=${CHROME_CLEANUP_INTERVAL_MS}ms, retries=${CHROME_CLEANUP_RETRIES}, retryDelay=${CHROME_CLEANUP_RETRY_DELAY_MS}ms`
-    );
-    
+    serverLogger.info('startup', 'Server configuration resolved', {
+        rawPort: process.env.PORT ?? null,
+        port: PORT,
+        chromeCleanupIntervalMs: CHROME_CLEANUP_INTERVAL_MS,
+        chromeCleanupRetries: CHROME_CLEANUP_RETRIES,
+        chromeCleanupRetryDelayMs: CHROME_CLEANUP_RETRY_DELAY_MS,
+    });
+
     const bundleReady = await initializeBundleOrExit();
     if (!bundleReady) {
         return;
@@ -467,43 +515,46 @@ export async function startServer() {
 
     return new Promise<void>((resolve) => {
         httpServer = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`✓ Server listening on 0.0.0.0:${PORT}`);
-            console.log(`✓ Endpoints: GET /health, POST /api/schedule/run, POST /api/render, GET /api/renders/:file`);
+            serverLogger.info('startup', 'Server listening', {
+                host: '0.0.0.0',
+                port: PORT,
+                endpoints: ['GET /health', 'POST /api/schedule/run', 'POST /api/render', 'GET /api/renders/:file'],
+            });
             if (SCHEDULER_ENABLED) {
                 startSchedulerLoop();
             } else {
-                console.log(`✓ Scheduler: disabled (set SCHEDULER_ENABLED=true to enable)`);
+                serverLogger.info('scheduler', 'Scheduler disabled', { enabled: false });
             }
             resolve();
         });
 
         httpServer.on('close', () => {
-            console.log('[shutdown] HTTP server closed');
+            serverLogger.info('shutdown', 'HTTP server closed');
         });
     });
 }
 
 function gracefulShutdown(signal: NodeJS.Signals) {
     if (shutdownInProgress) {
-        console.log(`[shutdown] ${signal} received while shutdown already in progress`);
+        serverLogger.warn('shutdown', 'Signal received while shutdown already in progress', { signal });
         return;
     }
 
     shutdownInProgress = true;
-    console.log(`[shutdown] Received ${signal}; starting graceful shutdown`);
+    serverLogger.info('shutdown', 'Starting graceful shutdown', { signal });
 
     clearInterval(periodicCleanupInterval);
     stopSchedulerLoop();
     cleanupChromeProcesses();
 
     const forceExitTimeout = setTimeout(() => {
-        console.error('[shutdown] Graceful shutdown timed out after 10s; forcing exit');
+        serverLogger.error('shutdown', 'Graceful shutdown timed out after 10s; forcing exit');
         process.exit(1);
     }, 10_000);
     forceExitTimeout.unref();
 
     if (!httpServer) {
-        console.log('[shutdown] No active HTTP server instance found; exiting');
+        serverLogger.info('shutdown', 'No active HTTP server instance found; exiting');
         process.exit(0);
         return;
     }
@@ -511,21 +562,21 @@ function gracefulShutdown(signal: NodeJS.Signals) {
     httpServer.close((error?: Error) => {
         clearTimeout(forceExitTimeout);
         if (error) {
-            console.error('[shutdown] Error while closing HTTP server:', error);
+            serverLogger.error('shutdown', 'Error while closing HTTP server', error);
             process.exit(1);
             return;
         }
 
         void closeRedisClient()
             .catch((redisError) => {
-                console.error('[shutdown] Error while closing Redis client:', redisError);
+                serverLogger.error('shutdown', 'Error while closing Redis client', redisError);
             })
             .then(() => closeTelemetryPool())
             .catch((poolError) => {
-                console.error('[shutdown] Error while closing telemetry pool:', poolError);
+                serverLogger.error('shutdown', 'Error while closing telemetry pool', poolError);
             })
             .finally(() => {
-                console.log('[shutdown] Graceful shutdown complete');
+                serverLogger.info('shutdown', 'Graceful shutdown complete');
                 process.exit(0);
             });
     });
@@ -533,9 +584,18 @@ function gracefulShutdown(signal: NodeJS.Signals) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+    serverLogger.error('process', 'Unhandled promise rejection', {
+        error: serializeError(reason),
+    });
+});
+process.on('uncaughtException', (error) => {
+    serverLogger.error('process', 'Uncaught exception', error);
+    process.exit(1);
+});
 
 app.post('/api/render', async (req, res) => {
-    console.log('[api/render] POST request received');
+    const requestId = res.locals.requestId;
     try {
         const { webhookUrl } = req.body;
         const validation = validateRenderManifest(req.body);
@@ -544,6 +604,13 @@ app.post('/api/render', async (req, res) => {
         }
 
         const batchId = crypto.randomBytes(4).toString('hex');
+        serverLogger.info('render-api', 'Render request accepted', {
+            requestId,
+            batchId,
+            slideCount: validation.normalized.carousel.length,
+            format: validation.normalized.format,
+            webhook: Boolean(webhookUrl),
+        });
         const processRenders = async () => {
             const rendered = await renderManifest(validation.normalized!, batchId);
             return rendered.images;
@@ -562,18 +629,35 @@ app.post('/api/render', async (req, res) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ success: true, batchId, images: outputUrls })
                     });
-                    console.log(`[webhook] ✓ Delivered to ${webhookUrl}`);
+                    serverLogger.info('webhook', 'Delivered render success webhook', {
+                        requestId,
+                        batchId,
+                        webhookUrl: sanitizeUrlForLogging(webhookUrl),
+                        outputCount: outputUrls.length,
+                    });
                 } catch (e) {
-                    console.error('[webhook] Failed to send success ping:', e);
+                    serverLogger.error('webhook', 'Failed to send success webhook', {
+                        requestId,
+                        batchId,
+                        webhookUrl: sanitizeUrlForLogging(webhookUrl),
+                        error: serializeError(e),
+                    });
                 } finally {
                     await cleanupChromeProcessesWithRetries('webhook success cleanup');
                     warnIfTooManyChromeProcesses();
-                    const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
-                    console.log(`[cleanup] ✓ Webhook render batch completed in ${elapsed}s, Chrome processes cleaned`);
+                    serverLogger.info('cleanup', 'Webhook render batch completed', {
+                        requestId,
+                        batchId,
+                        durationMs: Date.now() - backgroundStartTime,
+                    });
                 }
             }).catch(async (error) => {
                 try {
-                    console.error('[webhook] Background render error:', error);
+                    serverLogger.error('webhook', 'Background render error', {
+                        requestId,
+                        batchId,
+                        error: serializeError(error),
+                    });
                     await fetch(webhookUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -584,12 +668,20 @@ app.post('/api/render', async (req, res) => {
                         })
                     });
                 } catch (e) {
-                    console.error('[webhook] Failed to send error ping:', e);
+                    serverLogger.error('webhook', 'Failed to send error webhook', {
+                        requestId,
+                        batchId,
+                        webhookUrl: sanitizeUrlForLogging(webhookUrl),
+                        error: serializeError(e),
+                    });
                 } finally {
                     await cleanupChromeProcessesWithRetries('webhook failure cleanup');
                     warnIfTooManyChromeProcesses();
-                    const elapsed = ((Date.now() - backgroundStartTime) / 1000).toFixed(1);
-                    console.log(`[cleanup] ✗ Webhook render batch failed after ${elapsed}s, Chrome processes cleaned`);
+                    serverLogger.info('cleanup', 'Webhook render batch failed', {
+                        requestId,
+                        batchId,
+                        durationMs: Date.now() - backgroundStartTime,
+                    });
                 }
             });
             return;
@@ -603,13 +695,19 @@ app.post('/api/render', async (req, res) => {
             // Always cleanup after render completes (success or failure)
             await cleanupChromeProcessesWithRetries('sync render cleanup');
             warnIfTooManyChromeProcesses();
-            const elapsed = ((Date.now() - renderStartTime) / 1000).toFixed(1);
-            console.log(`[cleanup] ✓ Render batch completed in ${elapsed}s, Chrome processes cleaned`);
+            serverLogger.info('cleanup', 'Render batch completed', {
+                requestId,
+                batchId,
+                durationMs: Date.now() - renderStartTime,
+            });
         }
 
         res.json({ success: true, images: outputUrls });
     } catch (error) {
-        console.error('Render error:', error);
+        serverLogger.error('render-api', 'Render request failed', {
+            requestId,
+            error: serializeError(error),
+        });
         res.status(500).json({
             error: 'Failed to render images',
             details: error instanceof Error ? error.message : String(error),
@@ -619,7 +717,11 @@ app.post('/api/render', async (req, res) => {
 
 // Catch-all 404 handler
 app.use((req, res) => {
-    console.log(`[404] No route for ${req.method} ${req.path}`);
+    serverLogger.warn('http-404', 'No route matched request', {
+        requestId: res.locals.requestId,
+        method: req.method,
+        path: req.path,
+    });
     res.status(404).json({ error: 'Not Found', path: req.path, method: req.method });
 });
 
@@ -630,7 +732,7 @@ if (!isTestMode) {
         try {
             await startServer();
         } catch (err) {
-            console.error('[startup] Failed to start server:', err);
+            serverLogger.error('startup', 'Failed to start server', err);
             process.exit(1);
         }
     })();
