@@ -5,7 +5,7 @@ import { fetchRssNews } from './pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle, printScoringResults } from './pipeline/newsFiltering';
 import { isPostgresPostHistory, recordPost } from './pipeline/postHistory';
 import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfile';
-import type { NewsArticle, PublishablePost } from './pipeline/types';
+import type { GeneratedContent, NewsArticle, PublishablePost } from './pipeline/types';
 import path from 'path';
 import Logger from './utils/logger';
 import { closeTelemetryPool } from './pipeline/rssTelemetryStore';
@@ -18,6 +18,26 @@ dotenv.config();
 const RENDER_FORMAT = process.env.RENDER_FORMAT || 'mp4';
 const NEWS_CATEGORY = process.env.NEWS_CATEGORY || 'technology';
 const MIN_RELEVANCE_SCORE = parseInt(process.env.MIN_RELEVANCE_SCORE || '10', 10);
+
+export type PipelineRunResult =
+  | {
+      status: 'skipped_no_articles';
+      category: string;
+      minRelevanceScore: number;
+    }
+  | {
+      status: 'published';
+      article: NewsArticle;
+      articleUrl: string;
+      content: GeneratedContent;
+      slides: RenderManifestInput['carousel'];
+      mediaPaths: string[];
+      renderUrls: string[];
+      post: PublishablePost;
+      caption: string;
+      hashtags: string;
+      postId: string;
+    };
 
 /**
  * Renders the given manifest in-process using the shared render service.
@@ -40,7 +60,7 @@ async function renderMedia(manifest: any, format: string = 'mp4', signal?: Abort
   return result.images;
 }
 
-export async function runPipeline(signal?: AbortSignal) {
+export async function runPipelineWithResult(signal?: AbortSignal): Promise<PipelineRunResult> {
   const logger = new Logger();
   const accountProfile = loadAccountProfile();
   const accountKeywords = getAccountKeywords(accountProfile);
@@ -129,7 +149,11 @@ export async function runPipeline(signal?: AbortSignal) {
           minRelevanceScore: MIN_RELEVANCE_SCORE,
         }
       );
-      return;
+      return {
+        status: 'skipped_no_articles',
+        category: NEWS_CATEGORY,
+        minRelevanceScore: MIN_RELEVANCE_SCORE,
+      };
     }
 
     signal?.throwIfAborted();
@@ -231,6 +255,20 @@ export async function runPipeline(signal?: AbortSignal) {
     logger.info('publishing', 'Publish completed successfully');
     logger.info('pipeline', `✅ Pipeline completed successfully!\n📊 Logs: ${logger.getLogPath()}`);
 
+    return {
+      status: 'published',
+      article,
+      articleUrl: article.url,
+      content: aiData,
+      slides: aiData.manifest.carousel,
+      mediaPaths,
+      renderUrls: localFileUrls,
+      post,
+      caption: aiData.caption,
+      hashtags: aiData.hashtags,
+      postId: post.id ?? '',
+    };
+
   } catch (error) {
     logger.error('pipeline', 'Pipeline failed', error);
     throw error;
@@ -245,6 +283,10 @@ export async function runPipeline(signal?: AbortSignal) {
       }
     }
   }
+}
+
+export async function runPipeline(signal?: AbortSignal): Promise<void> {
+  await runPipelineWithResult(signal);
 }
 
 // Run the pipeline when executed directly from CLI.
