@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findNewPublishedPermalink,
+  __testing as instagramTesting,
   resolveInstagramUsername,
 } from '../src/automation/instagramPublisher';
 
@@ -34,5 +35,25 @@ describe('findNewPublishedPermalink', () => {
     const current = ['/reel/old-2/', '/p/old-1/'];
 
     expect(findNewPublishedPermalink(baseline, current)).toBeNull();
+  });
+});
+
+describe('instagram publish result helpers', () => {
+  it('creates a verified permalink result', () => {
+    const result = instagramTesting.createPublishResult({
+      confirmed: true,
+      permalink: '/p/new-3/',
+      verificationMethod: 'profile_permalink',
+      baselinePermalinkCount: 2,
+      publishDurationMs: 1234,
+    });
+
+    expect(result).toEqual({
+      confirmed: true,
+      permalink: '/p/new-3/',
+      verificationMethod: 'profile_permalink',
+      baselinePermalinkCount: 2,
+      publishDurationMs: 1234,
+    });
   });
 });

@@ -4,7 +4,12 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/automation/instagramPublisher', () => ({
-  publishToInstagram: vi.fn().mockResolvedValue(undefined),
+  publishToInstagram: vi.fn().mockResolvedValue({
+    confirmed: true,
+    permalink: 'https://www.instagram.com/p/test-post/',
+    verificationMethod: 'profile_permalink',
+    publishDurationMs: 1234,
+  }),
 }));
 
 vi.mock('../src/render/renderService', async (importOriginal) => {
@@ -21,6 +26,27 @@ vi.mock('../src/render/renderService', async (importOriginal) => {
 vi.mock('../src/pipeline/aiService', () => ({
   generatePostContentAI: vi.fn(),
 }));
+
+const publishedPostStoreMocks = vi.hoisted(() => ({
+  buildPublishedPostContext: vi.fn((batchId: string) => ({
+    batchId,
+    accountId: 'default',
+    contentIntent: 'balanced',
+    pipelineVersion: 'test',
+    modelName: 'gemini-2.5-flash',
+    sourceStrategy: 'gnews',
+    selectionStrategy: 'diverse',
+    renderFormat: 'png',
+  })),
+  recordSelectedPost: vi.fn().mockResolvedValue(undefined),
+  recordGeneratedPost: vi.fn().mockResolvedValue(undefined),
+  recordRenderedPost: vi.fn().mockResolvedValue(undefined),
+  recordPublishStartedPost: vi.fn().mockResolvedValue(undefined),
+  recordPublishedPost: vi.fn().mockResolvedValue(undefined),
+  recordFailedPost: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/pipeline/publishedPostStore', () => publishedPostStoreMocks);
 
 import { publishToInstagram } from '../src/automation/instagramPublisher';
 import { generatePostContentAI } from '../src/pipeline/aiService';
@@ -129,6 +155,7 @@ describe('runPipelineWithResult integration path', () => {
     ]);
     expect(result.post.caption).toContain('Developer work is changing fast.');
     expect(result.post.isCarousel).toBe(true);
+    expect(result.publishResult.permalink).toBe('https://www.instagram.com/p/test-post/');
 
     const history = await getRecentPosts(30);
     expect(history).toHaveLength(1);
@@ -143,5 +170,17 @@ describe('runPipelineWithResult integration path', () => {
     );
     expect(mockedRenderManifest).toHaveBeenCalledOnce();
     expect(mockedPublishToInstagram).toHaveBeenCalledWith(result.post, undefined);
+    expect(publishedPostStoreMocks.recordSelectedPost).toHaveBeenCalledOnce();
+    expect(publishedPostStoreMocks.recordGeneratedPost).toHaveBeenCalledOnce();
+    expect(publishedPostStoreMocks.recordRenderedPost).toHaveBeenCalledOnce();
+    expect(publishedPostStoreMocks.recordPublishedPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchId: expect.stringMatching(/^batch-/),
+      }),
+      expect.objectContaining({
+        permalink: 'https://www.instagram.com/p/test-post/',
+      })
+    );
+    expect(publishedPostStoreMocks.recordFailedPost).not.toHaveBeenCalled();
   });
 });

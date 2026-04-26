@@ -58,3 +58,12 @@ export interface PublishablePost {
   caption: string;
   isCarousel: boolean;
 }
+
+export interface InstagramPublishResult {
+  confirmed: boolean;
+  permalink?: string;
+  verificationMethod: 'profile_permalink' | 'dom_confirmation' | 'url_confirmation' | 'ui_confirmation';
+  baselinePermalinkCount?: number;
+  newPermalinkDetectedAt?: string;
+  publishDurationMs: number;
+}

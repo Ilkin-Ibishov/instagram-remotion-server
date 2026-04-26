@@ -5,11 +5,21 @@ import { fetchRssNews } from './pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle, printScoringResults } from './pipeline/newsFiltering';
 import { isPostgresPostHistory, recordPost } from './pipeline/postHistory';
 import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfile';
-import type { GeneratedContent, NewsArticle, PublishablePost } from './pipeline/types';
+import type { GeneratedContent, InstagramPublishResult, NewsArticle, PublishablePost } from './pipeline/types';
 import path from 'path';
 import Logger from './utils/logger';
 import { closeTelemetryPool } from './pipeline/rssTelemetryStore';
 import { renderManifest, validateRenderManifest, type RenderManifestInput } from './render/renderService';
+import {
+  buildPublishedPostContext,
+  recordFailedPost,
+  recordGeneratedPost,
+  recordPublishedPost,
+  recordPublishStartedPost,
+  recordRenderedPost,
+  recordSelectedPost,
+} from './pipeline/publishedPostStore';
+import { computePostQualityMetrics } from './pipeline/publishedPostMetrics';
 import * as dotenv from 'dotenv';
 import { pathToFileURL } from 'url';
 
@@ -37,6 +47,7 @@ export type PipelineRunResult =
       caption: string;
       hashtags: string;
       postId: string;
+      publishResult: InstagramPublishResult;
     };
 
 /**
@@ -66,7 +77,9 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
   const accountKeywords = getAccountKeywords(accountProfile);
   const useRssFeeds = process.env.USE_RSS_FEEDS !== 'false';
   const batchId = `batch-${Date.now()}`;
+  const publishedPostContext = buildPublishedPostContext(batchId);
   let rssFetchFailed = false;
+  let currentStage: 'selection' | 'generation' | 'render' | 'publish' | 'unknown' = 'unknown';
   
   try {
     signal?.throwIfAborted();
@@ -165,6 +178,7 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
     }
 
     const article = selectedArticleItem.article;
+    currentStage = 'selection';
     logger.info(
       'news-selection',
       `Selected: "${article.title}"`,
@@ -175,6 +189,7 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
       }
     );
     logger.info('pipeline', `Selected article (score: ${selectedArticleItem.score}): "${article.title}"`);
+    await recordSelectedPost(publishedPostContext, selectedArticleItem);
 
     // ── BUG-001 FIX: Dedup guard BEFORE AI transformation ──────────────────
     // File store: recordPost inserts a new row (URL + fingerprint) before Gemini runs.
@@ -189,8 +204,11 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
     );
 
     signal?.throwIfAborted();
+    currentStage = 'generation';
     logger.info('pipeline', '--- Step 1: AI Content Generation ---');
     const aiData = await generateContent(article, accountProfile, signal);
+    const qualityMetrics = computePostQualityMetrics(article, aiData);
+    await recordGeneratedPost(publishedPostContext, article, aiData, qualityMetrics);
     logger.info('ai-generation', `Generated ${aiData.manifest.carousel.length} slides with account context`, {
       account: accountProfile.handle,
       slideCount: aiData.manifest.carousel.length,
@@ -220,6 +238,7 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
     logger.debug('ai-generation', 'Hashtags:', aiData.hashtags);
 
     signal?.throwIfAborted();
+    currentStage = 'render';
     logger.info('pipeline', `--- Step 2: Rendering (Format: ${RENDER_FORMAT}) ---`);
     // Ensure the server is running on port 3000 before executing this script!
     const localFileUrls = await renderMedia(aiData.manifest, RENDER_FORMAT, signal);
@@ -235,6 +254,12 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
     
     logger.info('rendering', 'Render complete', { media_count: mediaPaths.length, format: RENDER_FORMAT });
     logger.debug('rendering', 'Rendered media paths:', mediaPaths);
+    await recordRenderedPost(publishedPostContext, {
+      renderFormat: RENDER_FORMAT,
+      renderUrls: localFileUrls,
+      mediaPaths,
+      mediaCount: mediaPaths.length,
+    });
 
     logger.info('pipeline', '--- Step 3: Assembly ---');
     const post: PublishablePost = {
@@ -247,13 +272,16 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
     logger.debug('assembly', 'Assembled post:', post);
 
     signal?.throwIfAborted();
+    currentStage = 'publish';
     logger.info('pipeline', '--- Step 4: Publishing to Instagram ---');
     // Uncomment this line to actually publish to Instagram.
     // Make sure storage.json has valid session!
-    await publishToInstagram(post, signal);
+    await recordPublishStartedPost(publishedPostContext, post);
+    const publishResult = await publishToInstagram(post, signal);
     
     logger.info('publishing', 'Publish completed successfully');
     logger.info('pipeline', `✅ Pipeline completed successfully!\n📊 Logs: ${logger.getLogPath()}`);
+    await recordPublishedPost(publishedPostContext, publishResult);
 
     return {
       status: 'published',
@@ -267,10 +295,12 @@ export async function runPipelineWithResult(signal?: AbortSignal): Promise<Pipel
       caption: aiData.caption,
       hashtags: aiData.hashtags,
       postId: post.id ?? '',
+      publishResult,
     };
 
   } catch (error) {
     logger.error('pipeline', 'Pipeline failed', error);
+    await recordFailedPost(publishedPostContext, currentStage, error);
     throw error;
   } finally {
     if (process.env.SERVER_MODE !== 'true') {

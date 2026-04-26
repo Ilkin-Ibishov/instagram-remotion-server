@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import type { Page } from 'playwright';
-import type { PublishablePost } from '../pipeline/types';
+import type { InstagramPublishResult, PublishablePost } from '../pipeline/types';
 import Logger from '../utils/logger';
 
 const instagramLogger = new Logger('instagram-publisher');
@@ -62,6 +62,12 @@ export function findNewPublishedPermalink(beforeLinks: string[], afterLinks: str
   }
   return null;
 }
+
+export const __testing = {
+  createPublishResult(result: InstagramPublishResult): InstagramPublishResult {
+    return result;
+  },
+};
 
 async function getRecentProfilePermalinks(page: Page, username: string, signal?: AbortSignal): Promise<string[]> {
   signal?.throwIfAborted();
@@ -264,7 +270,8 @@ export function assertInstagramSessionReady(
   );
 }
 
-export async function publishToInstagram(post: PublishablePost, signal?: AbortSignal): Promise<void> {
+export async function publishToInstagram(post: PublishablePost, signal?: AbortSignal): Promise<InstagramPublishResult> {
+  const startedAt = Date.now();
   const sessionFile = 'storage.json';
   const isHeadless = (process.env.PLAYWRIGHT_HEADLESS || 'true').toLowerCase() !== 'false';
   const minimumRemainingMs = Number(process.env.INSTAGRAM_SESSION_MIN_REMAINING_MS || 60 * 60 * 1000);
@@ -299,7 +306,9 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
     const verificationPage = await context.newPage();
     const targetUsername = resolveInstagramUsername(process.env.BRAND_HANDLE);
 
+    const startedAt = Date.now();
     let baselinePermalinks: string[] = [];
+    let verificationMethod: InstagramPublishResult['verificationMethod'] = 'dom_confirmation';
     if (targetUsername) {
       baselinePermalinks = await getRecentProfilePermalinks(verificationPage, targetUsername, signal);
       instagramLogger.info('instagram-verification', 'Captured baseline profile permalinks', {
@@ -485,10 +494,28 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
       }
 
       instagramLogger.info('instagram-verification', 'Verified new published permalink', { publishedPermalink });
+      return {
+        confirmed: true,
+        permalink: publishedPermalink,
+        verificationMethod: 'profile_permalink',
+        publishDurationMs: Date.now() - startedAt,
+        baselinePermalinkCount: baselinePermalinks.length,
+        newPermalinkDetectedAt: new Date().toISOString(),
+      };
+    } else if (publishConfirmed) {
+      verificationMethod = page.url().includes('/p/') || page.url().includes('/reel/')
+        ? 'url_confirmation'
+        : 'dom_confirmation';
     }
 
     instagramLogger.info('instagram-publish', 'Post successfully published');
     await delay(3000, signal);
+    return {
+      confirmed: true,
+      verificationMethod,
+      publishDurationMs: Date.now() - startedAt,
+      baselinePermalinkCount: baselinePermalinks.length,
+    };
 
   } catch (err) {
     instagramLogger.error('instagram-publish', 'Publishing to Instagram failed', err);
