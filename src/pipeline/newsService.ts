@@ -15,6 +15,20 @@ const GNEWS_COUNTRY = process.env.GNEWS_COUNTRY || 'us';
 const GNEWS_MAX_ARTICLES = Number(process.env.GNEWS_MAX_ARTICLES) || 10;
 // Cache TTL in seconds — controls how long GNews results are cached in Redis
 const GNEWS_CACHE_TTL_SECONDS = Number(process.env.GNEWS_CACHE_TTL_SECONDS) || 600; // 10 min default
+const GNEWS_USER_AGENT = 'instagram-content-generator/1.0';
+
+function getGNewsApiKey(): string {
+  return process.env.GNEWS_API_KEY || API_KEY || '';
+}
+
+function buildGNewsRequestInit(): RequestInit {
+  return {
+    headers: {
+      'X-Api-Key': getGNewsApiKey(),
+      'User-Agent': GNEWS_USER_AGENT,
+    },
+  };
+}
 
 function parseRetryAfterMs(retryAfterHeader: string | null, nowMs: number = Date.now()): number | undefined {
   if (!retryAfterHeader) {
@@ -133,9 +147,13 @@ export async function fetchTopNews(category: string = 'technology'): Promise<New
 
 async function _fetchTopNewsLive(category: string, logger: Logger): Promise<NewsArticle[]> {
 
-  const url = `${GNEWS_URL}?category=${category}&lang=${GNEWS_LANG}&country=${GNEWS_COUNTRY}&max=${GNEWS_MAX_ARTICLES}&apikey=${API_KEY}`;
-  // Used only for logging — strips sensitive apikey param
-  const safeUrl = `${GNEWS_URL}?category=${category}&lang=${GNEWS_LANG}&country=${GNEWS_COUNTRY}&max=${GNEWS_MAX_ARTICLES}&apikey=REDACTED`;
+  const params = new URLSearchParams({
+    category,
+    lang: GNEWS_LANG,
+    country: GNEWS_COUNTRY,
+    max: String(GNEWS_MAX_ARTICLES),
+  });
+  const url = `${GNEWS_URL}?${params.toString()}`;
 
   const isRetryableGNewsError = (error: unknown): boolean => {
     if (typeof error === 'object' && error && 'message' in error) {
@@ -150,7 +168,7 @@ async function _fetchTopNewsLive(category: string, logger: Logger): Promise<News
 
   let lastRetryDelay = 2000;
   const fetchFn = async () => {
-    const response = await fetch(url);
+    const response = await fetch(url, buildGNewsRequestInit());
     if (!response.ok) {
       const errorText = await response.text();
       // Check for Retry-After header on 429
@@ -163,7 +181,7 @@ async function _fetchTopNewsLive(category: string, logger: Logger): Promise<News
           logger.warn('gnews', `Received 429. Using Retry-After header value: ${retryAfter}`, { retryAfterMs });
         }
       }
-      logger.error('gnews', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url: safeUrl, retryAfterMs });
+      logger.error('gnews', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url, retryAfterMs });
       throw new Error(`GNews API Error: ${response.status} - ${errorText}`);
     }
     const data = await response.json();
@@ -235,15 +253,12 @@ async function _fetchSearchNewsLive(
     country: GNEWS_COUNTRY,
     max: String(maxResults),
     sortby,
-    apikey: API_KEY || '',
   });
 
   if (options?.from) params.append('from', options.from);
   if (options?.to) params.append('to', options.to);
 
   const url = `${searchEndpoint}?${params.toString()}`;
-  // Redact apikey from logged URL
-  const safeSearchUrl = url.replace(/apikey=[^&]+/, 'apikey=REDACTED');
 
   const isRetryableGNewsError = (error: unknown): boolean => {
     if (typeof error === 'object' && error && 'message' in error) {
@@ -256,7 +271,7 @@ async function _fetchSearchNewsLive(
 
   let lastRetryDelay = 2000;
   const fetchFn = async () => {
-    const response = await fetch(url);
+    const response = await fetch(url, buildGNewsRequestInit());
     if (!response.ok) {
       const errorText = await response.text();
       let retryAfterMs: number | undefined;
@@ -268,7 +283,7 @@ async function _fetchSearchNewsLive(
           logger.warn('gnews-search', `Received 429. Using Retry-After header value: ${retryAfter}`, { retryAfterMs });
         }
       }
-      logger.error('gnews-search', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url: safeSearchUrl, retryAfterMs });
+      logger.error('gnews-search', `GNews API Error: ${response.status}`, { status: response.status, error: errorText, url, retryAfterMs });
       throw new Error(`GNews API Error: ${response.status} - ${errorText}`);
     }
     const data = await response.json();
