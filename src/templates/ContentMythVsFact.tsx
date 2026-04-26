@@ -1,5 +1,6 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
+import { lineClamp, singleLineEllipsis } from './textOverflow';
 
 export default function ContentMythVsFact({
     data,
@@ -86,6 +87,7 @@ export default function ContentMythVsFact({
                         color: '#f2f2f2',
                         fontWeight: 700,
                         fontFamily: "'Montserrat', sans-serif",
+                        ...lineClamp(3, '100%'),
                     }}
                 >
                     {myth}
@@ -121,6 +123,7 @@ export default function ContentMythVsFact({
                         color: '#fafafa',
                         fontWeight: 700,
                         fontFamily: "'Montserrat', sans-serif",
+                        ...lineClamp(3, '100%'),
                     }}
                 >
                     {fact}
@@ -135,6 +138,7 @@ export default function ContentMythVsFact({
                     color: '#d6d6d6',
                     opacity: proofOpacity,
                     fontWeight: 500,
+                    ...lineClamp(4, '100%'),
                 }}
             >
                 {proof}
@@ -149,6 +153,7 @@ export default function ContentMythVsFact({
                     fontSize: 22,
                     fontWeight: 700,
                     letterSpacing: '0.05em',
+                    ...singleLineEllipsis(360),
                     opacity: interpolate(frame, [0, 24], [0.3, 0.75], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',

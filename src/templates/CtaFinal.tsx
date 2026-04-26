@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
+import { lineClamp } from './textOverflow';
 
 export default function CtaFinal({
     data,
@@ -102,6 +103,8 @@ export default function CtaFinal({
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${ctaY}px)`,
                         opacity: ctaOpacity,
+                        maxWidth: 920,
+                        ...lineClamp(2),
                     }}
                 >
                     {callToAction}
@@ -116,6 +119,8 @@ export default function CtaFinal({
                         lineHeight: 1.5,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
+                        maxWidth: 900,
+                        ...lineClamp(3),
                     }}
                 >
                     {subtext}

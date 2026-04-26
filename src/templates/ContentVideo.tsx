@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, Video, Img, useVideoConfig } from 'remotion';
 import { Play } from 'lucide-react';
+import { lineClamp, singleLineEllipsis } from './textOverflow';
 
 function VideoWithFallback({
     videoUrl,
@@ -225,6 +226,7 @@ export default function ContentVideo({
                             lineHeight: 1.2,
                             margin: 0,
                             fontFamily: "'Montserrat', sans-serif",
+                            ...lineClamp(2, 900),
                         }}
                     >
                         {title}
@@ -244,6 +246,7 @@ export default function ContentVideo({
                         marginTop: 40,
                         fontWeight: 500,
                         opacity: captionOpacity,
+                        ...lineClamp(3, 800),
                     }}
                 >
                     {data.caption}
@@ -258,6 +261,7 @@ export default function ContentVideo({
                         color: '#6b7280',
                         marginTop: 16,
                         opacity: sourceOpacity,
+                        ...singleLineEllipsis(900),
                     }}
                 >
                     Source: {data.source}
@@ -282,6 +286,7 @@ export default function ContentVideo({
                         fontWeight: 700,
                         letterSpacing: '0.05em',
                         color: 'white',
+                        ...singleLineEllipsis(420),
                     }}
                 >
                     {branding.handle}

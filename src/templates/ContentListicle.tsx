@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
+import { lineClamp, singleLineClamp } from './textOverflow';
 
 /**
  * CONTENT_LISTICLE — designed for medium-length text with numbered items.
@@ -84,6 +85,7 @@ export default function ContentListicle({
                     fontFamily: "'Montserrat', sans-serif",
                     transform: `translateY(${titleY}px)`,
                     opacity: titleOpacity,
+                    ...lineClamp(2, 920),
                 }}
             >
                 {title}
@@ -171,6 +173,9 @@ export default function ContentListicle({
                                     fontWeight: 500,
                                     margin: 0,
                                     paddingTop: 6,
+                                    flex: 1,
+                                    minWidth: 0,
+                                    ...lineClamp(3, 820),
                                 }}
                             >
                                 {item}
@@ -189,6 +194,7 @@ export default function ContentListicle({
                         fontStyle: 'italic',
                         marginTop: 24,
                         opacity: footnoteOpacity,
+                        ...lineClamp(2, 920),
                     }}
                 >
                     {data.footnote}
@@ -213,6 +219,7 @@ export default function ContentListicle({
                         fontWeight: 700,
                         letterSpacing: '0.05em',
                         color: 'white',
+                        ...singleLineClamp(340),
                     }}
                 >
                     {branding.handle}
