@@ -26,12 +26,17 @@ describe('Instagram session bootstrap', () => {
 
     it('accepts UTF-16LE encoded JSON payload and rewrites as UTF-8', () => {
         const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
+        const infoSpy = vi.spyOn(Logger.prototype, 'info').mockImplementation(() => undefined);
 
         const utf16Payload = Buffer.from('{"cookies":[]}', 'utf16le').toString('base64');
         const wroteSession = bootstrapInstagramSession(utf16Payload, 'C:/tmp/storage.json');
 
         expect(wroteSession).toBe(true);
         expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', '{"cookies":[]}', 'utf-8');
+        expect(infoSpy).toHaveBeenCalledWith(
+            'startup',
+            'INSTAGRAM_SESSION_B64 normalized from UTF-16LE to UTF-8 JSON'
+        );
     });
 
     it('warns and does not write when INSTAGRAM_SESSION_B64 is absent', () => {
