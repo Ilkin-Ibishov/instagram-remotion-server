@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, Img, useVideoConfig } from 'remotion';
 import { Zap } from 'lucide-react';
+import { lineClamp, singleLineEllipsis } from './textOverflow';
 
 export default function HookA({
     data,
@@ -153,6 +154,8 @@ export default function HookA({
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${headlineY}px)`,
                         opacity: headlineOpacity,
+                        maxWidth: 952,
+                        ...lineClamp(2),
                     }}
                 >
                     {headline}
@@ -169,6 +172,7 @@ export default function HookA({
                         margin: 0,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
+                        ...lineClamp(3),
                     }}
                 >
                     {subheadline}
@@ -208,6 +212,8 @@ export default function HookA({
                         fontWeight: 700,
                         letterSpacing: '0.05em',
                         color: 'white',
+                        maxWidth: 520,
+                        ...singleLineEllipsis,
                     }}
                 >
                     {branding.handle}

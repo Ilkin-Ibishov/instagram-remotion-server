@@ -1,5 +1,6 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
+import { lineClamp, singleLineEllipsis } from './textOverflow';
 
 export default function ContentStatSnapshot({
     data,
@@ -70,6 +71,7 @@ export default function ContentStatSnapshot({
                         textTransform: 'uppercase',
                         fontWeight: 700,
                         fontSize: 24,
+                        ...singleLineEllipsis(780),
                     }}
                 >
                     {kicker}
@@ -85,6 +87,7 @@ export default function ContentStatSnapshot({
                         transform: `scale(${statScale})`,
                         transformOrigin: 'left center',
                         fontWeight: 900,
+                        ...singleLineEllipsis('100%'),
                     }}
                 >
                     {stat}
@@ -98,6 +101,7 @@ export default function ContentStatSnapshot({
                         color: '#f5f5f5',
                         fontWeight: 600,
                         opacity: textOpacity,
+                        ...lineClamp(4),
                     }}
                 >
                     {context}
@@ -111,6 +115,7 @@ export default function ContentStatSnapshot({
                         color: '#d4d4d4',
                         fontWeight: 500,
                         opacity: textOpacity,
+                        ...lineClamp(4),
                     }}
                 >
                     {takeaway}
@@ -130,6 +135,7 @@ export default function ContentStatSnapshot({
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),
+                    ...singleLineEllipsis(360),
                 }}
             >
                 {branding.handle}

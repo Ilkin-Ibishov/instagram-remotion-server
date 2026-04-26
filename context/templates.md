@@ -64,5 +64,6 @@ Validation note: `CTA_FINAL.callToAction` is now expected to end with `?` so the
 ## Design notes
 
 - Layouts are **fixed 1080×1080** with inline styles; typography often references **Montserrat** (ensure webfonts if rendering off a machine without them — not configured in-repo).
+- Dynamic headline/body fields use shared overflow helpers from `src/templates/textOverflow.ts` for max-width, line-clamp, and ellipsis behavior. Keep new template copy inside these helpers so long real-world headlines do not spill outside the 1080×1080 frame.
 - **HookA** uses **`Img`** for remote images; **ContentVideo** uses **`Video`** for remote video — both require reachable URLs at render time.
 - For MP4 publishing, keep frame 0 visually informative: avoid fully black opening frames and avoid starting all foreground layers at `opacity: 0`.
