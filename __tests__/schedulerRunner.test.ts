@@ -181,11 +181,18 @@ describe('runScheduledPipeline', () => {
     expect(mockedRunPipeline).toHaveBeenCalledTimes(1);
   });
 
-  it('returns lock-held for concurrent invocations when first run owns lock', async () => {
+  it('prevents concurrent pipeline runs via distributed lock', async () => {
     let locked = false;
+    let acquireAttempts = 0;
+    let releaseAcquireGate: (() => void) | null = null;
     let resolveFirstRun: (() => void) | null = null;
+    const acquireGate = new Promise<void>((resolve) => {
+      releaseAcquireGate = resolve;
+    });
 
     mockedAcquireLock.mockImplementation(async () => {
+      acquireAttempts += 1;
+      await acquireGate;
       if (locked) {
         return null;
       }
@@ -212,15 +219,33 @@ describe('runScheduledPipeline', () => {
       lastSuccessAt: now,
     }));
 
-    const firstRunPromise = runScheduledPipeline();
-    await Promise.resolve();
+    const resultsPromise = Promise.allSettled([
+      runScheduledPipeline(),
+      runScheduledPipeline(),
+    ]);
 
-    const secondRunResult = await runScheduledPipeline();
-    expect(secondRunResult.status).toBe('skipped_lock_held');
+    for (let i = 0; i < 10 && acquireAttempts < 2; i += 1) {
+      await Promise.resolve();
+    }
+    expect(acquireAttempts).toBe(2);
+
+    releaseAcquireGate?.();
+    for (let i = 0; i < 10 && mockedRunPipeline.mock.calls.length === 0; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(mockedRunPipeline).toHaveBeenCalledTimes(1);
 
     resolveFirstRun?.();
-    const firstRunResult = await firstRunPromise;
-    expect(firstRunResult.status).toBe('executed');
+    const results = await resultsPromise;
+    expect(results).toHaveLength(2);
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+
+    const statuses = results.map((result) =>
+      result.status === 'fulfilled' ? result.value.status : 'rejected'
+    );
+    expect(statuses).toContain('executed');
+    expect(statuses).toContain('skipped_lock_held');
     expect(mockedReleaseLock).toHaveBeenCalled();
   });
 
