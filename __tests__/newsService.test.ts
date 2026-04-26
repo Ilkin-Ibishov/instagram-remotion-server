@@ -216,6 +216,24 @@ describe('GNews newsService', () => {
       expect(result[0].url).toBe('https://example.com/article');
     });
 
+    it('sends the API key in headers, not the top-headlines URL', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ articles: [] }),
+      } as any);
+
+      await fetchTopNews('technology');
+
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(String(url)).not.toContain('apikey=');
+      expect(init).toMatchObject({
+        headers: {
+          'X-Api-Key': 'test-api-key',
+          'User-Agent': 'instagram-content-generator/1.0',
+        },
+      });
+    });
+
     it('should return empty array when API key is missing', async () => {
       delete process.env.GNEWS_API_KEY;
       const result = await fetchTopNews('technology');
@@ -472,6 +490,13 @@ describe('GNews newsService', () => {
       expect(callUrl).toContain('from=2026-04-01T00%3A00%3A00Z');
       expect(callUrl).toContain('to=2026-04-08T23%3A59%3A59Z');
       expect(callUrl).toContain('max=25');
+      expect(callUrl).not.toContain('apikey=');
+      expect(fetchSpy.mock.calls[0][1]).toMatchObject({
+        headers: {
+          'X-Api-Key': 'test-api-key',
+          'User-Agent': 'instagram-content-generator/1.0',
+        },
+      });
     });
 
     it('should return empty array when API key is missing', async () => {
