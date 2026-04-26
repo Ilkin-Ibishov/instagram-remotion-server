@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS post_history (
 
 ALTER TABLE post_history ADD COLUMN IF NOT EXISTS normalized_url TEXT;
 ALTER TABLE post_history ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE post_history ADD COLUMN IF NOT EXISTS article_id TEXT;
 
 UPDATE post_history SET normalized_url = article_url WHERE normalized_url IS NULL;
 UPDATE post_history SET status = 'posted' WHERE status IS NULL;
@@ -24,4 +25,5 @@ ALTER TABLE post_history ALTER COLUMN status SET DEFAULT 'posted';
 
 CREATE INDEX IF NOT EXISTS idx_post_history_posted_at_desc ON post_history (posted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_post_history_article_url ON post_history (article_url);
+CREATE INDEX IF NOT EXISTS idx_post_history_article_id ON post_history (article_id) WHERE article_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_post_history_normalized_url ON post_history (normalized_url);

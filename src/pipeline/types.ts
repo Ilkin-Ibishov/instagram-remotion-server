@@ -34,6 +34,7 @@ export interface GeneratedContent {
 }
 
 export interface NewsArticle {
+  articleId?: string;
   title: string;
   description: string;
   content: string;

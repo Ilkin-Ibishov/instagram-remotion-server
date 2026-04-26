@@ -37,6 +37,7 @@ npm run test:integration
 - **`RENDER_DIR`** in `server.ts` is set to **`/tmp/renders`**. On **Linux/macOS** this is standard. On **Windows**, absolute POSIX-style paths can behave differently depending on Node version and environment; validate output directory when deploying to Windows or use a cross-platform `path.join` + `os.tmpdir()` if you change this in code.
 - **`GEMINI_TIMEOUT_MS`** controls the max wait time for a single Gemini generation call in `aiService.ts` (default: `60000`, minimum: `1`). Requests exceeding this budget fail with a descriptive timeout error instead of hanging indefinitely.
 - **`CONTENT_INTENT`** steers AI template sequencing by goal in `aiService.ts`: `balanced` (default), `educate`, `debate`, `newsflash`, or `visual_proof`.
+- Post history dedup uses normalized URLs, optional upstream `articleId`, and trigram title fingerprints. `POST_HISTORY_STORE=postgres` persists these fields in `post_history`; the duplicate threshold is `0.55`.
 - **`SERVER_MODE`** is set internally by `server.ts` for long-lived API/scheduler runs so shared resources remain available between requests. CLI execution via `pipelineRun.ts` leaves this unset and closes RSS telemetry pool on exit.
 - `pipelineRun.ts` now renders via shared in-process logic (`src/render/renderService.ts`) instead of calling `http://localhost:3000/api/render`, so standalone pipeline execution no longer depends on a separate local API server for rendering.
 - Chrome cleanup tuning in `server.ts` (optional):

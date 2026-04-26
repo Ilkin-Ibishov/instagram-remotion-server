@@ -63,7 +63,7 @@ describe('isArticlePostedInHistory', () => {
 
   it('detects same story with different URL when title fingerprint matches', async () => {
     const { createTitleFingerprint } = await import('../src/utils/titleFingerprint');
-    const title = 'Breaking: major platform outage resolved';
+    const title = 'OpenAI launches new developer tools for teams';
     const posted: Parameters<typeof isArticlePostedInHistory>[0] = [
       {
         articleTitle: title,
@@ -74,7 +74,44 @@ describe('isArticlePostedInHistory', () => {
       },
     ];
 
-    const syndicatedTitle = 'Breaking: Major platform outage resolved';
+    const syndicatedTitle = 'OpenAI releases new developer tools for companies';
     expect(isArticlePostedInHistory(posted, 'https://other.example/b', syndicatedTitle)).toBe(true);
+  });
+
+  it('does not treat same-company different-angle stories as fingerprint duplicates', async () => {
+    const { createTitleFingerprint } = await import('../src/utils/titleFingerprint');
+    const posted: Parameters<typeof isArticlePostedInHistory>[0] = [
+      {
+        articleTitle: 'Apple stock hits all time high after earnings',
+        articleUrl: 'https://example.com/apple-stock',
+        titleFingerprint: createTitleFingerprint('Apple stock hits all time high after earnings'),
+        postedAt: '2026-04-01T00:00:00.000Z',
+        batchId: 'b',
+      },
+    ];
+
+    expect(
+      isArticlePostedInHistory(
+        posted,
+        'https://other.example/apple-antitrust',
+        'Apple faces new antitrust lawsuit in Europe'
+      )
+    ).toBe(false);
+  });
+
+  it('detects duplicates by upstream article id when URLs differ', () => {
+    const posted: Parameters<typeof isArticlePostedInHistory>[0] = [
+      {
+        articleTitle: 'Story',
+        articleUrl: 'https://example.com/a',
+        articleId: 'gnews-123',
+        postedAt: '2026-04-01T00:00:00.000Z',
+        batchId: 'b',
+      },
+    ];
+
+    expect(
+      isArticlePostedInHistory(posted, 'https://mirror.example/a', 'Different title', 'gnews-123')
+    ).toBe(true);
   });
 });

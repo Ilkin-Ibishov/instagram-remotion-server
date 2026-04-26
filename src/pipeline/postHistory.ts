@@ -12,6 +12,7 @@ import { createTitleFingerprint, calculateSimilarity } from '../utils/titleFinge
  */
 
 export interface PostRecord {
+  articleId?: string;
   articleTitle: string;
   articleUrl: string;
   titleFingerprint?: string;
@@ -29,7 +30,7 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_HISTORY_FILE = path.resolve(MODULE_DIR, '../../post-history.json');
 const HISTORY_FILE = process.env.POST_HISTORY_PATH || DEFAULT_HISTORY_FILE;
 
-const FINGERPRINT_SIMILARITY_THRESHOLD = 0.35;
+const FINGERPRINT_SIMILARITY_THRESHOLD = 0.55;
 
 function parseMaxRows(): number {
   const raw = process.env.POST_HISTORY_MAX_ROWS;
@@ -61,6 +62,14 @@ export function isPostgresPostHistory(): boolean {
 
 function sanitizeText(value: string): string {
   return value.replace(/\0/g, '');
+}
+
+function sanitizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const sanitized = sanitizeText(value).trim();
+  return sanitized.length > 0 ? sanitized : undefined;
 }
 
 export function getHistoryPath(): string {
@@ -97,6 +106,7 @@ async function ensurePostHistorySchema(client: PoolClient): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await client.query(`ALTER TABLE post_history ADD COLUMN IF NOT EXISTS article_id TEXT`);
   await client.query(`ALTER TABLE post_history ADD COLUMN IF NOT EXISTS normalized_url TEXT`);
   await client.query(`ALTER TABLE post_history ADD COLUMN IF NOT EXISTS status TEXT`);
   await client.query(`UPDATE post_history SET normalized_url = article_url WHERE normalized_url IS NULL`);
@@ -117,6 +127,7 @@ async function ensurePostHistorySchema(client: PoolClient): Promise<void> {
 }
 
 function rowToRecord(row: {
+  article_id?: string | null;
   article_title: string;
   article_url: string;
   title_fingerprint: string | null;
@@ -124,6 +135,7 @@ function rowToRecord(row: {
   batch_id: string;
 }): PostRecord {
   return {
+    articleId: row.article_id ?? undefined,
     articleTitle: row.article_title,
     articleUrl: row.article_url,
     titleFingerprint: row.title_fingerprint ?? undefined,
@@ -138,12 +150,17 @@ function rowToRecord(row: {
 export function isArticlePostedInHistory(
   history: PostRecord[],
   articleUrl: string,
-  articleTitle?: string
+  articleTitle?: string,
+  articleId?: string
 ): boolean {
   const normalizedUrl = normalizeArticleUrl(articleUrl);
   const currentFingerprint = articleTitle ? createTitleFingerprint(articleTitle) : null;
+  const currentArticleId = sanitizeOptionalText(articleId);
 
   return history.some(record => {
+    if (currentArticleId && sanitizeOptionalText(record.articleId) === currentArticleId) {
+      return true;
+    }
     if (normalizeArticleUrl(record.articleUrl) === normalizedUrl) {
       return true;
     }
@@ -181,6 +198,7 @@ async function loadDedupSnapshotPostgres(): Promise<PostRecord[]> {
   try {
     await ensurePostHistorySchema(client);
     const res = await client.query<{
+      article_id: string | null;
       article_title: string;
       article_url: string;
       title_fingerprint: string | null;
@@ -188,7 +206,7 @@ async function loadDedupSnapshotPostgres(): Promise<PostRecord[]> {
       batch_id: string;
     }>(
       `
-      SELECT article_title, article_url, title_fingerprint, posted_at, batch_id
+      SELECT article_id, article_title, article_url, title_fingerprint, posted_at, batch_id
       FROM post_history
       ORDER BY posted_at DESC
       LIMIT $1
@@ -266,8 +284,9 @@ export async function hasBeenPosted(articleUrl: string, articleTitle?: string): 
   return isArticlePostedInHistory(snapshot, articleUrl, articleTitle);
 }
 
-export async function recordPost(article: { title: string; url: string }, batchId: string): Promise<void> {
+export async function recordPost(article: { id?: string; articleId?: string; title: string; url: string }, batchId: string): Promise<void> {
   const logger = new Logger();
+  const articleId = sanitizeOptionalText(article.articleId ?? article.id);
   const title = sanitizeText(article.title || '');
   const url = normalizeArticleUrl(sanitizeText(article.url || ''));
   const fp = createTitleFingerprint(title);
@@ -282,6 +301,7 @@ export async function recordPost(article: { title: string; url: string }, batchI
       await client.query(
         `
         INSERT INTO post_history (
+          article_id,
           article_title,
           article_url,
           normalized_url,
@@ -290,8 +310,9 @@ export async function recordPost(article: { title: string; url: string }, batchI
           batch_id,
           status
         )
-        VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7, $8)
         ON CONFLICT (normalized_url) DO UPDATE SET
+          article_id = COALESCE(EXCLUDED.article_id, post_history.article_id),
           article_title = EXCLUDED.article_title,
           article_url = EXCLUDED.article_url,
           title_fingerprint = EXCLUDED.title_fingerprint,
@@ -299,7 +320,7 @@ export async function recordPost(article: { title: string; url: string }, batchI
           batch_id = EXCLUDED.batch_id,
           status = EXCLUDED.status
         `,
-        [title, url, url, fp, postedAt, safeBatch, status]
+        [articleId ?? null, title, url, url, fp, postedAt, safeBatch, status]
       );
       const maxRows = parseMaxRows();
       await client.query(
@@ -333,6 +354,7 @@ export async function recordPost(article: { title: string; url: string }, batchI
 
   const history = historyResult.history;
   const record: PostRecord = {
+    articleId,
     articleTitle: title,
     articleUrl: url,
     titleFingerprint: fp,

@@ -44,7 +44,7 @@ describe('postHistory Postgres backend', () => {
 
     const mod = await import('../src/pipeline/postHistory');
 
-    await mod.recordPost({ title: 'Hello', url: 'https://example.com/a' }, 'batch-1');
+    await mod.recordPost({ title: 'Hello', url: 'https://example.com/a', articleId: 'gnews-1' }, 'batch-1');
 
     const insertCalls = mocks.pgQuery.mock.calls.filter(args => String(args[0]).includes('INSERT INTO post_history'));
     const deleteCalls = mocks.pgQuery.mock.calls.filter(args => String(args[0]).includes('DELETE FROM post_history'));
@@ -52,7 +52,9 @@ describe('postHistory Postgres backend', () => {
     expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
 
     const insertSql = String(insertCalls[insertCalls.length - 1][0]);
+    expect(insertSql).toContain('article_id');
     expect(insertSql).toContain('ON CONFLICT (normalized_url) DO UPDATE');
+    expect(insertCalls[insertCalls.length - 1][1]).toContain('gnews-1');
 
     const deleteSql = String(deleteCalls[0][0]);
     expect(deleteSql).toContain('OFFSET $1');
@@ -89,10 +91,11 @@ describe('postHistory Postgres backend', () => {
     process.env.POST_HISTORY_MAX_ROWS = '100';
 
     mocks.pgQuery.mockImplementation((sql: string) => {
-      if (sql.includes('SELECT article_title') && sql.includes('LIMIT')) {
+      if (sql.includes('SELECT article_id, article_title') && sql.includes('LIMIT')) {
         return Promise.resolve({
           rows: [
             {
+              article_id: 'gnews-2',
               article_title: 'T',
               article_url: 'https://ex.com/x',
               title_fingerprint: 'fp1',
@@ -109,6 +112,7 @@ describe('postHistory Postgres backend', () => {
     const rows = await mod.loadPostHistoryDedupSnapshot();
 
     expect(rows).toHaveLength(1);
+    expect(rows[0].articleId).toBe('gnews-2');
     expect(rows[0].articleTitle).toBe('T');
     expect(rows[0].articleUrl).toBe('https://ex.com/x');
 
