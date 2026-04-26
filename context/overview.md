@@ -25,6 +25,7 @@ Current pipeline behavior is **RSS-first ingestion with GNews fallback** for art
 | `server.ts` | Express app, bundle cache, render pipeline, export for tests |
 | `src/pipelineRun.ts` | News-to-publish orchestration (RSS primary, GNews fallback) |
 | `src/pipeline/rssService.ts` | RSS fetch/cache/normalize/dedup workflow |
+| `src/pipeline/postHistory.ts` | URL, upstream article ID, and trigram-title duplicate tracking with file or Postgres backends |
 | `src/pipeline/rssTelemetryStore.ts` | RSS telemetry persistence + source-health cooldown helpers |
 | `src/remotion/index.tsx` | Remotion root: registers composition |
 | `src/remotion/SlideComposition.tsx` | Routes `templateId` → template component + effects |

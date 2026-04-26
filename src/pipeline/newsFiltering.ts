@@ -238,7 +238,7 @@ export async function filterAndRankArticles(
 
   const filtered = articles
     .filter(article => {
-      if (isArticlePostedInHistory(dedupSnapshot, normalizeArticleUrl(article.url), article.title)) {
+      if (isArticlePostedInHistory(dedupSnapshot, normalizeArticleUrl(article.url), article.title, article.articleId)) {
         if (logger) {
           logger.debug('filter-duplicates', `Skipping already posted (URL or fingerprint): "${article.title}"`);
         }

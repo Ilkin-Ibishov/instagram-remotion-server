@@ -367,6 +367,7 @@ function mapToNewsArticle(raw: any): NewsArticle {
   }
 
   return {
+    articleId: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined,
     title: raw.title,
     description: raw.description || '',
     content,

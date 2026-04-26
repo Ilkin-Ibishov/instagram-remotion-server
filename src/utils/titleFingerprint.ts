@@ -76,13 +76,12 @@ export function createTitleFingerprint(title: string): string {
  * 
  * Typical thresholds:
  *   > 0.80  — near-identical (same headline, minor formatting)
- *   > 0.55  — same story, Gemini-rewritten (typical rewrite range)
+ *   >= 0.55 — same story, Gemini-rewritten (typical rewrite range)
  *   > 0.35  — same topic, different angles
  *   < 0.20  — different stories
  * 
- * `postHistory.ts` uses **0.35** (`FINGERPRINT_SIMILARITY_THRESHOLD`): a **lower** bar than
- * the 0.55 “Gemini rewrite” band above, so more pairs count as duplicates (more aggressive
- * dedup, with some risk of suppressing legitimately different angles). Tune in `postHistory.ts` if needed.
+ * `postHistory.ts` uses **0.55** (`FINGERPRINT_SIMILARITY_THRESHOLD`) so near rewrites
+ * count as duplicates without suppressing loosely related same-topic stories.
  */
 export function calculateSimilarity(fp1: string, fp2: string): number {
   const set1 = new Set(fp1.split(' ').filter(Boolean));

@@ -62,6 +62,7 @@ import { filterAndRankArticles, selectBestArticle } from '../src/pipeline/newsFi
 import { loadAccountProfile, getAccountKeywords } from '../src/pipeline/accountProfile';
 import { generateContent } from '../src/pipeline/contentGenerator';
 import { renderManifest } from '../src/render/renderService';
+import { recordPost } from '../src/pipeline/postHistory';
 
 const mockedFetchTopNews = vi.mocked(fetchTopNews);
 const mockedFetchSearchNews = vi.mocked(fetchSearchNews);
@@ -73,6 +74,7 @@ const mockedGetAccountKeywords = vi.mocked(getAccountKeywords);
 const mockedPublishToInstagram = vi.mocked(publishToInstagram);
 const mockedGenerateContent = vi.mocked(generateContent);
 const mockedRenderManifest = vi.mocked(renderManifest);
+const mockedRecordPost = vi.mocked(recordPost);
 
 describe('runPipeline', () => {
   const mockArticle = {
@@ -131,6 +133,35 @@ describe('runPipeline', () => {
     expect(mockedFetchTopNews).not.toHaveBeenCalled();
     expect(mockedRenderManifest).toHaveBeenCalledOnce();
     expect(mockedPublishToInstagram).toHaveBeenCalledOnce();
+  });
+
+  it('records the original article before AI content generation', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    mockedGenerateContent.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '[REDACTED]', effects: ['vignette'] },
+        carousel: [],
+      },
+      caption: 'This is a strong enough caption for the pipeline quality gate to accept.',
+      hashtags: '#test #developers #automation',
+    } as any);
+
+    await runPipeline();
+
+    expect(mockedRecordPost).toHaveBeenCalledWith(mockArticle, expect.stringMatching(/-pre-gen$/));
+    expect(mockedRecordPost.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedGenerateContent.mock.invocationCallOrder[0]
+    );
   });
 
   it('falls back to GNews when RSS primary fetch throws', async () => {
