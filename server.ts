@@ -30,14 +30,14 @@ function tryParseJson(value: string): boolean {
 function decodeInstagramSessionJson(sessionBase64: string): string {
     const rawBuffer = Buffer.from(sessionBase64.trim(), 'base64');
 
-    const utf8Candidate = rawBuffer.toString('utf-8').replace(/\u0000/g, '').trim();
+    const utf8Candidate = rawBuffer.toString('utf-8').trim();
     if (utf8Candidate && tryParseJson(utf8Candidate)) {
         return utf8Candidate;
     }
 
     const utf16Candidate = rawBuffer.toString('utf16le').replace(/\u0000/g, '').trim();
     if (utf16Candidate && tryParseJson(utf16Candidate)) {
-        console.warn('[startup] INSTAGRAM_SESSION_B64 looked like UTF-16LE; normalized to UTF-8 JSON');
+        serverLogger.info('startup', 'INSTAGRAM_SESSION_B64 normalized from UTF-16LE to UTF-8 JSON');
         return utf16Candidate;
     }
 
