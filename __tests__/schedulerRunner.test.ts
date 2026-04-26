@@ -27,6 +27,10 @@ vi.mock('../src/pipeline/scheduleState', () => ({
   recordRunFailure: vi.fn(),
 }));
 
+vi.mock('../src/pipeline/scheduleAlerts', () => ({
+  maybeSendPipelineFailureAlert: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../src/pipeline/schedulerLock', () => ({
   acquireDistributedLock: vi.fn(),
   releaseDistributedLock: vi.fn(),
@@ -72,6 +76,8 @@ const baseState = {
   lastSuccessAt: null,
   lastErrorAt: null,
   lastErrorMessage: null,
+  consecutiveFailureCount: 0,
+  lastAlertSentAt: null as Date | null,
 };
 
 describe('runScheduledPipeline', () => {

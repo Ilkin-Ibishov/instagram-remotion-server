@@ -423,6 +423,8 @@ app.get('/api/status', async (req, res) => {
             last_error_message: state.lastErrorMessage ?? null,
             next_run_at: state.nextRunAt.toISOString(),
             last_run_at: state.lastRunAt?.toISOString() ?? null,
+            consecutive_failure_count: state.consecutiveFailureCount,
+            last_alert_sent_at: state.lastAlertSentAt?.toISOString() ?? null,
         });
     } catch (err) {
         serverLogger.error('api-status', 'Schedule state database unavailable', {

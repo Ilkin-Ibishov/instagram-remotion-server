@@ -76,6 +76,8 @@ Optional (defaults in code):
 - `SCHEDULER_STARTUP_RETRY_DELAY_MS` (default: `60000` = 1 minute)
 - `SCHEDULER_STARTUP_MAX_RETRIES` (default: `10`)
 
+Failure webhooks (optional): when `PIPELINE_ALERT_WEBHOOK_URL` is set, the scheduler POSTs a small JSON payload after `recordRunFailure` for (a) Instagram session preflight errors, (b) `PIPELINE_ALERT_CONSECUTIVE_FAILURES` consecutive failures (default `3`), or (c) any failure when `last_success_at` is older than `PIPELINE_ALERT_MAX_HOURS_WITHOUT_SUCCESS` (default `48`). Deduped with `PIPELINE_ALERT_COOLDOWN_HOURS` (default `6`) using `schedule_state.last_alert_sent_at`. Optional `PIPELINE_ALERT_WEBHOOK_SECRET` is sent as `Authorization: Bearer …`.
+
 ### Internal scheduler loop
 
 When `SCHEDULER_ENABLED=true`, the server performs one scheduler run immediately after startup and then starts a `setInterval` loop that calls `runScheduledPipeline()` at the configured poll cadence. If the startup run returns `skipped_lock_held`, the server performs short bounded retries before falling back to the normal poll interval. The existing `shouldRunNow()` check decides run vs skip based on persisted `next_run_at` in Postgres, so the poll interval is just a check cadence — the actual run frequency is controlled by `SCHEDULE_MIN_DELAY_HOURS` / `SCHEDULE_MAX_DELAY_HOURS`.

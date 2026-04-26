@@ -8,6 +8,7 @@ import {
   shouldRunNow,
   type ScheduleState,
 } from './scheduleState';
+import { maybeSendPipelineFailureAlert } from './scheduleAlerts';
 import {
   acquireDistributedLock,
   releaseDistributedLock,
@@ -184,6 +185,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
       const sessionError = sessionValidation.reason || 'Instagram session is invalid';
       const nextRunAt = computeNextRunAt(new Date(), minDelayHours, maxDelayHours);
       const updated = await recordRunFailure(accountId, new Date(), nextRunAt, sessionError);
+      await maybeSendPipelineFailureAlert(accountId, updated);
       logger.error('schedule-preflight', 'Session validation failed', new Error(sessionError));
 
       return {
@@ -239,6 +241,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
     const failedAt = new Date();
     const nextRunAt = computeNextRunAt(failedAt, minDelayHours, maxDelayHours);
     const updated = await recordRunFailure(accountId, failedAt, nextRunAt, errorMessage);
+    await maybeSendPipelineFailureAlert(accountId, updated);
 
     logger.error('schedule', 'Scheduled run failed', error);
 
