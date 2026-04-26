@@ -1,0 +1,51 @@
+---
+description: ClickUp task audit, implementation, and status workflow for this project
+alwaysApply: true
+---
+
+# ClickUp task workflow
+
+## Scope
+
+- Use this workflow for ClickUp Space `901810511660` (`Automated Content Sharing System`).
+- Primary lists in scope:
+  - `901817195764` (`List`)
+  - `901817196353` (`Backlog`)
+- A valid ClickUp API token must come from environment/configuration; never hard-code or commit tokens.
+
+## Project-specific authority
+
+- For this project, the user has explicitly overridden the persistent QA-only / Git read-only preference.
+- It is acceptable to audit, implement, test, commit, push, and update ClickUp tasks when following this workflow.
+- Follow higher-priority Cloud Agent git requirements if they conflict with direct pushes to `main`. When the environment permits direct `main` pushes, the user's requested target is `main`.
+
+## Per-task workflow
+
+Process tasks one by one. Do not batch decisions across tasks.
+
+1. Read the task title, description, current status, assignees, custom fields, subtasks, attachments if relevant, and all comments.
+2. Ground the audit on the latest `main` branch state before deciding whether the task is outdated or still needed.
+3. Inspect relevant `context/*.md` files before substantial implementation, then inspect the actual code and tests.
+4. Decide one of:
+   - **Outdated/already applied:** the latest code already satisfies the task requirements.
+   - **Needs implementation:** the requirement is valid and not fully applied.
+   - **Deferred/blocked:** the task cannot be safely resolved with available information or environment.
+5. Add a ClickUp audit comment before changing status. The comment must summarize evidence, files or tests reviewed, and the decision.
+6. Before setting a task to `Closed`, verify that the exact status exists for the task/list/space.
+7. If outdated/already applied, change status to `Closed` after adding the audit comment.
+8. If implementation is needed:
+   - Plan the implementation from the task requirements and repository context.
+   - Create or update focused tests when the task changes behavior or covers a regression.
+   - Implement only the task's required scope.
+   - Run relevant automated tests and any required manual checks.
+   - Commit and push according to the active git workflow.
+   - Add a ClickUp implementation comment with test evidence and code references.
+   - Move the task to the appropriate completed status only after successful verification.
+9. If deferred/blocked, leave the task open and add a ClickUp comment explaining the blocker and the next actionable step.
+
+## Status and ClickUp update rules
+
+- Verify status names through the ClickUp API before using them.
+- Prefer comments that are concise, evidence-based, and specific.
+- Never expose secrets in comments, commits, logs, or PR descriptions.
+- Do not update unrelated tasks while processing the current task.
