@@ -3,6 +3,7 @@ import fs from 'fs';
 import request from 'supertest';
 import * as schedulerRunner from '../src/pipeline/schedulerRunner';
 import { __testing as serverTesting, app, bootstrapInstagramSession, initializeBundleOrExit } from '../server.ts';
+import Logger from '../src/utils/logger';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -14,13 +15,13 @@ afterEach(() => {
 describe('Instagram session bootstrap', () => {
     it('writes normalized UTF-8 JSON from INSTAGRAM_SESSION_B64 when provided', () => {
         const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
-        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const infoSpy = vi.spyOn(Logger.prototype, 'info').mockImplementation(() => undefined);
 
         const wroteSession = bootstrapInstagramSession('e30K', 'C:/tmp/storage.json');
 
         expect(wroteSession).toBe(true);
         expect(writeSpy).toHaveBeenCalledWith('C:/tmp/storage.json', '{}', 'utf-8');
-        expect(logSpy).toHaveBeenCalledWith('[startup] Instagram session written from INSTAGRAM_SESSION_B64');
+        expect(infoSpy).toHaveBeenCalledWith('startup', 'Instagram session written from INSTAGRAM_SESSION_B64');
     });
 
     it('accepts UTF-16LE encoded JSON payload and rewrites as UTF-8', () => {
@@ -35,13 +36,13 @@ describe('Instagram session bootstrap', () => {
 
     it('warns and does not write when INSTAGRAM_SESSION_B64 is absent', () => {
         const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
         const wroteSession = bootstrapInstagramSession(undefined, 'C:/tmp/storage.json');
 
         expect(wroteSession).toBe(false);
         expect(writeSpy).not.toHaveBeenCalled();
-        expect(warnSpy).toHaveBeenCalledWith('[startup] INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
+        expect(warnSpy).toHaveBeenCalledWith('startup', 'INSTAGRAM_SESSION_B64 not set; using existing storage.json if present');
     });
 });
 
@@ -207,6 +208,34 @@ describe('POST /api/render', () => {
 });
 
 describe('GET /health', () => {
+    it('echoes an incoming request id for Railway log correlation', async () => {
+        const logSpy = vi.spyOn(Logger.prototype, 'info').mockImplementation(() => undefined);
+
+        const response = await request(app)
+            .get('/health')
+            .set('x-request-id', 'req-test-123');
+
+        expect(response.headers['x-request-id']).toBe('req-test-123');
+        expect(logSpy).toHaveBeenCalledWith(
+            'http-request',
+            'Incoming request',
+            expect.objectContaining({
+                requestId: 'req-test-123',
+                method: 'GET',
+                path: '/health',
+            })
+        );
+        expect(logSpy).toHaveBeenCalledWith(
+            'http-response',
+            'Request completed',
+            expect.objectContaining({
+                requestId: 'req-test-123',
+                statusCode: response.status,
+                durationMs: expect.any(Number),
+            })
+        );
+    });
+
     it('should return 503 when the Remotion bundle is not ready', async () => {
         const response = await request(app)
             .get('/health');

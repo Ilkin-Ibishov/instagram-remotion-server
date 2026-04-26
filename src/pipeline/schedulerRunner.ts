@@ -184,7 +184,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
       const sessionError = sessionValidation.reason || 'Instagram session is invalid';
       const nextRunAt = computeNextRunAt(new Date(), minDelayHours, maxDelayHours);
       const updated = await recordRunFailure(accountId, new Date(), nextRunAt, sessionError);
-      logger.error('schedule-preflight', 'Session validation failed', sessionError);
+      logger.error('schedule-preflight', 'Session validation failed', new Error(sessionError));
 
       return {
         status: 'failed',
@@ -240,7 +240,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
     const nextRunAt = computeNextRunAt(failedAt, minDelayHours, maxDelayHours);
     const updated = await recordRunFailure(accountId, failedAt, nextRunAt, errorMessage);
 
-    logger.error('schedule', 'Scheduled run failed', errorMessage);
+    logger.error('schedule', 'Scheduled run failed', error);
 
     return {
       status: 'failed',

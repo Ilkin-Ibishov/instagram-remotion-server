@@ -4,6 +4,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import type { Page } from 'playwright';
 import type { PublishablePost } from '../pipeline/types';
+import Logger from '../utils/logger';
+
+const instagramLogger = new Logger('instagram-publisher');
 
 async function delay(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) {
@@ -124,7 +127,7 @@ async function dismissReelInfoModalIfPresent(
     signal?.throwIfAborted();
     const visible = await okButton.isVisible({ timeout: 600 }).catch(() => false);
     if (visible) {
-      console.log(`[instagram] Dismissing delayed Reels modal (${contextLabel})...`);
+      instagramLogger.info('instagram-modal', 'Dismissing delayed Reels modal', { contextLabel });
       await okButton.click({ force: true });
       await delay(500, signal);
       return true;
@@ -168,15 +171,17 @@ export function sanitizeInstagramCaption(caption: string): string {
 
   let safeCaption = normalizedSpacing;
   if (removedHashtags > 0) {
-    console.warn(
-      `[instagram] Caption hashtag count exceeded ${INSTAGRAM_HASHTAG_LIMIT}; removed ${removedHashtags} hashtag(s).`
-    );
+    instagramLogger.warn('instagram-caption', 'Caption hashtag limit exceeded; removed extra hashtags', {
+      limit: INSTAGRAM_HASHTAG_LIMIT,
+      removedHashtags,
+    });
   }
 
   if (safeCaption.length > INSTAGRAM_CAPTION_LIMIT) {
-    console.warn(
-      `[instagram] Caption length ${safeCaption.length} exceeds ${INSTAGRAM_CAPTION_LIMIT}; truncating.`
-    );
+    instagramLogger.warn('instagram-caption', 'Caption length exceeded limit; truncating', {
+      limit: INSTAGRAM_CAPTION_LIMIT,
+      originalLength: safeCaption.length,
+    });
     safeCaption = `${safeCaption.slice(0, INSTAGRAM_CAPTION_LIMIT - 3).trimEnd()}...`;
   }
 
@@ -279,12 +284,12 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
   }
 
   signal?.throwIfAborted();
-  console.log('Launching browser...');
+  instagramLogger.info('instagram-publish', 'Launching browser', { headless: isHeadless });
   const browser = await chromium.launch({
     headless: isHeadless,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
-  
+
   try {
     const context = await browser.newContext({
       storageState: sessionFile,
@@ -297,12 +302,15 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
     let baselinePermalinks: string[] = [];
     if (targetUsername) {
       baselinePermalinks = await getRecentProfilePermalinks(verificationPage, targetUsername, signal);
-      console.log(`[instagram] Baseline profile permalink count for @${targetUsername}: ${baselinePermalinks.length}`);
+      instagramLogger.info('instagram-verification', 'Captured baseline profile permalinks', {
+        username: targetUsername,
+        baselineCount: baselinePermalinks.length,
+      });
     } else {
-      console.warn('[instagram] BRAND_HANDLE is not configured for strict publish verification; falling back to UI-only confirmation.');
+      instagramLogger.warn('instagram-verification', 'BRAND_HANDLE not configured; falling back to UI-only confirmation');
     }
 
-    console.log('Navigating to Instagram...');
+    instagramLogger.info('instagram-publish', 'Navigating to Instagram');
     // Replace networkidle with domcontentloaded to prevent hanging on medias streams
     await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
@@ -327,12 +335,12 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
       );
     }
 
-    console.log('Checking for popups (Notifications, Save Login, etc)...');
+    instagramLogger.info('instagram-publish', 'Checking for popups');
     for (let i = 0; i < 3; i++) {
       const notNowBtn = page.getByRole('button', { name: 'Not Now', exact: true }).first();
       // Increase visibility timeout slightly; Instagram modals can fade in
       if (await notNowBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        console.log('Dismissing "Not Now" popup...');
+        instagramLogger.info('instagram-modal', 'Dismissing Not Now popup');
         await notNowBtn.click({ force: true });
         await delay(1500, signal);
       } else {
@@ -340,10 +348,10 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
       }
     }
 
-    console.log('Clicking "Create" (New post) button...');
+    instagramLogger.info('instagram-publish', 'Clicking Create button');
     const createNav = page.locator('svg[aria-label="New post"], svg[aria-label="Create"]').first();
     const createText = page.getByRole('link', { name: 'Create' }).first();
-    
+
     if (await createNav.isVisible({ timeout: 5000 }).catch(() => false)) {
       await createNav.click({ force: true });
     } else if (await createText.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -360,23 +368,26 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
       await postMenuOptions.click({ force: true });
       await delay(2000, signal);
     }
-    
-    console.log(`Uploading ${post.isCarousel ? 'carousel media' : 'single media'}...`);
+
+    instagramLogger.info('instagram-publish', 'Uploading media', {
+      isCarousel: post.isCarousel,
+      mediaCount: post.mediaPaths.length,
+    });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.waitFor({ state: 'attached', timeout: 10000 });
-    
+
     // Resolve all paths to absolute paths
     const absoluteMediaPaths = post.mediaPaths.map(p => path.resolve(p));
-    
+
     // Playwright supports array of paths for multiple file upload
     await fileInput.setInputFiles(absoluteMediaPaths);
-    
-    console.log('Waiting for media upload processing (handling delay)...');
+
+    instagramLogger.info('instagram-publish', 'Waiting for media upload processing');
     await delay(5000, signal);
 
     await dismissReelInfoModalIfPresent(page, 'post-upload', 3000, signal);
 
-    console.log('Clicking "Next" on crop step...');
+    instagramLogger.info('instagram-publish', 'Clicking Next on crop step');
     await dismissReelInfoModalIfPresent(page, 'before-crop-next', 3000, signal);
     const nextButton1 = page.getByText('Next', { exact: true }).first();
     await nextButton1.waitFor({ state: 'visible', timeout: 15000 });
@@ -384,7 +395,7 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
 
     await delay(3000, signal);
 
-    console.log('Clicking "Next" on edit step...');
+    instagramLogger.info('instagram-publish', 'Clicking Next on edit step');
     await dismissReelInfoModalIfPresent(page, 'before-edit-next', 3000, signal);
     const nextButton2 = page.getByText('Next', { exact: true }).first();
     await nextButton2.waitFor({ state: 'visible', timeout: 15000 });
@@ -392,7 +403,7 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
 
     await delay(3000, signal);
 
-    console.log('Filling caption...');
+    instagramLogger.info('instagram-publish', 'Filling caption');
     const captionEditor = page.locator('div[aria-label="Write a caption..."]');
     await captionEditor.waitFor({ state: 'visible', timeout: 10000 });
     // Focus and type instead of fill can be more robust for some contenteditables
@@ -402,7 +413,7 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
 
     await delay(2000, signal);
 
-    console.log('Clicking "Share" button...');
+    instagramLogger.info('instagram-publish', 'Clicking Share button');
     let shareClicked = false;
     for (let i = 0; i < 15; i++) {
         // Find all elements with exact text "Share" (this includes hidden SVGs)
@@ -426,7 +437,7 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
         throw new Error('Share button never became visible or clickable.');
     }
 
-    console.log('Waiting for post to complete...');
+    instagramLogger.info('instagram-publish', 'Waiting for publish confirmation');
     // Confirm publish success via multiple sequential signals to avoid SPA race false-negatives.
     let publishConfirmed = false;
 
@@ -447,7 +458,7 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
         ]);
         publishConfirmed = true;
       } catch {
-        console.warn('[instagram] Could not confirm success via DOM; checking URL fallback.');
+        instagramLogger.warn('instagram-publish', 'Could not confirm success via DOM; checking URL fallback');
         const currentUrl = page.url();
         publishConfirmed = currentUrl.includes('/p/') || currentUrl.includes('/reel/');
       }
@@ -473,17 +484,17 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
         );
       }
 
-      console.log(`[instagram] Verified new published permalink: ${publishedPermalink}`);
+      instagramLogger.info('instagram-verification', 'Verified new published permalink', { publishedPermalink });
     }
 
-    console.log('Post successfully published!');
+    instagramLogger.info('instagram-publish', 'Post successfully published');
     await delay(3000, signal);
 
   } catch (err) {
-    console.error('Publishing to Instagram failed:', err);
-    throw err; 
+    instagramLogger.error('instagram-publish', 'Publishing to Instagram failed', err);
+    throw err;
   } finally {
-    console.log('Closing browser...');
+    instagramLogger.info('instagram-publish', 'Closing browser');
     await browser.close();
   }
 }
