@@ -81,6 +81,12 @@ const TITLE_SIMILARITY_THRESHOLD = Number(process.env.RSS_TITLE_DEDUP_THRESHOLD 
 function createParser(): Parser {
   return new Parser({
     timeout: resolveRssFetchTimeoutMs(),
+    // RSS-01: keep xml2js in predictable shape; Node’s sax stack does not resolve external
+    // entities like classic libxml XXE, but trim/normalize reduces odd whitespace surprises.
+    xml2js: {
+      trim: true,
+      normalize: true,
+    },
     customFields: {
       item: [
         ['media:content', 'mediaContent', { keepArray: false }],

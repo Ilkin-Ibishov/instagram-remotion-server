@@ -75,13 +75,18 @@ export function scoreGeneratedContentQuality(content: GeneratedContent): { score
  */
 export async function generateContent(
   article: NewsArticle,
-  accountProfile?: AccountProfile
+  accountProfile?: AccountProfile,
+  signal?: AbortSignal
 ): Promise<GeneratedContent> {
+  signal?.throwIfAborted();
   let content: GeneratedContent | null = null;
   try {
     // Call the AI service to generate structured manifest, caption, and hashtags.
-    content = await generatePostContentAI(article, accountProfile);
+    content = await generatePostContentAI(article, accountProfile, signal);
   } catch (error) {
+    if (signal?.aborted) {
+      throw signal.reason !== undefined ? signal.reason : error;
+    }
     throw new Error(
       `Content generation failed for article "${article.title}" (${article.url}): ${
         error instanceof Error ? error.message : String(error)

@@ -98,6 +98,7 @@ describe('runScheduledPipeline', () => {
     process.env.POSTING_TIMEZONE = 'UTC';
     process.env.POSTING_HOURS_START = '0';
     process.env.POSTING_HOURS_END = '24';
+    process.env.REDIS_URL = 'redis://127.0.0.1:6379';
   });
 
   afterEach(() => {
@@ -108,6 +109,7 @@ describe('runScheduledPipeline', () => {
     delete process.env.POSTING_TIMEZONE;
     delete process.env.POSTING_HOURS_START;
     delete process.env.POSTING_HOURS_END;
+    delete process.env.REDIS_URL;
   });
 
   it('applies deterministic minimum jitter when Math.random is 0', async () => {
@@ -166,6 +168,17 @@ describe('runScheduledPipeline', () => {
     expect(diffMs).toBeLessThan(maxMs);
 
     randomSpy.mockRestore();
+  });
+
+  it('runs the pipeline without acquiring a lock when REDIS_URL is not set', async () => {
+    delete process.env.REDIS_URL;
+
+    const result = await runScheduledPipeline();
+
+    expect(result.status).toBe('executed');
+    expect(mockedAcquireLock).not.toHaveBeenCalled();
+    expect(mockedReleaseLock).not.toHaveBeenCalled();
+    expect(mockedRunPipeline).toHaveBeenCalledTimes(1);
   });
 
   it('returns lock-held for concurrent invocations when first run owns lock', async () => {

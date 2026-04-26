@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getRedisClient } from '../utils/redisClient';
+import { getRedisClient, isRedisUrlConfigured } from '../utils/redisClient';
 import Logger from '../utils/logger';
 
 export interface LockHandle {
@@ -7,7 +7,14 @@ export interface LockHandle {
   token: string;
 }
 
+/**
+ * Acquire a distributed lock using Redis SET NX EX (single round-trip, atomic).
+ * Requires REDIS_URL — callers should use `isRedisUrlConfigured()` and skip locking when Redis is absent.
+ */
 export async function acquireDistributedLock(key: string, ttlSeconds: number): Promise<LockHandle | null> {
+  if (!isRedisUrlConfigured()) {
+    throw new Error('acquireDistributedLock requires REDIS_URL');
+  }
   const client = await getRedisClient();
   const token = crypto.randomUUID();
   const result = await client.set(key, token, {
@@ -66,8 +73,9 @@ export async function renewDistributedLock(handle: LockHandle, ttlSeconds: numbe
 /**
  * Run an async operation while keeping the lock alive via a heartbeat.
  * The heartbeat fires at ttlSeconds/3 intervals to renew the lock TTL.
- * If the lock is lost mid-run (e.g. Redis restart), the operation is NOT
- * interrupted but a warning is logged so the caller can detect it.
+ * If the lock is lost mid-run (e.g. Redis restart), renewal fails: the `AbortSignal`
+ * is aborted and, after `fn` settles, this helper throws if the lock was lost so the
+ * caller does not treat the run as cleanly serialized.
  *
  * @param handle    The lock handle returned by acquireDistributedLock
  * @param ttlSeconds The original lock TTL (renewal interval = ttlSeconds/3)
@@ -83,25 +91,34 @@ export async function runWithLockHeartbeat<T>(
   const logger = new Logger();
   const controller = new AbortController();
 
-  const heartbeat = setInterval(async () => {
-    try {
-      const renewed = await renewDistributedLock(handle, ttlSeconds);
-      if (!renewed) {
-        lockLost = true;
-        controller.abort(new Error(`Distributed lock lost for key ${handle.key}`));
-        clearInterval(heartbeat);
+  let renewInFlight = false;
+  const heartbeat = setInterval(() => {
+    void (async () => {
+      if (renewInFlight) {
+        return;
       }
-    } catch (error) {
-      lockLost = true;
-      controller.abort(new Error(`Distributed lock heartbeat failed for key ${handle.key}`));
-      logger.error('scheduler-lock', 'Heartbeat renewal failed — lock may have expired', {
-        lockKey: handle.key,
-        error: error instanceof Error
-          ? { name: error.name, message: error.message, stack: error.stack }
-          : error,
-      });
-      clearInterval(heartbeat);
-    }
+      renewInFlight = true;
+      try {
+        const renewed = await renewDistributedLock(handle, ttlSeconds);
+        if (!renewed) {
+          lockLost = true;
+          controller.abort(new Error(`Distributed lock lost for key ${handle.key}`));
+          clearInterval(heartbeat);
+        }
+      } catch (error) {
+        lockLost = true;
+        controller.abort(new Error(`Distributed lock heartbeat failed for key ${handle.key}`));
+        logger.error('scheduler-lock', 'Heartbeat renewal failed — lock may have expired', {
+          lockKey: handle.key,
+          error: error instanceof Error
+            ? { name: error.name, message: error.message, stack: error.stack }
+            : error,
+        });
+        clearInterval(heartbeat);
+      } finally {
+        renewInFlight = false;
+      }
+    })();
   }, intervalMs);
 
   try {

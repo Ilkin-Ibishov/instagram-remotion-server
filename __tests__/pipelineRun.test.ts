@@ -36,7 +36,8 @@ vi.mock('../src/pipeline/newsFiltering', () => ({
 }));
 
 vi.mock('../src/pipeline/postHistory', () => ({
-  recordPost: vi.fn(),
+  recordPost: vi.fn().mockResolvedValue(undefined),
+  isPostgresPostHistory: vi.fn(() => false),
 }));
 
 vi.mock('../src/pipeline/accountProfile', () => ({
@@ -221,12 +222,12 @@ describe('runPipeline', () => {
     expect(mockedFetchTopNews).toHaveBeenCalledOnce();
   });
 
-  it('throws when no relevant articles pass scoring and does not publish', async () => {
+  it('exits gracefully when no relevant articles pass scoring and does not publish', async () => {
     mockedFetchTopNews.mockResolvedValue([mockArticle]);
     // Both top-headlines pass and search fallback return nothing relevant
     mockedFilterAndRankArticles.mockReturnValue([]);
 
-    await expect(runPipeline()).rejects.toThrow('No relevant articles found');
+    await expect(runPipeline()).resolves.toBeUndefined();
     expect(mockedFetchSearchNews).toHaveBeenCalledOnce();
     expect(mockedSelectBestArticle).not.toHaveBeenCalled();
     expect(mockedGenerateContent).not.toHaveBeenCalled();
@@ -296,6 +297,43 @@ describe('runPipeline', () => {
     mockedGenerateContent.mockRejectedValue(new Error('Content quality score 2/5 below minimum 4'));
 
     await expect(runPipeline()).rejects.toThrow('Content quality score 2/5 below minimum 4');
+    expect(mockedPublishToInstagram).not.toHaveBeenCalled();
+  });
+
+  it('throws when AI returns a mid-carousel slide with empty data before render or publish', async () => {
+    const scoredArticle = {
+      article: mockArticle,
+      score: 15,
+      reasons: ['startup in title'],
+      matchedKeywords: [],
+      scoreBreakdown: { titleMatches: 1, descriptionMatches: 0, baseScore: 5 },
+    };
+
+    mockedFetchRssNews.mockResolvedValue([mockArticle]);
+    mockedFilterAndRankArticles.mockReturnValue([scoredArticle]);
+    mockedSelectBestArticle.mockReturnValue(scoredArticle);
+    // Simulates generateContent returning a manifest that passed its own gate but has {} on a middle slide
+    mockedGenerateContent.mockResolvedValue({
+      manifest: {
+        globalBranding: { accentColor: '#3b82f6', handle: '@theinitial.dev', effects: ['vignette'] },
+        carousel: [
+          {
+            templateId: 'HOOK_A',
+            data: { headline: 'Hook line', subheadline: 'Subhook', imageUrl: null as unknown as null },
+          },
+          { templateId: 'CONTENT_GENERIC', data: {} },
+          {
+            templateId: 'CTA_FINAL',
+            data: { callToAction: 'Would you try this?', subtext: 'Tell us below' },
+          },
+        ],
+      },
+      caption: 'Caption passes quality gate.',
+      hashtags: '#test',
+    } as any);
+
+    await expect(runPipeline()).rejects.toThrow(/empty slides/i);
+    expect(mockedRenderManifest).not.toHaveBeenCalled();
     expect(mockedPublishToInstagram).not.toHaveBeenCalled();
   });
 });

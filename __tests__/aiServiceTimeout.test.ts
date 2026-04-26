@@ -34,4 +34,12 @@ describe('withTimeout', () => {
       'Gemini API timeout after 1ms'
     );
   });
+
+  it('rejects when AbortSignal fires before the operation completes', async () => {
+    const ac = new AbortController();
+    const neverResolves = new Promise<string>(() => {});
+    const pending = withTimeout(neverResolves, 60_000, 'should not fire', ac.signal);
+    ac.abort(new Error('lock lost'));
+    await expect(pending).rejects.toThrow('lock lost');
+  });
 });

@@ -15,6 +15,21 @@ describe('redisClient', () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
   });
 
+  it('reports when Redis URL is not configured', async () => {
+    vi.resetModules();
+    delete process.env.REDIS_URL;
+    const mod = await import('../src/utils/redisClient');
+    expect(mod.isRedisUrlConfigured()).toBe(false);
+    await expect(mod.getRedisClient()).rejects.toThrow('REDIS_URL');
+  });
+
+  it('treats empty REDIS_URL as not configured', async () => {
+    vi.resetModules();
+    process.env.REDIS_URL = '   ';
+    const mod = await import('../src/utils/redisClient');
+    expect(mod.isRedisUrlConfigured()).toBe(false);
+  });
+
   it('retries creating a Redis client after an initial connect failure', async () => {
     const firstClient = {
       connect: vi.fn().mockRejectedValue(new Error('connect failed')),

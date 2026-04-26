@@ -1,98 +1,93 @@
-# Architecture — Long-Term Memory
+# Architecture — full system
 
-## Project: instagram-content-generator-remotion
-
-**Purpose:** Remotion 4 + Express service rendering Instagram-style carousel frames (1080×1080) as PNG/MP4.
-
-**Flow:** Automation tool (n8n) → fetches content → builds JSON manifest → POST `/api/render` → renders slides → returns URLs or webhooks result.
+**Project:** `instagram-content-generator-remotion`  
+**Role:** Automated content pipeline: ingest news → filter/dedup → AI (Gemini) → Remotion render → Instagram (Playwright). Express serves renders, health, and scheduler when enabled.
 
 ---
 
-## Tech Stack
+## High-level data flow
+
+```mermaid
+flowchart LR
+  RSS[RSS sources] --> RssService[rssService]
+  GNews[GNews API] --> NewsService[newsService]
+  RssService --> Filter[newsFiltering]
+  NewsService --> Filter
+  Filter --> History[postHistory]
+  Filter --> Select[selectBestArticle]
+  Select --> AI[aiService / contentGenerator]
+  AI --> Guard[empty-slide guard]
+  Guard --> Remotion[renderService]
+  Remotion --> IG[instagramPublisher]
+  Scheduler[schedulerRunner] --> PipelineRun[pipelineRun]
+  PipelineRun --> Filter
+```
+
+1. **Ingestion:** `USE_RSS_FEEDS !== 'false'` → `fetchRssNews` (registry, Redis cooldown, cross-source dedup, telemetry to Postgres). On failure or empty relevant set → `fetchTopNews` / `fetchSearchNews` (GNews, Redis cache).
+2. **Filter / rank:** `filterAndRankArticles` — `hasBeenPosted` (URL + title trigram fingerprint), repetitive-topic skip, keyword scoring vs `MIN_RELEVANCE_SCORE`.
+3. **Selection:** `selectBestArticle` with `top` or `diverse` (random pick among top 3).
+4. **Early dedup record:** `recordPost(article, batchId-pre-gen)` with **original** title/URL so Gemini rewrites still match history.
+5. **AI:** `generateContent` → Gemini 2.5 Flash; manifest validation without rigid JSON schema in model (avoids empty objects).
+6. **Safety:** abort if any slide has empty `data` after generation.
+7. **Render:** in-process `renderManifest` (PNG/MP4) to `/tmp/renders` (or Windows path in pipeline).
+8. **Publish:** `publishToInstagram` (Playwright, session from `storage.json` / `INSTAGRAM_SESSION_B64`).
+
+---
+
+## Tech stack
 
 | Layer | Technology |
-|-------|------------|
-| Runtime | Node (ES modules), `tsx` for dev |
-| API | Express 4, JSON up to ~50MB |
-| Rendering | Remotion 4 (`@remotion/bundler`, `@remotion/renderer`) |
-| UI | React 18, inline styles, `lucide-react` icons |
-| Tests | Vitest + Supertest |
+|--------|------------|
+| Runtime | Node ESM, `tsx` for dev, optional `tsc` + `node dist/server.js` for production |
+| API | Express — `/api/render`, static `/api/renders/`, health, scheduled pipeline hook |
+| Video | Remotion 4, `@remotion/bundler` / `renderer` |
+| LLM | `@google/generative-ai`, `GEMINI_API_KEY` |
+| News | GNews v4, `rss-parser` + `sanitize-html` + `he` |
+| Browser automation | Playwright (Instagram) |
+| Cache / locks | Redis — GNews cache, RSS source cooldown, `schedulerLock` for pipeline |
+| Durable store | PostgreSQL — RSS run/source telemetry (`rssTelemetryStore`); post history is still **file JSON** (see current-state) |
+| Deploy | Docker, Railway; env via `.env` / platform |
 
 ---
 
-## Repository Layout
+## Key paths
 
 | Path | Role |
 |------|------|
-| `server.ts` | Express app, bundle cache, render pipeline |
-| `src/remotion/index.tsx` | Remotion root: registers `Slide` composition |
-| `src/remotion/SlideComposition.tsx` | Routes `templateId` → template component + effects |
-| `src/templates/*.tsx` | One React component per slide type |
-| `src/components/EffectsOverlay.tsx` | Post-process visual effects overlay |
-| `__tests__/server.test.ts` | API validation tests (no full render) |
+| `server.ts` | Express, scheduler, `bootstrapInstagramSession`, render imports |
+| `src/pipelineRun.ts` | End-to-end pipeline (CLI and invoked from scheduler) |
+| `src/pipeline/schedulerRunner.ts` | Posting window, `shouldRunNow`, distributed lock, `runPipeline` |
+| `src/pipeline/postHistory.ts` | Posted URL + `titleFingerprint`, JSON file, cap 500 |
+| `src/utils/titleFingerprint.ts` | Trigram fingerprint + similarity for dedup |
+| `src/pipeline/newsFiltering.ts` | Scoring, dedup, `selectBestArticle` |
+| `src/pipeline/rssService.ts` | Fetch, normalize, image extraction, title dedup threshold |
+| `src/pipeline/rssTelemetryStore.ts` | Postgres + Redis for RSS health |
+| `src/render/renderService.ts` | Bundle cache, `validateRenderManifest`, Remotion still/media |
+| `src/pipeline/aiService.ts` | Gemini calls, response parse/validate |
+| `src/automation/instagramPublisher.ts` | Session + publish |
+| `__tests__/` | Vitest + Supertest |
 
 ---
 
-## API: POST `/api/render`
+## External integrations
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `globalBranding` | Yes | `{ accentColor, handle, effects: string[] }` |
-| `carousel` | Yes | Array of `{ templateId, data }` |
-| `format` | No | `'png'` (default) or `'mp4'` |
-| `webhookUrl` | No | Async mode: returns 202 immediately, POSTs result to webhook |
-
-**Render:** Per slide → `renderStill` (PNG) or `renderMedia` (MP4, h264, concurrency 4).
-**Output:** Files at `/tmp/renders/render-{batchId}-{index}.{ext}`, served via `/api/renders/`.
+- **n8n / HTTP callers:** POST `/api/render` with manifest; optional `webhookUrl` for async. Field names must match `context/templates.md`.
+- **GNews:** query param `apikey` today — see `memory/current-state.md` and SEC-03.
+- **ClickUp / Railway:** no ClickUp MCP in repo `.cursor/mcp.json` (Railway only); task tracking is external.
 
 ---
 
-## Composition
+## Composition (Remotion)
 
-- **ID:** `Slide` (must match `COMPOSITION_ID` in `server.ts`)
-- **Canvas:** 1080×1080, 30 fps, 720 frames (24s)
-
----
-
-## Template Registry
-
-| `templateId` | Component | Purpose |
-|--------------|-----------|---------|
-| `HOOK_A` | `HookA.tsx` | Opening hook with optional bg image |
-| `CONTENT_GENERIC` | `ContentGeneric.tsx` | Title + body + optional highlight |
-| `CONTENT_LISTICLE` | `ContentListicle.tsx` | Numbered list + optional footnote |
-| `CONTENT_VIDEO` | `ContentVideo.tsx` | Video frame with title overlay |
-| `CTA_FINAL` | `CtaFinal.tsx` | Closing CTA with social icons |
-
----
-
-## Effects Overlay
-
-| Token | Effect |
-|-------|--------|
-| `crt` | Scanlines + RGB fringing |
-| `noise` | SVG turbulence grain |
-| `vignette` | Radial darkening |
-| `chromatic` | Split RGB glow |
-| `halftone` | Dot pattern |
-
-Unknown tokens ignored. Overlay is post-composite (z-index 40–50), `pointerEvents: none`.
-
----
-
-## External Integration (n8n)
-
-- Workflow files in repo (`n8n-workflow*.json`) are templates — URLs/keys are placeholders.
-- Pattern: Schedule → HTTP fetch content → LLM formats JSON → POST `/api/render`.
-- Use `webhookUrl` to avoid n8n timeout on long jobs.
-- **Critical:** LLM output field names must match template contracts (e.g. `footnote` not `footer`).
+- Composition id: `Slide` (see `context/remotion.md`).
+- 1080×1080, fps/duration from env (`COMPOSITION_FPS`, `COMPOSITION_DURATION_SECONDS` where applicable).
 
 ---
 
 ## Development
 
-- **Dev server:** `tsx server.ts` (port 3000, host 0.0.0.0)
-- **Preview:** `npx remotion studio src/remotion/index.tsx`
-- **Tests:** `npx vitest run`
-- **`RENDER_DIR`:** `/tmp/renders` — adjust for Windows deployments
-- **CI:** Use `npm ci` (lock file present)
+- `npm run dev` — `tsx server.ts`
+- `npm run pipeline` — one pipeline run
+- `npm test` / `npx vitest` — see `rules/testing-standards.md`
+
+*Legacy note:* an older version of this file described only “render + n8n”. The sections above are the current full automation architecture.

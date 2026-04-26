@@ -1,16 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../src/pipeline/postHistory', () => ({
-  hasBeenPosted: vi.fn(() => false),
-  getRecentPosts: vi.fn(() => []),
-}));
+vi.mock('../src/pipeline/postHistory', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/pipeline/postHistory')>();
+  return {
+    ...actual,
+    getRecentPosts: vi.fn(() => Promise.resolve([])),
+    loadPostHistoryDedupSnapshot: vi.fn(() => Promise.resolve([])),
+    claimArticle: vi.fn(() => Promise.resolve(true)),
+  };
+});
 
-import { getRecentPosts } from '../src/pipeline/postHistory';
+import { claimArticle, getRecentPosts, loadPostHistoryDedupSnapshot } from '../src/pipeline/postHistory';
 
 import { filterAndRankArticles, scoreArticleRelevance } from '../src/pipeline/newsFiltering';
 import { selectBestArticle } from '../src/pipeline/newsFiltering';
 
 const mockedGetRecentPosts = vi.mocked(getRecentPosts);
+const mockedClaimArticle = vi.mocked(claimArticle);
+const mockedLoadDedupSnapshot = vi.mocked(loadPostHistoryDedupSnapshot);
 
 describe('newsFiltering', () => {
   beforeEach(() => {
@@ -18,14 +25,16 @@ describe('newsFiltering', () => {
     delete process.env.REPETITION_WINDOW_DAYS;
     delete process.env.REPETITION_THRESHOLD;
     delete process.env.REPETITION_PENALTY;
+    delete process.env.POST_HISTORY_STORE;
+    delete process.env.DATABASE_URL;
   });
 
-  it('downranks same-topic articles when recent history repeats the topic', () => {
+  it('hard-skips same-topic articles when recent history hits repetition threshold', async () => {
     process.env.REPETITION_WINDOW_DAYS = '7';
     process.env.REPETITION_THRESHOLD = '3';
     process.env.REPETITION_PENALTY = '25';
 
-    mockedGetRecentPosts.mockReturnValue([
+    mockedGetRecentPosts.mockResolvedValue([
       {
         articleTitle: 'ChatGPT for developers keeps growing',
         articleUrl: 'https://example.com/r1',
@@ -46,7 +55,7 @@ describe('newsFiltering', () => {
       },
     ]);
 
-    const scored = filterAndRankArticles(
+    const scored = await filterAndRankArticles(
       [
         {
           title: 'ChatGPT agent improvements for developers',
@@ -72,9 +81,8 @@ describe('newsFiltering', () => {
       -100
     );
 
-    expect(scored).toHaveLength(2);
+    expect(scored).toHaveLength(1);
     expect(scored[0].article.title).toContain('Kubernetes');
-    expect(scored[1].article.title).toContain('ChatGPT');
   });
 
   it('handles null description without throwing in scoring', () => {
@@ -94,8 +102,8 @@ describe('newsFiltering', () => {
     expect(result.matchedKeywords.some((k) => k.keyword === 'startup')).toBe(true);
   });
 
-  it('does not throw when filtering articles with null description values', () => {
-    const scored = filterAndRankArticles(
+  it('does not throw when filtering articles with null description values', async () => {
+    const scored = await filterAndRankArticles(
       [
         {
           title: 'General economy update',
@@ -188,6 +196,133 @@ describe('newsFiltering', () => {
 
     expect(first?.article.url).toBe('a');
     expect(last?.article.url).toBe('c');
+  });
+
+  it('postgres: skips URL/fingerprint matches from dedup snapshot before any claim', async () => {
+    process.env.POST_HISTORY_STORE = 'postgres';
+    process.env.DATABASE_URL = 'postgres://localhost/test';
+
+    mockedLoadDedupSnapshot.mockResolvedValueOnce([
+      {
+        articleTitle: 'Already posted kubernetes story',
+        articleUrl: 'https://example.com/current-kubernetes',
+        postedAt: '2026-04-01T00:00:00.000Z',
+        batchId: 'old',
+      },
+    ]);
+
+    const scored = await filterAndRankArticles(
+      [
+        {
+          title: 'Kubernetes reliability update for infrastructure teams',
+          description: 'Platform-level improvements for cluster uptime',
+          content: '...',
+          url: 'https://example.com/current-kubernetes',
+          imageUrl: 'https://example.com/k8s.jpg',
+          publishedAt: '2026-04-12T01:00:00.000Z',
+          source: 'Example',
+        },
+      ],
+      ['kubernetes'],
+      undefined,
+      -100
+    );
+
+    expect(scored).toBeNull();
+    expect(mockedClaimArticle).not.toHaveBeenCalled();
+  });
+
+  it('postgres: first successful claim returns one ranked article', async () => {
+    process.env.POST_HISTORY_STORE = 'postgres';
+    process.env.DATABASE_URL = 'postgres://localhost/test';
+
+    mockedClaimArticle.mockResolvedValueOnce(true);
+
+    const scored = await filterAndRankArticles(
+      [
+        {
+          title: 'Kubernetes reliability update for infrastructure teams',
+          description: 'Platform-level improvements for cluster uptime',
+          content: '...',
+          url: 'https://example.com/current-kubernetes',
+          imageUrl: 'https://example.com/k8s.jpg',
+          publishedAt: '2026-04-12T01:00:00.000Z',
+          source: 'Example',
+        },
+      ],
+      ['kubernetes'],
+      undefined,
+      -100
+    );
+
+    expect(scored).toHaveLength(1);
+    expect(scored![0].article.title).toContain('Kubernetes');
+    expect(mockedClaimArticle).toHaveBeenCalledTimes(1);
+  });
+
+  it('postgres: returns null when every claim loses', async () => {
+    process.env.POST_HISTORY_STORE = 'postgres';
+    process.env.DATABASE_URL = 'postgres://localhost/test';
+
+    mockedClaimArticle.mockResolvedValue(false);
+
+    const scored = await filterAndRankArticles(
+      [
+        {
+          title: 'Kubernetes reliability update for infrastructure teams',
+          description: 'Platform-level improvements',
+          content: '...',
+          url: 'https://example.com/k8s',
+          imageUrl: 'https://example.com/k8s.jpg',
+          publishedAt: '2026-04-12T01:00:00.000Z',
+          source: 'Example',
+        },
+      ],
+      ['kubernetes'],
+      undefined,
+      -100
+    );
+
+    expect(scored).toBeNull();
+    expect(mockedClaimArticle).toHaveBeenCalledTimes(1);
+  });
+
+  it('postgres: tries the next candidate when earlier claims lose', async () => {
+    process.env.POST_HISTORY_STORE = 'postgres';
+    process.env.DATABASE_URL = 'postgres://localhost/test';
+
+    mockedClaimArticle.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    const scored = await filterAndRankArticles(
+      [
+        {
+          title: 'Lower ranked story',
+          description: 'kubernetes and platform news',
+          content: '...',
+          url: 'https://example.com/b',
+          imageUrl: 'https://example.com/b.jpg',
+          publishedAt: '2026-04-12T01:00:00.000Z',
+          source: 'Example',
+        },
+        {
+          title: 'Higher ranked kubernetes story',
+          description: 'kubernetes platform improvements',
+          content: '...',
+          url: 'https://example.com/a',
+          imageUrl: 'https://example.com/a.jpg',
+          publishedAt: '2026-04-12T01:00:00.000Z',
+          source: 'Example',
+        },
+      ],
+      ['platform', 'kubernetes'],
+      undefined,
+      -100
+    );
+
+    expect(scored).toHaveLength(1);
+    // Higher-scored article is tried first; after that claim loses, the next candidate wins.
+    expect(scored![0].article.url).toBe('https://example.com/b');
+    expect(mockedClaimArticle).toHaveBeenCalledTimes(2);
   });
 
   it('diverse strategy clamps out-of-range random values to the last top candidate', () => {

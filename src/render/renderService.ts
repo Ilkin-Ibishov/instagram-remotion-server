@@ -246,15 +246,19 @@ export function getBundleHealth(): { status: 'ok' | 'not_ready'; bundle: boolean
 
 export async function renderManifest(
   input: RenderManifestInput,
-  providedBatchId?: string
+  providedBatchId?: string,
+  signal?: AbortSignal
 ): Promise<{ images: string[]; batchId: string }> {
+  signal?.throwIfAborted();
   const serveUrl = await ensureBundle();
+  signal?.throwIfAborted();
   const format = input.format === 'mp4' ? 'mp4' : 'png';
   const batchId = providedBatchId ?? crypto.randomBytes(4).toString('hex');
   const outputUrls: string[] = [];
   const renderTimeoutMs = parseIntWithFallback('RENDER_TIMEOUT_MS', 60_000, 10_000, 600_000);
 
   for (const [i, slide] of input.carousel.entries()) {
+    signal?.throwIfAborted();
     console.log(`[render] slide ${i + 1}/${input.carousel.length} (${slide.templateId}, ${format})`);
 
     const inputProps = {
@@ -314,6 +318,7 @@ export async function renderManifest(
 
     console.log(`[render] ✓ ${filename}`);
     outputUrls.push(`/api/renders/${filename}`);
+    signal?.throwIfAborted();
   }
 
   return { images: outputUrls, batchId };

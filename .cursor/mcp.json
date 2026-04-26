@@ -3,6 +3,12 @@
     "Railway": {
       "command": "npx",
       "args": ["-y", "@railway/mcp-server"]
+    },
+    "ClickUp": {
+      "url": "https://mcp.clickup.com/mcp",
+      "headers": {
+        "Authorization": "Bearer pk_95660056_T2Z2R14JJBLP2D2M852TL7ETICXBDJE5"
+      }
     }
   }
 }

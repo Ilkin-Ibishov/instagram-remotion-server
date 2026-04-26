@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/pipeline/aiService', () => ({
   generatePostContentAI: vi.fn(),
@@ -10,6 +10,10 @@ import { generatePostContentAI } from '../src/pipeline/aiService';
 const mockedGeneratePostContentAI = vi.mocked(generatePostContentAI);
 
 describe('generateContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   const article = {
     title: 'Test article',
     description: 'desc',
@@ -58,6 +62,14 @@ describe('generateContent', () => {
     mockedGeneratePostContentAI.mockResolvedValueOnce(validContent);
 
     await expect(generateContent(article as any)).resolves.toEqual(validContent);
+  });
+
+  it('does not call the AI service when the signal is already aborted', async () => {
+    const ac = new AbortController();
+    ac.abort(new Error('stop early'));
+
+    await expect(generateContent(article as any, undefined, ac.signal)).rejects.toThrow('stop early');
+    expect(mockedGeneratePostContentAI).not.toHaveBeenCalled();
   });
 
   it('throws when generated content falls below the quality threshold', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeForPrompt } from '../src/pipeline/aiService';
+import { sanitizeForPrompt, stripNulBytesFromAiResponseText } from '../src/pipeline/aiService';
 
 describe('sanitizeForPrompt', () => {
   it('returns empty string for nullish values', () => {
@@ -22,5 +22,19 @@ describe('sanitizeForPrompt', () => {
 
   it('enforces max length', () => {
     expect(sanitizeForPrompt('abcdefgh', 5)).toBe('abcde');
+  });
+});
+
+describe('stripNulBytesFromAiResponseText', () => {
+  it('removes raw NUL bytes so JSON.parse can succeed', () => {
+    const raw = '{"manifest":\0{"x":1}}\0';
+    const stripped = stripNulBytesFromAiResponseText(raw);
+    expect(stripped).toBe('{"manifest":{"x":1}}');
+    expect(() => JSON.parse(stripped)).not.toThrow();
+  });
+
+  it('leaves normal JSON unchanged', () => {
+    const j = '{"a":1}';
+    expect(stripNulBytesFromAiResponseText(j)).toBe(j);
   });
 });

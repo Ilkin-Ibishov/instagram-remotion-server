@@ -13,13 +13,18 @@ function resetCachedClient(): void {
   redisClientPromise = null;
 }
 
+/** True when Redis URL is set (non-empty). Callers that require a lock or cache should check this first. */
+export function isRedisUrlConfigured(): boolean {
+  return Boolean(process.env.REDIS_URL?.trim());
+}
+
 export async function getRedisClient(): Promise<RedisClient> {
   if (redisClientPromise) {
     return redisClientPromise;
   }
 
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
+  if (!redisUrl?.trim()) {
     throw new Error('REDIS_URL is required');
   }
 

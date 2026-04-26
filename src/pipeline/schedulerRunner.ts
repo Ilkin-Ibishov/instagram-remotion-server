@@ -8,8 +8,14 @@ import {
   shouldRunNow,
   type ScheduleState,
 } from './scheduleState';
-import { acquireDistributedLock, releaseDistributedLock, runWithLockHeartbeat } from './schedulerLock';
+import {
+  acquireDistributedLock,
+  releaseDistributedLock,
+  runWithLockHeartbeat,
+  type LockHandle,
+} from './schedulerLock';
 import { executeWithRetry } from './retryPolicy';
+import { isRedisUrlConfigured } from '../utils/redisClient';
 
 let lastTelemetryPruneWeek: string | null = null;
 
@@ -117,6 +123,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
   const retryCount = getNumberEnv('SCHEDULE_RETRY_COUNT', 1);
   const retryDelayMs = getNumberEnv('SCHEDULE_RETRY_DELAY_MS', 5000);
   const lockKey = `pipeline:schedule:${accountId}`;
+  const redisLockEnabled = isRedisUrlConfigured();
 
   const now = new Date();
   const decision = await shouldRunNow(accountId, now);
@@ -152,15 +159,23 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
     };
   }
 
-  const lock = await acquireDistributedLock(lockKey, lockTtlSeconds);
-  if (!lock) {
-    logger.warn('schedule-lock', `Lock already held for ${accountId}`, { lockKey });
-    return {
-      status: 'skipped_lock_held',
-      reason: 'lock_held',
+  let lock: LockHandle | null = null;
+
+  if (redisLockEnabled) {
+    lock = await acquireDistributedLock(lockKey, lockTtlSeconds);
+    if (!lock) {
+      logger.warn('schedule-lock', `Lock already held for ${accountId}`, { lockKey });
+      return {
+        status: 'skipped_lock_held',
+        reason: 'lock_held',
+        accountId,
+        lockKey,
+      };
+    }
+  } else {
+    logger.warn('schedule-lock', 'REDIS_URL not set; scheduled run proceeds without a distributed lock', {
       accountId,
-      lockKey,
-    };
+    });
   }
 
   try {
@@ -180,7 +195,7 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
       };
     }
 
-    await runWithLockHeartbeat(lock, lockTtlSeconds, (signal) =>
+    const runPipelineWithRetries = (signal: AbortSignal | undefined) =>
       executeWithRetry(
         async () => runPipeline(signal),
         {
@@ -192,8 +207,13 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
             });
           },
         }
-      )
-    );
+      );
+
+    if (lock) {
+      await runWithLockHeartbeat(lock, lockTtlSeconds, (signal) => runPipelineWithRetries(signal));
+    } else {
+      await runPipelineWithRetries(undefined);
+    }
 
     const finishedAt = new Date();
     const nextRunAt = computeNextRunAt(finishedAt, minDelayHours, maxDelayHours);
@@ -230,12 +250,14 @@ export async function runScheduledPipeline(): Promise<SchedulerOutcome> {
       ...normalizeOutcomeState(updated),
     };
   } finally {
-    await releaseDistributedLock(lock).catch((error) => {
-      logger.warn('schedule-lock', 'Failed to release lock', {
-        lockKey,
-        error: extractErrorMessage(error),
+    if (lock) {
+      await releaseDistributedLock(lock).catch((error) => {
+        logger.warn('schedule-lock', 'Failed to release lock', {
+          lockKey,
+          error: extractErrorMessage(error),
+        });
       });
-    });
+    }
   }
 }
 

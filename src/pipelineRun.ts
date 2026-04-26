@@ -3,7 +3,7 @@ import { generateContent } from './pipeline/contentGenerator';
 import { fetchTopNews, fetchSearchNews } from './pipeline/newsService';
 import { fetchRssNews } from './pipeline/rssService';
 import { filterAndRankArticles, selectBestArticle, printScoringResults } from './pipeline/newsFiltering';
-import { recordPost } from './pipeline/postHistory';
+import { isPostgresPostHistory, recordPost } from './pipeline/postHistory';
 import { loadAccountProfile, getAccountKeywords } from './pipeline/accountProfile';
 import type { NewsArticle, PublishablePost } from './pipeline/types';
 import path from 'path';
@@ -23,7 +23,7 @@ const MIN_RELEVANCE_SCORE = parseInt(process.env.MIN_RELEVANCE_SCORE || '10', 10
  * Renders the given manifest in-process using the shared render service.
  * Returns an array of relative API asset paths.
  */
-async function renderMedia(manifest: any, format: string = 'mp4'): Promise<string[]> {
+async function renderMedia(manifest: any, format: string = 'mp4', signal?: AbortSignal): Promise<string[]> {
   const logger = new Logger();
   logger.info('render', `Rendering manifest in-process (format: ${format})`);
 
@@ -36,7 +36,7 @@ async function renderMedia(manifest: any, format: string = 'mp4'): Promise<strin
     throw new Error(`Render failed: ${validation.error ?? 'invalid manifest format'}`);
   }
 
-  const result = await renderManifest(validation.normalized as RenderManifestInput);
+  const result = await renderManifest(validation.normalized as RenderManifestInput, undefined, signal);
   return result.images;
 }
 
@@ -49,6 +49,7 @@ export async function runPipeline(signal?: AbortSignal) {
   let rssFetchFailed = false;
   
   try {
+    signal?.throwIfAborted();
     logger.info('pipeline', `--- Step 0: Fetching News (${useRssFeeds ? 'RSS primary + GNews fallback' : `GNews category: ${NEWS_CATEGORY}`}) ---`);
     logger.info('pipeline', `Account: ${accountProfile.handle} | Niche: ${accountProfile.niche.join(', ')}`);
 
@@ -88,7 +89,7 @@ export async function runPipeline(signal?: AbortSignal) {
     
     let scoredArticles =
       articles.length > 0
-        ? filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE)
+        ? (await filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE)) ?? []
         : [];
     if (articles.length > 0) {
       printScoringResults(scoredArticles, logger);
@@ -102,7 +103,8 @@ export async function runPipeline(signal?: AbortSignal) {
       );
       articles = await fetchTopNews(NEWS_CATEGORY);
       logger.info('news-fetch', `GNews fetched ${articles.length} articles from API`, { count: articles.length });
-      scoredArticles = filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+      scoredArticles =
+        (await filterAndRankArticles(articles, accountKeywords, logger, MIN_RELEVANCE_SCORE)) ?? [];
       printScoringResults(scoredArticles, logger);
     }
 
@@ -113,17 +115,26 @@ export async function runPipeline(signal?: AbortSignal) {
       logger.info('search-fallback', `Searching GNews with niche keywords: "${searchQuery}"`);
       const searchArticles = await fetchSearchNews(searchQuery, { sortby: 'relevance' });
       logger.info('news-fetch', `Search fallback fetched ${searchArticles.length} articles`, { count: searchArticles.length });
-      scoredArticles = filterAndRankArticles(searchArticles, accountKeywords, logger, MIN_RELEVANCE_SCORE);
+      scoredArticles =
+        (await filterAndRankArticles(searchArticles, accountKeywords, logger, MIN_RELEVANCE_SCORE)) ?? [];
       printScoringResults(scoredArticles, logger);
     }
 
     if (scoredArticles.length === 0) {
-      logger.warn('pipeline', `⚠️ No relevant articles found even after search fallback! All articles have score < ${MIN_RELEVANCE_SCORE} or were already posted.`);
-      throw new Error(`No relevant articles found for category '${NEWS_CATEGORY}' (threshold: ${MIN_RELEVANCE_SCORE})`);
+      logger.info(
+        'pipeline',
+        'No articles available for posting after RSS/GNews fetch and search fallback. All candidates were filtered out (low relevance score vs threshold, already posted, repetitive topic, or lost atomic URL claim). Skipping AI, render, and publish.',
+        {
+          category: NEWS_CATEGORY,
+          minRelevanceScore: MIN_RELEVANCE_SCORE,
+        }
+      );
+      return;
     }
 
-    // Select best article
-    const selectedArticleItem = selectBestArticle(scoredArticles, 'top', logger);
+    signal?.throwIfAborted();
+    // Select from top N with randomness (strategy: "diverse" in newsFiltering)
+    const selectedArticleItem = selectBestArticle(scoredArticles, 'diverse', logger);
     
     if (!selectedArticleItem) {
       throw new Error('No articles available to post');
@@ -141,8 +152,21 @@ export async function runPipeline(signal?: AbortSignal) {
     );
     logger.info('pipeline', `Selected article (score: ${selectedArticleItem.score}): "${article.title}"`);
 
+    // ── BUG-001 FIX: Dedup guard BEFORE AI transformation ──────────────────
+    // File store: recordPost inserts a new row (URL + fingerprint) before Gemini runs.
+    // Postgres: filterAndRankArticles() already claimed normalized_url; recordPost
+    // upserts title/batch/fingerprint onto that row (ON CONFLICT DO UPDATE).
+    // ────────────────────────────────────────────────────────────────────────
+    await recordPost(article, `${batchId}-pre-gen`);
+    logger.info(
+      'history',
+      `${isPostgresPostHistory() ? 'Postgres pre-gen upsert' : 'Pre-generation dedup record'}: "${article.title}"`,
+      { batchId }
+    );
+
+    signal?.throwIfAborted();
     logger.info('pipeline', '--- Step 1: AI Content Generation ---');
-    const aiData = await generateContent(article, accountProfile);
+    const aiData = await generateContent(article, accountProfile, signal);
     logger.info('ai-generation', `Generated ${aiData.manifest.carousel.length} slides with account context`, {
       account: accountProfile.handle,
       slideCount: aiData.manifest.carousel.length,
@@ -157,10 +181,13 @@ export async function runPipeline(signal?: AbortSignal) {
       }
     });
     
+    // BUG-001 FIX: Hard block on empty slides — don't publish blank content
     if (hasEmptySlides) {
-      logger.error('ai-generation', '❌ CRITICAL: One or more slides have empty data. The carousel will render blank.', {
+      const errorMsg = `AI returned ${aiData.manifest.carousel.filter((s: any) => !s.data || Object.keys(s.data).length === 0).length} empty slides. Aborting pipeline — would publish blank content.`;
+      logger.error('ai-generation', '❌ CRITICAL: ' + errorMsg, {
         carousel: aiData.manifest.carousel,
       });
+      throw new Error(errorMsg);
     }
     
     // Debug: Log the full manifest for inspection
@@ -168,9 +195,10 @@ export async function runPipeline(signal?: AbortSignal) {
     logger.debug('ai-generation', 'Caption:', aiData.caption);
     logger.debug('ai-generation', 'Hashtags:', aiData.hashtags);
 
+    signal?.throwIfAborted();
     logger.info('pipeline', `--- Step 2: Rendering (Format: ${RENDER_FORMAT}) ---`);
     // Ensure the server is running on port 3000 before executing this script!
-    const localFileUrls = await renderMedia(aiData.manifest, RENDER_FORMAT);
+    const localFileUrls = await renderMedia(aiData.manifest, RENDER_FORMAT, signal);
     
     // The server returns URLs like `/api/renders/render-xyz-0.png` or `/api/renders/render-xyz-0.mp4`
     // Map these back to actual file paths
@@ -194,17 +222,11 @@ export async function runPipeline(signal?: AbortSignal) {
     
     logger.debug('assembly', 'Assembled post:', post);
 
+    signal?.throwIfAborted();
     logger.info('pipeline', '--- Step 4: Publishing to Instagram ---');
-    if (signal?.aborted) {
-      throw new Error(`Pipeline aborted before publish: ${String(signal.reason || 'lock lost')}`);
-    }
     // Uncomment this line to actually publish to Instagram.
     // Make sure storage.json has valid session!
-    await publishToInstagram(post);
-    
-    // Record this article as posted to prevent duplicates
-    recordPost(article, batchId);
-    logger.info('history', `Recorded post to history`, { batchId, articleTitle: article.title });
+    await publishToInstagram(post, signal);
     
     logger.info('publishing', 'Publish completed successfully');
     logger.info('pipeline', `✅ Pipeline completed successfully!\n📊 Logs: ${logger.getLogPath()}`);

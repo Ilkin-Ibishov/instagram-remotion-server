@@ -5,7 +5,27 @@ import * as os from 'os';
 import type { Page } from 'playwright';
 import type { PublishablePost } from '../pipeline/types';
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+async function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    throw signal.reason;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(signal!.reason);
+    };
+    const id = setTimeout(() => {
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      resolve();
+    }, ms);
+    if (!signal) {
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 export interface SessionValidationResult {
   valid: boolean;
@@ -40,9 +60,10 @@ export function findNewPublishedPermalink(beforeLinks: string[], afterLinks: str
   return null;
 }
 
-async function getRecentProfilePermalinks(page: Page, username: string): Promise<string[]> {
+async function getRecentProfilePermalinks(page: Page, username: string, signal?: AbortSignal): Promise<string[]> {
+  signal?.throwIfAborted();
   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await delay(2500);
+  await delay(2500, signal);
 
   const links = await page
     .locator('a[href^="/p/"], a[href^="/reel/"]')
@@ -71,18 +92,20 @@ async function waitForNewProfilePermalink(
   username: string,
   baseline: string[],
   timeoutMs = 90_000,
-  pollMs = 4_000
+  pollMs = 4_000,
+  signal?: AbortSignal
 ): Promise<string | null> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const currentLinks = await getRecentProfilePermalinks(page, username);
+    signal?.throwIfAborted();
+    const currentLinks = await getRecentProfilePermalinks(page, username, signal);
     const newLink = findNewPublishedPermalink(baseline, currentLinks);
     if (newLink) {
       return newLink;
     }
 
-    await delay(pollMs);
+    await delay(pollMs, signal);
   }
 
   return null;
@@ -91,20 +114,22 @@ async function waitForNewProfilePermalink(
 async function dismissReelInfoModalIfPresent(
   page: Page,
   contextLabel: string,
-  timeoutMs: number = 3000
+  timeoutMs: number = 3000,
+  signal?: AbortSignal
 ): Promise<boolean> {
   const okButton = page.getByRole('button', { name: 'OK', exact: true }).first();
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
+    signal?.throwIfAborted();
     const visible = await okButton.isVisible({ timeout: 600 }).catch(() => false);
     if (visible) {
       console.log(`[instagram] Dismissing delayed Reels modal (${contextLabel})...`);
       await okButton.click({ force: true });
-      await delay(500);
+      await delay(500, signal);
       return true;
     }
-    await delay(200);
+    await delay(200, signal);
   }
 
   return false;
@@ -234,11 +259,12 @@ export function assertInstagramSessionReady(
   );
 }
 
-export async function publishToInstagram(post: PublishablePost): Promise<void> {
+export async function publishToInstagram(post: PublishablePost, signal?: AbortSignal): Promise<void> {
   const sessionFile = 'storage.json';
   const isHeadless = (process.env.PLAYWRIGHT_HEADLESS || 'true').toLowerCase() !== 'false';
   const minimumRemainingMs = Number(process.env.INSTAGRAM_SESSION_MIN_REMAINING_MS || 60 * 60 * 1000);
-  
+
+  signal?.throwIfAborted();
   if (!fs.existsSync(sessionFile)) {
     throw new Error(`Session file ${sessionFile} not found. Please run saveSession script first.`);
   }
@@ -252,6 +278,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
     }
   }
 
+  signal?.throwIfAborted();
   console.log('Launching browser...');
   const browser = await chromium.launch({
     headless: isHeadless,
@@ -269,7 +296,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
 
     let baselinePermalinks: string[] = [];
     if (targetUsername) {
-      baselinePermalinks = await getRecentProfilePermalinks(verificationPage, targetUsername);
+      baselinePermalinks = await getRecentProfilePermalinks(verificationPage, targetUsername, signal);
       console.log(`[instagram] Baseline profile permalink count for @${targetUsername}: ${baselinePermalinks.length}`);
     } else {
       console.warn('[instagram] BRAND_HANDLE is not configured for strict publish verification; falling back to UI-only confirmation.');
@@ -278,8 +305,8 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
     console.log('Navigating to Instagram...');
     // Replace networkidle with domcontentloaded to prevent hanging on medias streams
     await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    
-    await delay(5000); // Give react visual rendering time
+
+    await delay(5000, signal); // Give react visual rendering time
 
     // Explicit authentication guard after UI settles.
     const authSignals = await page.evaluate(() => ({
@@ -307,7 +334,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
       if (await notNowBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         console.log('Dismissing "Not Now" popup...');
         await notNowBtn.click({ force: true });
-        await delay(1500);
+        await delay(1500, signal);
       } else {
         break;
       }
@@ -325,13 +352,13 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
       throw new Error('Could not find Create / New post button.');
     }
 
-    await delay(2000);
-    
+    await delay(2000, signal);
+
     // There might be a sub-menu "Post" vs "Reel". If "Post" text appears, click it.
     const postMenuOptions = page.locator('span', { hasText: /^Post$/ }).first();
     if (await postMenuOptions.isVisible()) {
       await postMenuOptions.click({ force: true });
-      await delay(2000);
+      await delay(2000, signal);
     }
     
     console.log(`Uploading ${post.isCarousel ? 'carousel media' : 'single media'}...`);
@@ -345,25 +372,25 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
     await fileInput.setInputFiles(absoluteMediaPaths);
     
     console.log('Waiting for media upload processing (handling delay)...');
-    await delay(5000); 
+    await delay(5000, signal);
 
-     await dismissReelInfoModalIfPresent(page, 'post-upload');
-    
+    await dismissReelInfoModalIfPresent(page, 'post-upload', 3000, signal);
+
     console.log('Clicking "Next" on crop step...');
-     await dismissReelInfoModalIfPresent(page, 'before-crop-next');
+    await dismissReelInfoModalIfPresent(page, 'before-crop-next', 3000, signal);
     const nextButton1 = page.getByText('Next', { exact: true }).first();
     await nextButton1.waitFor({ state: 'visible', timeout: 15000 });
     await nextButton1.click({ force: true });
-    
-    await delay(3000);
-    
+
+    await delay(3000, signal);
+
     console.log('Clicking "Next" on edit step...');
-    await dismissReelInfoModalIfPresent(page, 'before-edit-next');
+    await dismissReelInfoModalIfPresent(page, 'before-edit-next', 3000, signal);
     const nextButton2 = page.getByText('Next', { exact: true }).first();
     await nextButton2.waitFor({ state: 'visible', timeout: 15000 });
     await nextButton2.click({ force: true });
 
-    await delay(3000);
+    await delay(3000, signal);
 
     console.log('Filling caption...');
     const captionEditor = page.locator('div[aria-label="Write a caption..."]');
@@ -373,7 +400,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
     const safeCaption = sanitizeInstagramCaption(post.caption);
     await page.keyboard.insertText(safeCaption);
 
-    await delay(2000);
+    await delay(2000, signal);
 
     console.log('Clicking "Share" button...');
     let shareClicked = false;
@@ -392,7 +419,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
             }
         }
         if (shareClicked) break;
-        await delay(1000); // 1s polling interval
+        await delay(1000, signal); // 1s polling interval
     }
 
     if (!shareClicked) {
@@ -434,7 +461,10 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
       const publishedPermalink = await waitForNewProfilePermalink(
         verificationPage,
         targetUsername,
-        baselinePermalinks
+        baselinePermalinks,
+        90_000,
+        4_000,
+        signal
       );
 
       if (!publishedPermalink) {
@@ -447,7 +477,7 @@ export async function publishToInstagram(post: PublishablePost): Promise<void> {
     }
 
     console.log('Post successfully published!');
-    await delay(3000); 
+    await delay(3000, signal);
 
   } catch (err) {
     console.error('Publishing to Instagram failed:', err);

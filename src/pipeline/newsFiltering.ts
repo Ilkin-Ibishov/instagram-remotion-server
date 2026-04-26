@@ -1,8 +1,15 @@
 import type { NewsArticle } from './types';
-import { hasBeenPosted, getRecentPosts } from './postHistory';
+import {
+  claimArticle,
+  getRecentPosts,
+  isArticlePostedInHistory,
+  isPostgresPostHistory,
+  loadPostHistoryDedupSnapshot,
+} from './postHistory';
 import type { AccountProfile } from './accountProfile';
 import Logger from '../utils/logger';
 import { normalizeArticleUrl } from '../utils/normalizeUrl';
+import { createTitleFingerprint } from '../utils/titleFingerprint';
 
 /**
  * News Relevance Scoring System
@@ -192,14 +199,23 @@ export function scoreArticleRelevance(
  * - Articles with score below minScore threshold
  * Updates scoring based on recent post frequency
  */
-export function filterAndRankArticles(
+export async function filterAndRankArticles(
   articles: NewsArticle[],
   accountKeywords: string[],
   logger?: Logger,
   minScore: number = 10
-): ScoredArticle[] {
+): Promise<ScoredArticle[] | null> {
+  if (articles.length === 0) {
+    return [];
+  }
+
   const repetitionWindowDays = parsePositiveEnvInt('REPETITION_WINDOW_DAYS', 7);
-  const recent = getRecentPosts(repetitionWindowDays);
+  const usePostgresClaims = isPostgresPostHistory();
+  // URL + title-fingerprint dedup against recent history (file or Postgres). Claims only
+  // serialize same-URL races; fingerprint check still required so syndicated URLs cannot
+  // repost the same story under a different link.
+  const dedupSnapshot = await loadPostHistoryDedupSnapshot();
+  const recent = await getRecentPosts(repetitionWindowDays);
   const recentCount = recent.length;
 
   if (logger) {
@@ -208,6 +224,7 @@ export function filterAndRankArticles(
       repetitionWindowDays,
       keywordCount: accountKeywords.length,
       minimumScoreThreshold: minScore,
+      postHistoryBackend: usePostgresClaims ? 'postgres+claim' : 'file',
     });
   }
 
@@ -221,22 +238,40 @@ export function filterAndRankArticles(
 
   const filtered = articles
     .filter(article => {
-      // Skip already posted articles (normalise URL before checking to handle www/http variants)
-      if (hasBeenPosted(normalizeArticleUrl(article.url))) {
+      if (isArticlePostedInHistory(dedupSnapshot, normalizeArticleUrl(article.url), article.title)) {
         if (logger) {
-          logger.debug('filter-duplicates', `Skipping already posted: "${article.title}"`);
+          logger.debug('filter-duplicates', `Skipping already posted (URL or fingerprint): "${article.title}"`);
         }
         filterResults.skippedDuplicates++;
         filterResults.skippedArticles.push({
           title: article.title,
-          reason: 'Already posted',
+          reason: 'Already posted (URL or content fingerprint)',
         });
         return false;
       }
+
+      // BUG-001: Hard skip on repetitive same-topic content
+      // Changed from penalty-only to hard filter: if this article covers the same
+      // topic as something posted recently, skip it entirely instead of just
+      // reducing its score (which allowed high-relevance duplicates to pass)
+      const sameTopicRecentCount = countRecentSameTopicPosts(article, accountKeywords, recent);
+      const repetitionThreshold = parsePositiveEnvInt('REPETITION_THRESHOLD', 3);
+      if (sameTopicRecentCount >= repetitionThreshold) {
+        if (logger) {
+          logger.debug('filter-duplicates', `Skipping repetitive topic: "${article.title}" (${sameTopicRecentCount} recent posts on same topic)`);
+        }
+        filterResults.skippedDuplicates++;
+        filterResults.skippedArticles.push({
+          title: article.title,
+          reason: `Repetitive topic (${sameTopicRecentCount} recent posts)`,
+        });
+        return false;
+      }
+      
       return true;
     })
     .map(article => {
-      const sameTopicRecentCount = countRecentSameTopicPosts(article, accountKeywords, recent);
+      const sameTopicRecentCount = 0; // Already filtered above
       const scored = scoreArticleRelevance(article, accountKeywords, sameTopicRecentCount);
       return {
         article,
@@ -288,7 +323,30 @@ export function filterAndRankArticles(
     );
   }
 
-  return filtered;
+  if (!usePostgresClaims) {
+    return filtered;
+  }
+
+  if (filtered.length === 0) {
+    return null;
+  }
+
+  for (const item of filtered) {
+    const fp = createTitleFingerprint(item.article.title || '');
+    const claimed = await claimArticle(item.article.url || '', fp);
+    if (claimed) {
+      if (logger) {
+        logger.info('filtering', `Atomic claim won for URL (postgres): "${item.article.title.substring(0, 80)}"`);
+      }
+      return [item];
+    }
+    if (logger) {
+      logger.debug('filter-duplicates', `Claim lost (URL already reserved): "${item.article.title}"`);
+    }
+    filterResults.skippedDuplicates++;
+  }
+
+  return null;
 }
 
 /**

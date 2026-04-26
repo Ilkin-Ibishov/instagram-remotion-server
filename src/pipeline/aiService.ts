@@ -367,6 +367,14 @@ export function sanitizeForPrompt(value: string | undefined | null, maxLength = 
     .slice(0, maxLength);
 }
 
+/**
+ * Gemini occasionally emits raw NUL bytes in JSON text, which breaks JSON.parse in V8/Node.
+ * Strip before parsing; escaped \\u0000 inside strings is left to JSON.parse.
+ */
+export function stripNulBytesFromAiResponseText(text: string): string {
+  return text.replace(/\0/g, "");
+}
+
 function parseSlideBoundEnv(raw: string | undefined, fallback: number): number {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
@@ -387,8 +395,10 @@ export function resolveGeminiTimeoutMs(raw: string | undefined = process.env.GEM
 export async function withTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,
-  timeoutMessage: string
+  timeoutMessage: string,
+  signal?: AbortSignal
 ): Promise<T> {
+  signal?.throwIfAborted();
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -397,8 +407,22 @@ export async function withTimeout<T>(
     }, timeoutMs);
   });
 
+  const abortPromise =
+    signal &&
+    new Promise<never>((_, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+
   try {
-    return await Promise.race([operation, timeoutPromise]);
+    const racers: Promise<T>[] = [operation, timeoutPromise];
+    if (abortPromise) {
+      racers.push(abortPromise);
+    }
+    return await Promise.race(racers);
   } finally {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
@@ -667,12 +691,12 @@ function validateSlideData(templateId: string, data: unknown, index: number): st
 
 function validateGeneratedContent(payload: unknown, requiredTemplateSequence: readonly string[]): GeneratedContent {
   if (!isRecord(payload)) {
-    throw new Error("Gemini response root must be an object");
+    throw new Error("AI manifest invalid: root JSON value must be an object");
   }
 
   const { manifest, caption, hashtags } = payload;
   if (!isRecord(manifest)) {
-    throw new Error("Gemini response missing manifest object");
+    throw new Error("AI manifest invalid: missing or non-object `manifest`");
   }
 
   if (!isRecord(manifest.globalBranding)) {
@@ -749,7 +773,9 @@ function validateGeneratedContent(payload: unknown, requiredTemplateSequence: re
   }
 
   if (validationErrors.length > 0) {
-    throw new Error(`Gemini response validation failed: ${validationErrors.join("; ")}`);
+    throw new Error(
+      `AI manifest invalid (pre-render): ${validationErrors.join("; ")}`
+    );
   }
 
   return {
@@ -769,8 +795,10 @@ function validateGeneratedContent(payload: unknown, requiredTemplateSequence: re
 
 export async function generatePostContentAI(
   article: NewsArticle,
-  accountProfile?: AccountProfile
+  accountProfile?: AccountProfile,
+  signal?: AbortSignal
 ): Promise<GeneratedContent> {
+  signal?.throwIfAborted();
   if (!API_KEY) {
     throw new Error("GEMINI_API_KEY not found in environment variables. Please add it to .env");
   }
@@ -1021,9 +1049,12 @@ RETURN ONLY JSON.`;
     const result = await withTimeout(
       model.generateContent(prompt),
       geminiTimeoutMs,
-      `Gemini API timeout after ${geminiTimeoutMs}ms`
+      `Gemini API timeout after ${geminiTimeoutMs}ms`,
+      signal
     );
+    signal?.throwIfAborted();
     const response = await result.response;
+    signal?.throwIfAborted();
     let responseText = response.text();
     
     aiLogger.debug('ai-service', `Raw Gemini response (first 500 chars): ${responseText.substring(0, 500)}`);
@@ -1034,7 +1065,10 @@ RETURN ONLY JSON.`;
       aiLogger.debug('ai-service', 'Found JSON in markdown code block, extracting...');
       responseText = jsonMatch[1];
     }
-    
+
+    responseText = stripNulBytesFromAiResponseText(responseText);
+
+    signal?.throwIfAborted();
     let json: unknown;
     try {
       json = JSON.parse(responseText);
@@ -1051,7 +1085,9 @@ RETURN ONLY JSON.`;
       throw new Error(`JSON parse error. Full response saved to ${debugPath}. Error: ${parseErrorMessage}`);
     }
 
+    signal?.throwIfAborted();
     const normalized = normalizeGeneratedPayloadForValidation(json, requiredTemplateSequence);
+    signal?.throwIfAborted();
     return validateGeneratedContent(normalized, requiredTemplateSequence);
   } catch (error) {
     aiLogger.error('ai-service', 'Gemini generation error', error);
