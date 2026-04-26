@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
-import 'dotenv/config';
+import dotenv from 'dotenv';
+// Prefer .env over a stale CLICKUP_TOKEN injected by the host (dotenv default does not override).
+dotenv.config({ path: '.env', override: true });
 import client from '../src/automation/clickupClient';
 
 function usage() {
