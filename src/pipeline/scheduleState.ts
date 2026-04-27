@@ -11,16 +11,42 @@ export interface ScheduleState {
   consecutiveFailureCount: number;
   /** When a pipeline alert webhook was last accepted (dedupe / rate limit). */
   lastAlertSentAt: Date | null;
+  /** While set and in the future, scheduled runs are skipped (circuit-breaker cooldown). */
+  pipelineCooldownUntil: Date | null;
 }
 
 export interface ShouldRunDecision {
   allowed: boolean;
-  reason?: 'not_due';
+  reason?: 'not_due' | 'pipeline_cooldown';
   state: ScheduleState;
 }
 
 let pool: Pool | null = null;
 let schemaInitialized = false;
+
+function parseCooldownThreshold(): number {
+  const raw = process.env.PIPELINE_COOLDOWN_FAILURE_THRESHOLD;
+  if (raw === undefined || raw === '') {
+    return 3;
+  }
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) {
+    return 3;
+  }
+  return n;
+}
+
+function parseCooldownMinutes(): number {
+  const raw = process.env.PIPELINE_COOLDOWN_MINUTES;
+  if (raw === undefined || raw === '') {
+    return 30;
+  }
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    return 30;
+  }
+  return Math.min(24 * 60, n);
+}
 
 function getPool(): Pool {
   if (pool) {
@@ -63,6 +89,10 @@ async function ensureSchema(): Promise<void> {
       ALTER TABLE schedule_state
       ADD COLUMN IF NOT EXISTS last_alert_sent_at TIMESTAMPTZ
     `);
+    await client.query(`
+      ALTER TABLE schedule_state
+      ADD COLUMN IF NOT EXISTS pipeline_cooldown_until TIMESTAMPTZ
+    `);
     schemaInitialized = true;
   } finally {
     client.release();
@@ -81,6 +111,7 @@ function toState(row: any): ScheduleState {
     lastErrorMessage: row.last_error_message ?? null,
     consecutiveFailureCount: count,
     lastAlertSentAt: row.last_alert_sent_at ? new Date(row.last_alert_sent_at) : null,
+    pipelineCooldownUntil: row.pipeline_cooldown_until ? new Date(row.pipeline_cooldown_until) : null,
   };
 }
 
@@ -123,6 +154,15 @@ export async function shouldRunNow(accountId: string, now: Date): Promise<Should
   const safeAccountId = accountId.replace(/\0/g, '');
   const state = await getOrCreateScheduleState(safeAccountId, now);
 
+  const cooldownUntil = state.pipelineCooldownUntil;
+  if (cooldownUntil && cooldownUntil.getTime() > now.getTime()) {
+    return {
+      allowed: false,
+      reason: 'pipeline_cooldown',
+      state,
+    };
+  }
+
   if (state.nextRunAt.getTime() > now.getTime()) {
     return {
       allowed: false,
@@ -155,6 +195,7 @@ export async function recordRunSuccess(accountId: string, now: Date, nextRunAt: 
         last_error_at = NULL,
         last_error_message = NULL,
         consecutive_failure_count = 0,
+        pipeline_cooldown_until = NULL,
         updated_at = NOW()
       WHERE account_id = $1
       RETURNING *
@@ -231,7 +272,29 @@ export async function recordRunFailure(
       throw new Error(msg);
     }
 
-    return toState(result.rows[0]);
+    let row = result.rows[0];
+    const threshold = parseCooldownThreshold();
+    if (threshold > 0) {
+      const newCount = typeof row.consecutive_failure_count === 'number' ? row.consecutive_failure_count : 0;
+      if (newCount >= threshold) {
+        const minutes = parseCooldownMinutes();
+        const cooldownUntil = new Date(now.getTime() + minutes * 60 * 1000);
+        const cool = await client.query(
+          `
+          UPDATE schedule_state
+          SET pipeline_cooldown_until = $2, updated_at = NOW()
+          WHERE account_id = $1
+          RETURNING *
+          `,
+          [safeAccountId, cooldownUntil.toISOString()]
+        );
+        if (cool.rows[0]) {
+          row = cool.rows[0];
+        }
+      }
+    }
+
+    return toState(row);
   } finally {
     client.release();
   }
