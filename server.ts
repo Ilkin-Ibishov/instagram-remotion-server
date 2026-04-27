@@ -425,6 +425,7 @@ app.get('/api/status', async (req, res) => {
             last_run_at: state.lastRunAt?.toISOString() ?? null,
             consecutive_failure_count: state.consecutiveFailureCount,
             last_alert_sent_at: state.lastAlertSentAt?.toISOString() ?? null,
+            pipeline_cooldown_until: state.pipelineCooldownUntil?.toISOString() ?? null,
         });
     } catch (err) {
         serverLogger.error('api-status', 'Schedule state database unavailable', {

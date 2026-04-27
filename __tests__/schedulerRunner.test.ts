@@ -78,6 +78,7 @@ const baseState = {
   lastErrorMessage: null,
   consecutiveFailureCount: 0,
   lastAlertSentAt: null as Date | null,
+  pipelineCooldownUntil: null as Date | null,
 };
 
 describe('runScheduledPipeline', () => {
