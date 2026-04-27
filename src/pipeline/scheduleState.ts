@@ -7,6 +7,10 @@ export interface ScheduleState {
   lastSuccessAt: Date | null;
   lastErrorAt: Date | null;
   lastErrorMessage: string | null;
+  /** Incremented on each recorded failure; reset to 0 on success. */
+  consecutiveFailureCount: number;
+  /** When a pipeline alert webhook was last accepted (dedupe / rate limit). */
+  lastAlertSentAt: Date | null;
 }
 
 export interface ShouldRunDecision {
@@ -51,6 +55,14 @@ async function ensureSchema(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await client.query(`
+      ALTER TABLE schedule_state
+      ADD COLUMN IF NOT EXISTS consecutive_failure_count INTEGER NOT NULL DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE schedule_state
+      ADD COLUMN IF NOT EXISTS last_alert_sent_at TIMESTAMPTZ
+    `);
     schemaInitialized = true;
   } finally {
     client.release();
@@ -58,6 +70,8 @@ async function ensureSchema(): Promise<void> {
 }
 
 function toState(row: any): ScheduleState {
+  const rawCount = row.consecutive_failure_count;
+  const count = typeof rawCount === 'number' && Number.isFinite(rawCount) ? rawCount : 0;
   return {
     accountId: row.account_id,
     nextRunAt: new Date(row.next_run_at),
@@ -65,6 +79,8 @@ function toState(row: any): ScheduleState {
     lastSuccessAt: row.last_success_at ? new Date(row.last_success_at) : null,
     lastErrorAt: row.last_error_at ? new Date(row.last_error_at) : null,
     lastErrorMessage: row.last_error_message ?? null,
+    consecutiveFailureCount: count,
+    lastAlertSentAt: row.last_alert_sent_at ? new Date(row.last_alert_sent_at) : null,
   };
 }
 
@@ -138,6 +154,7 @@ export async function recordRunSuccess(accountId: string, now: Date, nextRunAt: 
         next_run_at = $3,
         last_error_at = NULL,
         last_error_message = NULL,
+        consecutive_failure_count = 0,
         updated_at = NOW()
       WHERE account_id = $1
       RETURNING *
@@ -190,6 +207,7 @@ export async function recordRunFailure(
         last_error_at = $2,
         last_error_message = $3,
         next_run_at = $4,
+        consecutive_failure_count = schedule_state.consecutive_failure_count + 1,
         updated_at = NOW()
       WHERE account_id = $1
       RETURNING *
@@ -238,4 +256,35 @@ export async function readScheduleState(accountId: string): Promise<ScheduleStat
   } finally {
     client.release();
   }
+}
+
+/**
+ * Record that an outbound pipeline alert webhook was delivered (for dedupe / cooldown).
+ */
+export async function recordAlertSent(accountId: string, at: Date): Promise<void> {
+  await ensureSchema();
+  const safeAccountId = accountId.replace(/\0/g, '');
+
+  const client = await getPool().connect();
+  try {
+    await client.query(
+      `
+      UPDATE schedule_state
+      SET last_alert_sent_at = $2, updated_at = NOW()
+      WHERE account_id = $1
+      `,
+      [safeAccountId, at.toISOString()]
+    );
+  } finally {
+    client.release();
+  }
+}
+
+/** @internal Test-only reset of module singletons */
+export function __resetScheduleStateForTests(): void {
+  if (pool) {
+    void pool.end().catch(() => undefined);
+  }
+  pool = null;
+  schemaInitialized = false;
 }
