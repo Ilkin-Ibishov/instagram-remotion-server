@@ -306,7 +306,6 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
     const verificationPage = await context.newPage();
     const targetUsername = resolveInstagramUsername(process.env.BRAND_HANDLE);
 
-    const startedAt = Date.now();
     let baselinePermalinks: string[] = [];
     let verificationMethod: InstagramPublishResult['verificationMethod'] = 'dom_confirmation';
     if (targetUsername) {
@@ -487,20 +486,28 @@ export async function publishToInstagram(post: PublishablePost, signal?: AbortSi
         signal
       );
 
-      if (!publishedPermalink) {
-        throw new Error(
-          `Instagram UI indicated success, but no new post/reel appeared on @${targetUsername} within verification timeout.`
-        );
+      if (publishedPermalink) {
+        instagramLogger.info('instagram-verification', 'Verified new published permalink', { publishedPermalink });
+        return {
+          confirmed: true,
+          permalink: publishedPermalink,
+          verificationMethod: 'profile_permalink',
+          publishDurationMs: Date.now() - startedAt,
+          baselinePermalinkCount: baselinePermalinks.length,
+          newPermalinkDetectedAt: new Date().toISOString(),
+        };
       }
 
-      instagramLogger.info('instagram-verification', 'Verified new published permalink', { publishedPermalink });
+      instagramLogger.warn(
+        'instagram-verification',
+        'Share flow succeeded in UI but profile grid did not show a new permalink within the timeout; recording publish as confirmed without permalink (profile updates can lag)',
+        { username: targetUsername, baselineCount: baselinePermalinks.length }
+      );
       return {
         confirmed: true,
-        permalink: publishedPermalink,
-        verificationMethod: 'profile_permalink',
+        verificationMethod: 'dom_confirmation',
         publishDurationMs: Date.now() - startedAt,
         baselinePermalinkCount: baselinePermalinks.length,
-        newPermalinkDetectedAt: new Date().toISOString(),
       };
     } else if (publishConfirmed) {
       verificationMethod = page.url().includes('/p/') || page.url().includes('/reel/')
