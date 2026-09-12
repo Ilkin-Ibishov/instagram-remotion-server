@@ -22,7 +22,8 @@
 
 - **`templateId`:** string
 - **`data`:** `Record<string, any>` (per-template shape; see [templates.md](./templates.md))
-- **`branding`:** `{ accentColor, handle, effects: string[] }`
+- **`branding`:** `{ niche?, accentColor, handle, effects: string[] }`
+  - **`niche`** (optional): One of `psychology-micro`, `history-flash`, `legal-rights-az`, `study-hacks`, `ai-tools-daily`. Controls design tokens (colors, spacing, typography). Falls back to `psychology-micro` if missing or invalid.
 
 ## Local preview (Studio)
 

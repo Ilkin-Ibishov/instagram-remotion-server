@@ -63,7 +63,22 @@ Validation note: `CTA_FINAL.callToAction` is now expected to end with `?` so the
 
 ## Design notes
 
-- Layouts are **fixed 1080×1080** with inline styles; typography often references **Montserrat** (ensure webfonts if rendering off a machine without them — not configured in-repo).
+- Layouts are **fixed 1080×1080** with inline styles; typography uses **Montserrat** (ensure webfonts if rendering off a machine without them — not configured in-repo).
 - Dynamic headline/body fields use shared overflow helpers from `src/templates/textOverflow.ts` for max-width, line-clamp, and ellipsis behavior. Keep new template copy inside these helpers so long real-world headlines do not spill outside the 1080×1080 frame.
 - **HookA** uses **`Img`** for remote images; **ContentVideo** uses **`Video`** for remote video — both require reachable URLs at render time.
 - For MP4 publishing, keep frame 0 visually informative: avoid fully black opening frames and avoid starting all foreground layers at `opacity: 0`.
+
+### Design Token System (v2)
+
+All templates now consume **design tokens** from `src/remotion/designTokens.ts` based on **`branding.niche`**:
+
+- **Supported niches:** `psychology-micro`, `history-flash`, `legal-rights-az`, `study-hacks`, `ai-tools-daily`
+- Each niche has a distinct color palette, background gradient, and accent color.
+- **Safe zones** enforced for 9:16 vertical platforms (TikTok/IG/Shorts):
+  - **Top:** 120px (profile pics, status bars)
+  - **Bottom:** 140px (captions, CTA overlays)
+  - **Sides:** 64px (text margins)
+- **Typography:** Hook size (88px), title (58px), body (36px), caption (24px) — optimized for phone readability.
+- **Motion timings:** Hook duration (~0.6s), transitions (~0.8s), stagger delay (~0.2s) — calibrated for retention.
+- If `branding.niche` is missing or invalid, defaults to `psychology-micro`.
+- See **`DESIGN_SYSTEM.md`** for full token reference and usage guide.
