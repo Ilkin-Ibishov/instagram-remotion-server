@@ -58,8 +58,17 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
     const pastWords = autoKaraoke.filter((word) => frame >= word.endFrame);
 
     // Word entrance animation (scale + opacity)
+    // CRITICAL: First word MUST be visible at frame 0 (thumbnail requirement)
     const getWordScale = (word: KaraokeWord) => {
         const relativeFrame = frame - word.startFrame;
+        // First word (STOP): immediately at full scale at frame 0
+        if (word.startFrame === 0) {
+            return interpolate(relativeFrame, [0, 4], [1.05, 1], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+            });
+        }
+        // Later words: punch entrance
         return interpolate(relativeFrame, [0, 8], [0.92, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
@@ -68,13 +77,24 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
 
     const getWordOpacity = (word: KaraokeWord) => {
         const relativeFrame = frame - word.startFrame;
-        // Fade in fast, stay, fade out
-        if (relativeFrame < 8) {
-            return interpolate(relativeFrame, [0, 8], [0, 1], { extrapolateLeft: 'clamp' });
+        // CRITICAL: First word (STOP) must be VISIBLE at frame 0
+        if (word.startFrame === 0 && relativeFrame >= 0) {
+            // Immediately visible, then fade out at end
+            const exitFrame = word.endFrame - word.startFrame;
+            if (relativeFrame > exitFrame - 10) {
+                return interpolate(relativeFrame, [exitFrame - 10, exitFrame], [1, 0], {
+                    extrapolateRight: 'clamp',
+                });
+            }
+            return 1; // Full opacity at frame 0
+        }
+        // Later words: fade in fast
+        if (relativeFrame < 6) {
+            return interpolate(relativeFrame, [0, 6], [0, 1], { extrapolateLeft: 'clamp' });
         }
         const exitFrame = word.endFrame - word.startFrame;
         if (relativeFrame > exitFrame - 8) {
-            return interpolate(relativeFrame, [exitFrame - 8, exitFrame], [1, 0.3], {
+            return interpolate(relativeFrame, [exitFrame - 8, exitFrame], [1, 0.2], {
                 extrapolateRight: 'clamp',
             });
         }
@@ -125,33 +145,43 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
                 }}
             >
                 {/* ACTIVE WORD(S): Large karaoke-style highlight */}
-                {activeWords.map((word, idx) => (
-                    <div
-                        key={`active-${word.startFrame}-${idx}`}
-                        style={{
-                            fontSize: 72,
-                            fontWeight: 900,
-                            color: '#fff',
-                            textAlign: 'center',
-                            textTransform: 'uppercase',
-                            fontFamily: "'Montserrat', sans-serif",
-                            letterSpacing: '-0.02em',
-                            lineHeight: 1.1,
-                            textShadow: `
-                                0 4px 20px rgba(0,0,0,0.9),
-                                0 0 40px ${tokens.colors.primary}80
-                            `,
-                            transform: `scale(${getWordScale(word)})`,
-                            opacity: getWordOpacity(word),
-                            padding: '12px 24px',
-                            background: `linear-gradient(135deg, ${tokens.colors.primary}20 0%, transparent 100%)`,
-                            borderRadius: 8,
-                            border: `3px solid ${tokens.colors.primary}60`,
-                        }}
-                    >
-                        {word.text}
-                    </div>
-                ))}
+                {activeWords.map((word, idx) => {
+                    // First word (STOP): HOT CONTRARIAN STAMP — red/white punch on cyan dark
+                    const isFirstWord = word.startFrame === 0;
+                    return (
+                        <div
+                            key={`active-${word.startFrame}-${idx}`}
+                            style={{
+                                fontSize: isFirstWord ? 120 : 72, // STOP: huge stamp
+                                fontWeight: 900,
+                                color: isFirstWord ? '#fff' : '#fff',
+                                textAlign: 'center',
+                                textTransform: 'uppercase',
+                                fontFamily: "'Montserrat', sans-serif",
+                                letterSpacing: isFirstWord ? '0.05em' : '-0.02em',
+                                lineHeight: 1.1,
+                                textShadow: isFirstWord 
+                                    ? `0 6px 30px rgba(0,0,0,1), 0 0 60px #ef4444cc` // Red glow for STOP
+                                    : `0 4px 20px rgba(0,0,0,0.9), 0 0 40px ${tokens.colors.primary}80`,
+                                transform: `scale(${getWordScale(word)}) rotate(${isFirstWord ? '-2deg' : '0deg'})`,
+                                opacity: getWordOpacity(word),
+                                padding: isFirstWord ? '24px 48px' : '12px 24px',
+                                background: isFirstWord
+                                    ? `linear-gradient(135deg, #ef444460 0%, #dc262660 100%)` // Red stamp bg
+                                    : `linear-gradient(135deg, ${tokens.colors.primary}20 0%, transparent 100%)`,
+                                borderRadius: 12,
+                                border: isFirstWord 
+                                    ? `6px solid #ef4444` // Red border for STOP stamp
+                                    : `3px solid ${tokens.colors.primary}60`,
+                                boxShadow: isFirstWord 
+                                    ? `0 8px 40px #ef444480, inset 0 2px 0 rgba(255,255,255,0.3)` // Stamp depth
+                                    : 'none',
+                            }}
+                        >
+                            {word.text}
+                        </div>
+                    );
+                })}
 
                 {/* UPCOMING WORD: Subtle preview */}
                 {upcomingWord && activeWords.length === 0 && (
