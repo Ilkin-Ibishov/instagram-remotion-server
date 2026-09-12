@@ -16,7 +16,8 @@
         "posts:report": "tsx scripts/publishedPostsReport.ts",
         "bot:render": "tsx scripts/renderBotManifest.ts",
         "bot:test-multi": "tsx scripts/testMultiNiche.ts",
-        "bot:render-voice": "tsx scripts/botRenderVoice.ts"
+        "bot:render-voice": "tsx scripts/botRenderVoice.ts",
+        "mcp:serve": "tsx src/mcp/server.ts"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",

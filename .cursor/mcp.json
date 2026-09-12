@@ -1,5 +1,10 @@
 {
   "mcpServers": {
+    "instagram-platform": {
+      "command": "npm",
+      "args": ["run", "mcp:serve"],
+      "cwd": "/workspace"
+    },
     "Railway": {
       "command": "npx",
       "args": ["-y", "@railway/mcp-server"]

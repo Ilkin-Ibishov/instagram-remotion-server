@@ -1,6 +1,38 @@
 # Content Pipeline Map
 
-This document maps the auto content pipeline for the instagram-remotion-server project.
+This document maps the content pipeline architecture including bot-manifest intake, MCP platform layer, and multi-platform publishing.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     SPECIALIST BOTS                              │
+│  (Publisher bots, Growth analysts, Niche-voice content engines) │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     MCP PLATFORM SERVER                          │
+│              (src/mcp/server.ts - stdio transport)              │
+│                                                                   │
+│  Tools:                                                          │
+│  - render_niche_voice  → Remotion render pipeline               │
+│  - publish_post        → Platform adapters                      │
+│  - get_post_metrics    → Metrics store + scrape hooks           │
+│  - list_published_posts → Postgres analytics                    │
+│  - list_niches         → Niche registry                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  Instagram   │  │   TikTok     │  │ YouTube      │
+    │  Adapter     │  │   Adapter    │  │ Shorts       │
+    │              │  │   (stub)     │  │ Adapter      │
+    │  ✅ Publish  │  │   ⏳ Phase 2 │  │ (stub)       │
+    │  ✅ Metrics  │  │              │  │ ⏳ Phase 2   │
+    └──────────────┘  └──────────────┘  └──────────────┘
+```
 
 ## Current Pipeline (Gemini-based)
 
@@ -70,7 +102,7 @@ This document maps the auto content pipeline for the instagram-remotion-server p
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## New Bot Intake Path (Gemini-free)
+## Bot Manifest Intake Path (Gemini-free)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -93,7 +125,8 @@ This document maps the auto content pipeline for the instagram-remotion-server p
 │  Intake methods:                                                   │
 │    1. POST /api/bot-render (HTTP endpoint)                        │
 │    2. CLI: npm run bot:render <manifest.json>                     │
-│    3. Programmatic: processBotIntake(payload)                     │
+│    3. MCP: render_niche_voice tool                                │
+│    4. Programmatic: processBotIntake(payload)                     │
 │                                                                     │
 │  Validation:                                                       │
 │    • Type checks (manifest structure)                             │
@@ -123,16 +156,85 @@ This document maps the auto content pipeline for the instagram-remotion-server p
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## MCP Platform Layer
+
+The **MCP platform server** (`src/mcp/server.ts`) exposes the render + publish pipeline to external bots via stdio protocol.
+
+### MCP Bot Workflow Example
+
+```
+Bot (e.g., niche-voice agent)
+  │
+  ├─► list_niches()
+  │     └─> [psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily]
+  │
+  ├─► render_niche_voice({ niche: 'psychology-micro', manifest, format: 'mp4' })
+  │     └─> { batchId, renderUrls, mediaPaths }
+  │
+  ├─► publish_post({ platform: 'instagram', mediaPaths, caption, niche })
+  │     └─> { permalink, verificationMethod, publishDurationMs }
+  │
+  └─► list_published_posts({ platform: 'instagram', days: 7 })
+        └─> [{ batchId, permalink, status, ... }]
+```
+
+### Growth Analyst Workflow (via MCP)
+
+```
+Analyst bot
+  │
+  ├─► list_published_posts({ days: 30, limit: 50 })
+  │     └─> [post1, post2, ...]
+  │
+  └─► For each post:
+        get_post_metrics({ platform, permalink })
+          └─> { likes, comments, views, saves, capturedAt }
+              (Phase 1: metrics from DB, live scraping Phase 2)
+```
+
+### MCP Tools
+
+| Tool | Purpose | Status |
+|------|---------|--------|
+| `render_niche_voice` | Render niche-branded content | ✅ Production |
+| `publish_post` | Publish to Instagram/TikTok/YouTube | ✅ IG only (Phase 1) |
+| `get_post_metrics` | Fetch engagement metrics | ⚠️ Store only (Phase 1) |
+| `list_published_posts` | Query recent posts | ✅ Production |
+| `list_niches` | List available niches | ✅ Production |
+
+### Platform Adapter Status
+
+| Platform | Publish | Metrics | Format | Status |
+|----------|---------|---------|--------|--------|
+| Instagram | ✅ | ⚠️ Store | 1080×1080 | Production |
+| TikTok | ❌ | ❌ | 1080×1920 | Phase 2 (stub) |
+| YouTube Shorts | ❌ | ❌ | 1080×1920 | Phase 2 (stub) |
+
+## Niche System (LOCKED)
+
+**5 locked niches** (do not invent new ones):
+
+1. `psychology-micro` — Micro-psychology insights
+2. `history-flash` — Quick history facts
+3. `legal-rights-az` — Legal rights explainers
+4. `study-hacks` — Study tips and productivity
+5. `ai-tools-daily` — AI tool reviews
+
+**Registry:** These map to account profiles and RSS sources. Do not add niches without updating:
+- `src/pipeline/rssSourceRegistry.ts` (RSS feeds per niche)
+- `src/pipeline/accountProfile.ts` (BRAND_NICHE env)
+- `src/mcp/tools/listNiches.ts` (MCP niche list)
+
 ## Key Differences: Bot Path vs Gemini Path
 
-| Aspect | Gemini Path | Bot Path |
-|--------|-------------|----------|
-| Content generation | Gemini 2.5 Flash API | Teammate bots/agents |
-| Input | NewsArticle + AccountProfile | Complete BotProducedManifest |
-| Quality validation | Gemini output → quality gates | Bot manifest → quality gates |
-| Render | ✅ Same Remotion pipeline | ✅ Same Remotion pipeline |
-| Publish | ✅ Same Instagram publisher | ✅ Same Instagram publisher |
-| Dedup tracking | ✅ URL + title fingerprinting | ✅ Optional sourceArticle tracking |
+| Aspect | Gemini Path | Bot Path | MCP Path |
+|--------|-------------|----------|----------|
+| Content generation | Gemini 2.5 Flash API | Teammate bots/agents | External MCP bots |
+| Input | NewsArticle + AccountProfile | Complete BotProducedManifest | Niche + Manifest |
+| Entry point | Scheduled cron | HTTP/CLI/programmatic | MCP stdio tools |
+| Quality validation | Gemini output → gates | Bot manifest → gates | Manifest → gates |
+| Render | ✅ Remotion pipeline | ✅ Remotion pipeline | ✅ Remotion pipeline |
+| Publish | ✅ Instagram Playwright | ✅ Instagram Playwright | ✅ Instagram (+ stubs) |
 
 ## Bot Manifest Contract
 
@@ -147,7 +249,7 @@ See `fixtures/BOT_MANIFEST_GUIDE.md` for complete specification.
       "format": "mp4",
       "globalBranding": {
         "accentColor": "#3B82F6",
-        "handle": "@technewsbot",
+        "handle": "@psychology_micro",
         "effects": ["scanlines", "chromatic"]
       },
       "carousel": [
@@ -165,7 +267,7 @@ See `fixtures/BOT_MANIFEST_GUIDE.md` for complete specification.
 
 ## Integration Points
 
-### 1. Standalone Bot Render (Current Implementation)
+### 1. Standalone Bot Render
 
 ```bash
 # CLI
@@ -175,6 +277,10 @@ npm run bot:render fixtures/bot-manifest-example.json
 curl -X POST http://localhost:3000/api/bot-render \
   -H "Content-Type: application/json" \
   -d @manifest.json
+
+# MCP
+npm run mcp:serve
+# Then call render_niche_voice via MCP host
 ```
 
 ### 2. Pipeline Integration (Future)
@@ -195,72 +301,83 @@ if (process.env.USE_BOT_MANIFESTS === 'true') {
 }
 ```
 
-## Gaps & Next Steps
+## Render Pipeline Details
 
-### Current Gaps
-1. ❌ Bot manifests don't integrate with scheduled pipeline yet
-2. ❌ No bot API endpoint/queue for fetching manifests
-3. ❌ No multi-niche brand config (constraint: don't invent niches)
+### Remotion Composition Flow
 
-### Completed
-1. ✅ Bot manifest type contract defined (`BotProducedManifest`)
-2. ✅ HTTP intake endpoint (`POST /api/bot-render`)
-3. ✅ CLI intake script (`npm run bot:render`)
-4. ✅ Quality validation (same gates as Gemini)
-5. ✅ End-to-end render proof (fixture → MP4 output)
-6. ✅ Comprehensive documentation
-
-### Recommended Next Steps
-1. Create a bot API contract (HTTP/queue) for bots to submit manifests
-2. Wire bot intake into `pipelineRun.ts` with feature flag
-3. Add bot manifest fetch/poll mechanism for scheduled runs
-4. Extend to support multiple account profiles (if configs exist)
-5. Add E2E test: bot manifest → render → publish (dry-run)
-
-## File Reference
-
-| File | Purpose |
-|------|---------|
-| `src/pipeline/botManifestTypes.ts` | Type definitions & JSON schema |
-| `src/pipeline/botManifestService.ts` | Validation & intake processing |
-| `scripts/renderBotManifest.ts` | CLI render script |
-| `server.ts` (lines 13-14, 604-692) | HTTP `/api/bot-render` endpoint |
-| `fixtures/bot-manifest-example.json` | Working example manifest |
-| `fixtures/BOT_MANIFEST_GUIDE.md` | Complete bot manifest specification |
-
-## Testing
-
-### Proof of Render
-```bash
-npm run bot:render fixtures/bot-manifest-example.json
+```
+server.ts (ensureBundle)
+  └─> @remotion/bundler: bundle src/remotion/index.tsx
+       └─> src/remotion/SlideComposition.tsx
+            └─> templateMap[templateId] → template component
+                 └─> src/templates/{HookA,ContentGeneric,CtaFinal,...}.tsx
+                      └─> src/components/EffectsOverlay.tsx (branding.effects)
 ```
 
-**Expected output:**
-- Validation: ✅ Quality score 5/5
-- Render: 4 MP4 files in `/tmp/renders/`
-- Duration: ~3 minutes (bundling + rendering)
+### Render Output
 
-### HTTP Endpoint Test
-```bash
-# Start server
-npm run dev
+```
+/tmp/renders/
+  ├─ render-a1b2c3d4-0.mp4
+  ├─ render-a1b2c3d4-1.mp4
+  └─ render-a1b2c3d4-2.mp4
 
-# In another terminal
-curl -X POST http://localhost:3000/api/bot-render \
-  -H "Content-Type: application/json" \
-  -d @fixtures/bot-manifest-example.json
+Served at:
+  /api/renders/render-a1b2c3d4-0.mp4
+  /api/renders/render-a1b2c3d4-1.mp4
+  /api/renders/render-a1b2c3d4-2.mp4
 ```
 
-## Architecture Decision: Why Separate Bot Path?
+## Deployment
 
-1. **Decoupling:** Bots can iterate on content strategy independently of Remotion/publish infrastructure
-2. **Flexibility:** Different bots can specialize (niche voice, trend scout, fact-check) without changing render code
-3. **Reliability:** Removes Gemini API as a single point of failure for content generation
-4. **Testability:** Bot manifests can be validated/rendered without API keys or rate limits
-5. **Cost:** Shifts content generation work to teammate bots (potentially cheaper/faster)
+### HTTP Server (Existing)
 
-## Success Criteria (Met ✅)
+```
+Railway → Express server (server.ts)
+  - POST /api/render
+  - POST /api/bot-render (bot manifest intake)
+  - POST /api/schedule/run (cron trigger)
+  - GET /api/renders/:filename (static serve)
+```
 
-- ✅ PR open with working intake for bot-produced manifests (no Gemini dependency for content)
-- ✅ Fixture/sample manifest + clear prove-render steps
-- ✅ Pipeline map in the PR description
+### MCP Server (New)
+
+```
+MCP host (Claude Desktop, n8n, automation) → stdio
+  └─> tsx src/mcp/server.ts
+       └─> Reads same .env, DATABASE_URL, storage.json
+       └─> Shares RENDER_DIR with HTTP server
+```
+
+**Can run side-by-side:** Both servers use same resources (Postgres, Redis, Remotion).
+
+## File References
+
+| Layer | Files |
+|-------|-------|
+| MCP server | `src/mcp/server.ts` |
+| MCP tools | `src/mcp/tools/*.ts` |
+| Platform adapters | `src/mcp/adapters/{instagram,tiktok,youtube}.ts` |
+| Bot manifest types | `src/pipeline/botManifestTypes.ts` |
+| Bot manifest service | `src/pipeline/botManifestService.ts` |
+| Bot render script | `scripts/renderBotManifest.ts` |
+| Render pipeline | `server.ts`, `src/remotion/`, `src/templates/` |
+| Instagram automation | `src/automation/instagramPublisher.ts` |
+| Metrics store | `src/pipeline/publishedPostStore.ts` |
+| Scheduled pipeline | `src/pipelineRun.ts`, `src/pipeline/{rssService,aiService,newsFiltering}.ts` |
+
+## Phase 2 Roadmap
+
+- [ ] 9:16 vertical templates for TikTok/Shorts/Reels
+- [ ] TikTok Playwright automation
+- [ ] YouTube Data API v3 upload
+- [ ] Live metrics scraping (Instagram Graph API or Playwright)
+- [ ] Per-niche session management
+- [ ] Wire bot manifests into scheduled pipeline with feature flag
+
+## Related Documentation
+
+- MCP platform architecture: [context/mcp-platform.md](./context/mcp-platform.md)
+- Bot manifest guide: [fixtures/BOT_MANIFEST_GUIDE.md](./fixtures/BOT_MANIFEST_GUIDE.md)
+- API server and render: [context/api-server.md](./context/api-server.md)
+- Template contracts: [context/templates.md](./context/templates.md)
