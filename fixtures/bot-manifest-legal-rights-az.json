@@ -1,0 +1,58 @@
+{
+  "nicheId": "legal-rights-az",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#0EA5E9",
+        "handle": "@legalrightsaz",
+        "effects": ["scanlines"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "You have the right to remain silent",
+            "subheadline": "And you should use it more than you think",
+            "imageUrl": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_LISTICLE",
+          "data": {
+            "title": "When to Actually Stay Silent",
+            "items": [
+              "Police ask: 'Do you know why I stopped you?'",
+              "'Can I search your car/bag/phone?'",
+              "'Where are you coming from/going?'",
+              "'Had anything to drink tonight?'"
+            ],
+            "footnote": "Source: ACLU Know Your Rights Guide"
+          }
+        },
+        {
+          "templateId": "CONTENT_MYTH_VS_FACT",
+          "data": {
+            "myth": "Only guilty people refuse to answer police questions",
+            "fact": "The Fifth Amendment protects everyone. Innocent people get convicted from misinterpreted statements daily.",
+            "proof": "According to the Innocence Project, false confessions contribute to 29% of wrongful convictions"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Did you know about this right?",
+            "subtext": "Be honest in the comments"
+          }
+        }
+      ]
+    },
+    "caption": "Police officer: 'Do you know why I stopped you?'\n\nYou: 'I'd prefer not to answer questions.'\n\nThat's it.\n\nYou're not being rude.\n\nYou're exercising your Fifth Amendment right.\n\nKnow your rights. Use them.",
+    "hashtags": "#LegalRights #KnowYourRights #CivilRights #FifthAmendment #LegalAdvice #ACLU #YourRights #LawEducation"
+  },
+  "sourceArticle": {
+    "title": "Your Right to Remain Silent: What You Need to Know",
+    "url": "https://example.com/fifth-amendment-rights",
+    "source": "ACLU"
+  }
+}
