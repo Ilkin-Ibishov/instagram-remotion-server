@@ -8,7 +8,7 @@ This document describes the **Model Context Protocol (MCP)** server that exposes
 
 1. **Single entrypoint** for all bot-driven content operations (render, publish, metrics)
 2. **Platform-agnostic interface** supporting Instagram, TikTok, YouTube Shorts
-3. **Niche-aware** rendering using locked account profiles (technology, business, startup, ai, science)
+3. **Niche-aware** rendering using locked account profiles (psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily)
 4. **Metrics read path** for growth analytics and post-performance tracking
 5. **Stable error contracts** for unimplemented platforms (no silent failures)
 
@@ -31,7 +31,7 @@ Render content for a specific niche using account branding.
 **Input:**
 ```typescript
 {
-  niche: 'technology' | 'business' | 'startup' | 'ai' | 'science',
+  niche: 'psychology-micro' | 'history-flash' | 'legal-rights-az' | 'study-hacks' | 'ai-tools-daily',
   manifest: CarouselManifest,  // globalBranding + carousel[]
   format?: 'png' | 'mp4'       // Default: 'mp4'
 }
@@ -180,14 +180,14 @@ List available account niches.
 {
   success: boolean,
   niches: Array<{
-    id: string,              // 'technology', 'business', etc.
-    displayName: string,     // 'Technology', 'Business'
+    id: string,              // 'psychology-micro', 'history-flash', etc.
+    displayName: string,     // 'Psychology Micro', 'History Flash'
     platforms: string[]      // ['instagram'] (Phase 1)
   }>
 }
 ```
 
-**Implementation:** Returns hardcoded 5 niches from `src/pipeline/rssSourceRegistry.ts` (technology, business, startup, ai, science). Phase 2 can load from dynamic niche config or multi-account session registry.
+**Implementation:** Returns hardcoded 5 niches from `src/pipeline/rssSourceRegistry.ts` (psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily). Phase 2 can load from dynamic niche config or multi-account session registry.
 
 ## Bot integration patterns
 

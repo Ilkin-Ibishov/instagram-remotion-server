@@ -7,7 +7,7 @@
 import type { CarouselManifest } from '../pipeline/types';
 
 export type Platform = 'instagram' | 'tiktok' | 'youtube_shorts';
-export type Niche = 'technology' | 'business' | 'startup' | 'ai' | 'science';
+export type Niche = 'psychology-micro' | 'history-flash' | 'legal-rights-az' | 'study-hacks' | 'ai-tools-daily';
 export type RenderFormat = 'png' | 'mp4';
 
 export interface RenderNicheVoiceInput {

@@ -35,7 +35,7 @@ Render niche-branded content via Remotion.
 
 ```typescript
 {
-  niche: 'technology' | 'business' | 'startup' | 'ai' | 'science',
+  niche: 'psychology-micro' | 'history-flash' | 'legal-rights-az' | 'study-hacks' | 'ai-tools-daily',
   manifest: {
     globalBranding: { accentColor, handle, effects },
     carousel: [{ templateId, data }, ...]
@@ -52,7 +52,7 @@ Publish to Instagram/TikTok/YouTube Shorts (Instagram production-ready).
   platform: 'instagram' | 'tiktok' | 'youtube_shorts',
   mediaPaths: ['/tmp/renders/render-abc123-0.mp4', ...],
   caption: 'Post caption with #hashtags',
-  niche: 'technology'
+  niche: 'psychology-micro'
 }
 ```
 
@@ -73,7 +73,7 @@ Query recent posts with filtering.
 ```typescript
 {
   platform?: 'instagram',
-  niche?: 'technology',
+  niche?: 'psychology-micro',
   limit?: 10,
   days?: 7
 }
@@ -134,14 +134,14 @@ Same as main server:
 ```typescript
 // Publisher bot workflow
 const niches = await mcp.call('list_niches');
-// → { niches: [{ id: 'technology', displayName: 'Technology', platforms: ['instagram'] }] }
+// → { niches: [{ id: 'psychology-micro', displayName: 'Psychology Micro', platforms: ['instagram'] }] }
 
 const renderResult = await mcp.call('render_niche_voice', {
-  niche: 'technology',
+  niche: 'psychology-micro',
   manifest: {
-    globalBranding: { accentColor: '#ef4444', handle: '@tech_insights', effects: ['vignette'] },
+    globalBranding: { accentColor: '#ef4444', handle: '@psychology_micro', effects: ['vignette'] },
     carousel: [
-      { templateId: 'HOOK_A', data: { headline: 'Breaking Tech News', subheadline: 'AI reaches new milestone' } },
+      { templateId: 'HOOK_A', data: { headline: 'Mind Hack Alert', subheadline: 'Cognitive bias explained' } },
       { templateId: 'CTA_FINAL', data: { callToAction: 'What do you think?', subtext: 'Follow for more' } }
     ]
   }
@@ -151,8 +151,8 @@ const renderResult = await mcp.call('render_niche_voice', {
 const publishResult = await mcp.call('publish_post', {
   platform: 'instagram',
   mediaPaths: renderResult.mediaPaths,
-  caption: 'Breaking: AI reaches new milestone\n\n#technology #ai #tech',
-  niche: 'technology'
+  caption: 'Mind Hack: Understanding cognitive bias\n\n#psychology #mindfulness #selfimprovement',
+  niche: 'psychology-micro'
 });
 // → { success: true, permalink: 'https://instagram.com/p/xyz', verificationMethod: 'profile_permalink' }
 ```

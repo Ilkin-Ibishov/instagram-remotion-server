@@ -1,10 +1,8 @@
-# Pipeline architecture map
+# Content Pipeline Map
 
-## Overview
+This document maps the content pipeline architecture including bot-manifest intake, MCP platform layer, and multi-platform publishing.
 
-This document visualizes the end-to-end content pipeline and the new **MCP platform layer** for bot-driven multi-platform publishing.
-
-## Architecture layers
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,83 +32,143 @@ This document visualizes the end-to-end content pipeline and the new **MCP platf
     │  ✅ Publish  │  │   ⏳ Phase 2 │  │ (stub)       │
     │  ✅ Metrics  │  │              │  │ ⏳ Phase 2   │
     └──────────────┘  └──────────────┘  └──────────────┘
-              │
-              ▼
-    ┌──────────────────────────────────────────────────┐
-    │        EXISTING INSTAGRAM PIPELINE                │
-    │                                                    │
-    │  Playwright Publisher (src/automation/           │
-    │    instagramPublisher.ts)                        │
-    │  - Session validation (storage.json)             │
-    │  - DOM automation + upload                       │
-    │  - Profile verification (baseline permalink)     │
-    │                                                    │
-    │  Metrics Store (src/pipeline/                    │
-    │    publishedPostStore.ts)                        │
-    │  - Postgres: published_posts, post_events        │
-    │  - Quality scoring, engagement snapshots         │
-    └──────────────────────────────────────────────────┘
 ```
 
-## Existing scheduled pipeline (RSS/GNews → Instagram)
+## Current Pipeline (Gemini-based)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SCHEDULED AUTOMATION                          │
-│            (Railway cron → POST /api/schedule/run)              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   PIPELINE ORCHESTRATION                         │
-│                  (src/pipelineRun.ts)                           │
-│                                                                   │
-│  1. RSS ingestion (rssService.ts)                               │
-│     - Fetch from sources (techcrunch, wired, etc.)              │
-│     - Cache + dedup via Redis                                   │
-│     - Source-health cooldowns                                   │
-│     - Fallback: GNews search if RSS yields no articles          │
-│                                                                   │
-│  2. Article selection (newsFiltering.ts)                        │
-│     - Score by niche keyword relevance                          │
-│     - Dedup vs post history (trigram + URL)                     │
-│     - Recency + quality signals                                 │
-│                                                                   │
-│  3. AI content generation (aiService.ts)                        │
-│     - Gemini 2.5 Flash: article → manifest                      │
-│     - Template sequence + captions                              │
-│     - Niche-aware prompts (account profile)                     │
-│                                                                   │
-│  4. Remotion render (server.ts → POST /api/render)             │
-│     - Bundle Remotion compositions                              │
-│     - Render slides (1080×1080 PNG or MP4)                      │
-│     - Save to RENDER_DIR (/tmp/renders)                         │
-│                                                                   │
-│  5. Instagram publish (instagramPublisher.ts)                   │
-│     - Playwright automation                                     │
-│     - Upload media, caption, share                              │
-│     - Profile verification (detect new permalink)               │
-│                                                                   │
-│  6. Analytics persistence (publishedPostStore.ts)               │
-│     - Record to Postgres (published_posts table)                │
-│     - Quality snapshot, template sequence                       │
-│     - Post events timeline                                      │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│ INGEST                                                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  RSS Feeds (Primary)                                               │
+│    ├─ Fetch from configured feeds                                 │
+│    ├─ Normalize & deduplicate                                     │
+│    └─ Track source health (Redis cooldown)                        │
+│                                                                     │
+│  GNews API (Fallback)                                              │
+│    ├─ Top headlines by category                                   │
+│    ├─ Keyword search fallback                                     │
+│    └─ Redis cache (10min TTL)                                     │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ FILTER & DEDUP                                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  • Score by relevance (account niche/keywords)                    │
+│  • Remove already-posted URLs (normalize URLs first)              │
+│  • Filter out repetitive topics (trigram title matching)          │
+│  • Atomic URL claim (Postgres, prevents race conditions)          │
+│  • Select top-scored article                                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ CONTENT GENERATION (Gemini 2.5 Flash)  ← DEPENDENCY              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Input: NewsArticle + AccountProfile                              │
+│  Output: GeneratedContent                                         │
+│    ├─ manifest (globalBranding + carousel of 3-5 slides)         │
+│    ├─ caption (4-8 lines, Instagram-optimized)                   │
+│    └─ hashtags (8-12 unique tags)                                │
+│                                                                     │
+│  Quality gates: slideCount, template variety, caption length      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ RENDER (Remotion 4)                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  • Bundle Remotion composition (cached)                           │
+│  • Render each slide sequentially (MP4 or PNG)                    │
+│  • Template components: HOOK_A, CONTENT_*, CTA_FINAL              │
+│  • Output: /tmp/renders/render-{batchId}-*.mp4                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ PUBLISH (Instagram via Playwright)                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  • Session validation (expiry check)                              │
+│  • Upload media (single or carousel)                              │
+│  • Add caption + hashtags                                         │
+│  • Verify post published                                          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## MCP platform integration
+## Bot Manifest Intake Path (Gemini-free)
 
-The **MCP platform layer** exposes the same render + publish capabilities to external bots via stdio protocol:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ BOT/AGENT PRODUCES MANIFEST                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Teammate bots (niche voice, trend scout) or Cursor/Grok agents   │
+│  produce complete BotProducedManifest:                            │
+│    ├─ manifest (globalBranding + carousel)                        │
+│    ├─ caption                                                      │
+│    ├─ hashtags                                                     │
+│    └─ optional sourceArticle metadata                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ BOT MANIFEST INTAKE                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Intake methods:                                                   │
+│    1. POST /api/bot-render (HTTP endpoint)                        │
+│    2. CLI: npm run bot:render <manifest.json>                     │
+│    3. MCP: render_niche_voice tool                                │
+│    4. Programmatic: processBotIntake(payload)                     │
+│                                                                     │
+│  Validation:                                                       │
+│    • Type checks (manifest structure)                             │
+│    • Quality gates (same as Gemini: 4/5 minimum)                 │
+│    • Template validation (per-template schemas)                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ RENDER (Remotion 4)  ← SAME AS GEMINI PATH                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  • Bundle Remotion composition (cached)                           │
+│  • Render each slide sequentially (MP4 or PNG)                    │
+│  • Output: /tmp/renders/render-{batchId}-*.mp4                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ PUBLISH (Instagram)  ← SAME AS GEMINI PATH                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  • Session validation                                             │
+│  • Upload media + caption/hashtags                                │
+│  • Verify post published                                          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-### Bot workflow (via MCP)
+## MCP Platform Layer
+
+The **MCP platform server** (`src/mcp/server.ts`) exposes the render + publish pipeline to external bots via stdio protocol.
+
+### MCP Bot Workflow Example
 
 ```
 Bot (e.g., niche-voice agent)
   │
   ├─► list_niches()
-  │     └─> [technology, business, startup, ai, science]
+  │     └─> [psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily]
   │
-  ├─► render_niche_voice({ niche: 'technology', manifest, format: 'mp4' })
+  ├─► render_niche_voice({ niche: 'psychology-micro', manifest, format: 'mp4' })
   │     └─> { batchId, renderUrls, mediaPaths }
   │
   ├─► publish_post({ platform: 'instagram', mediaPaths, caption, niche })
@@ -120,7 +178,7 @@ Bot (e.g., niche-voice agent)
         └─> [{ batchId, permalink, status, ... }]
 ```
 
-### Growth analyst workflow (via MCP)
+### Growth Analyst Workflow (via MCP)
 
 ```
 Analyst bot
@@ -131,26 +189,121 @@ Analyst bot
   └─► For each post:
         get_post_metrics({ platform, permalink })
           └─> { likes, comments, views, saves, capturedAt }
-              (Phase 1: not yet implemented, returns not_available)
+              (Phase 1: metrics from DB, live scraping Phase 2)
 ```
 
-## Render pipeline details
+### MCP Tools
 
-### Entry: POST /api/render
+| Tool | Purpose | Status |
+|------|---------|--------|
+| `render_niche_voice` | Render niche-branded content | ✅ Production |
+| `publish_post` | Publish to Instagram/TikTok/YouTube | ✅ IG only (Phase 1) |
+| `get_post_metrics` | Fetch engagement metrics | ⚠️ Store only (Phase 1) |
+| `list_published_posts` | Query recent posts | ✅ Production |
+| `list_niches` | List available niches | ✅ Production |
 
-```
+### Platform Adapter Status
+
+| Platform | Publish | Metrics | Format | Status |
+|----------|---------|---------|--------|--------|
+| Instagram | ✅ | ⚠️ Store | 1080×1080 | Production |
+| TikTok | ❌ | ❌ | 1080×1920 | Phase 2 (stub) |
+| YouTube Shorts | ❌ | ❌ | 1080×1920 | Phase 2 (stub) |
+
+## Niche System (LOCKED)
+
+**5 locked niches** (do not invent new ones):
+
+1. `psychology-micro` — Micro-psychology insights
+2. `history-flash` — Quick history facts
+3. `legal-rights-az` — Legal rights explainers
+4. `study-hacks` — Study tips and productivity
+5. `ai-tools-daily` — AI tool reviews
+
+**Registry:** These map to account profiles and RSS sources. Do not add niches without updating:
+- `src/pipeline/rssSourceRegistry.ts` (RSS feeds per niche)
+- `src/pipeline/accountProfile.ts` (BRAND_NICHE env)
+- `src/mcp/tools/listNiches.ts` (MCP niche list)
+
+## Key Differences: Bot Path vs Gemini Path
+
+| Aspect | Gemini Path | Bot Path | MCP Path |
+|--------|-------------|----------|----------|
+| Content generation | Gemini 2.5 Flash API | Teammate bots/agents | External MCP bots |
+| Input | NewsArticle + AccountProfile | Complete BotProducedManifest | Niche + Manifest |
+| Entry point | Scheduled cron | HTTP/CLI/programmatic | MCP stdio tools |
+| Quality validation | Gemini output → gates | Bot manifest → gates | Manifest → gates |
+| Render | ✅ Remotion pipeline | ✅ Remotion pipeline | ✅ Remotion pipeline |
+| Publish | ✅ Instagram Playwright | ✅ Instagram Playwright | ✅ Instagram (+ stubs) |
+
+## Bot Manifest Contract
+
+See `fixtures/BOT_MANIFEST_GUIDE.md` for complete specification.
+
+**Minimal example:**
+
+```json
 {
-  globalBranding: { accentColor, handle, effects },
-  carousel: [
-    { templateId: 'HOOK_A', data: { headline, subheadline, imageUrl } },
-    { templateId: 'CONTENT_GENERIC', data: { title, body, highlight } },
-    { templateId: 'CTA_FINAL', data: { callToAction, subtext } }
-  ],
-  format: 'mp4'  // or 'png'
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#3B82F6",
+        "handle": "@psychology_micro",
+        "effects": ["scanlines", "chromatic"]
+      },
+      "carousel": [
+        { "templateId": "HOOK_A", "data": {...} },
+        { "templateId": "CONTENT_GENERIC", "data": {...} },
+        { "templateId": "CTA_FINAL", "data": {...} }
+      ]
+    },
+    "caption": "...",
+    "hashtags": "..."
+  },
+  "sourceArticle": { "title": "...", "url": "..." }
 }
 ```
 
-### Remotion composition flow
+## Integration Points
+
+### 1. Standalone Bot Render
+
+```bash
+# CLI
+npm run bot:render fixtures/bot-manifest-example.json
+
+# HTTP
+curl -X POST http://localhost:3000/api/bot-render \
+  -H "Content-Type: application/json" \
+  -d @manifest.json
+
+# MCP
+npm run mcp:serve
+# Then call render_niche_voice via MCP host
+```
+
+### 2. Pipeline Integration (Future)
+
+To wire bot manifests into the scheduled pipeline (`src/pipelineRun.ts`):
+
+```typescript
+// Replace Gemini generation step
+if (process.env.USE_BOT_MANIFESTS === 'true') {
+  const botManifest = await fetchFromBotAPI(article);
+  const intake = processBotIntake({ manifest: botManifest });
+  if (!intake.valid || !intake.content) {
+    throw new Error('Bot manifest validation failed');
+  }
+  aiData = intake.content; // Skip Gemini, use bot content
+} else {
+  aiData = await generateContent(article, accountProfile);
+}
+```
+
+## Render Pipeline Details
+
+### Remotion Composition Flow
 
 ```
 server.ts (ensureBundle)
@@ -161,7 +314,7 @@ server.ts (ensureBundle)
                       └─> src/components/EffectsOverlay.tsx (branding.effects)
 ```
 
-### Render output
+### Render Output
 
 ```
 /tmp/renders/
@@ -175,134 +328,19 @@ Served at:
   /api/renders/render-a1b2c3d4-2.mp4
 ```
 
-## Platform adapter contract
-
-Each platform (Instagram, TikTok, YouTube Shorts) implements:
-
-```typescript
-interface PlatformAdapter {
-  name: string;
-  supportedFormats: ('square' | 'vertical')[];
-  
-  canPublish(): boolean;
-  publish(post, niche) → { success, permalink, ... }
-  
-  canFetchMetrics(): boolean;
-  getMetrics(identifier) → { likes, comments, views, ... } | null
-  
-  listPosts(opts) → [{ batchId, permalink, ... }]
-}
-```
-
-### Phase 1 status
-
-| Adapter | canPublish | canFetchMetrics | Notes |
-|---------|------------|-----------------|-------|
-| Instagram | ✅ true | ✅ true (store only) | Playwright + session, metrics from DB |
-| TikTok | ❌ false | ❌ false | Returns `notImplemented: true` |
-| YouTube | ❌ false | ❌ false | Returns `notImplemented: true` |
-
-### Phase 2 roadmap
-
-- **9:16 templates:** Add vertical (1080×1920) templates for TikTok/Shorts/Reels
-- **TikTok automation:** Playwright upload flow + session management
-- **YouTube Data API v3:** OAuth + video.insert for Shorts
-- **Live metrics scraping:** Instagram Playwright scrape, TikTok Analytics API, YouTube Analytics API
-
-## Niche system
-
-### Niche sources
-
-- **5 locked niches:** `technology`, `business`, `startup`, `ai`, `science`
-- **Registry:** `src/pipeline/rssSourceRegistry.ts` (RSS sources per niche)
-- **Account profile:** `src/pipeline/accountProfile.ts` (BRAND_NICHE env)
-- **MCP tool:** `list_niches()` returns niche metadata for bot discovery
-
-### Per-niche publishing (Phase 2)
-
-```
-Bot → list_niches() → { id: 'technology', platforms: ['instagram', 'tiktok'] }
-Bot → publish_post({ platform: 'instagram', niche: 'technology', ... })
-      └─> Adapter loads storage_technology.json (per-niche session)
-```
-
-**Phase 1:** Single Instagram account session (`storage.json`), niche param ignored.
-
-## Metrics and analytics
-
-### Published posts store (Postgres)
-
-```
-published_posts
-  ├─ batch_id (unique)
-  ├─ status (selected, generated, rendered, published, failed)
-  ├─ article_title, article_url, article_source
-  ├─ caption, hashtags, template_sequence
-  ├─ quality_snapshot (JSON: slideCount, hashtagCount, hookFingerprint, ...)
-  ├─ instagram_permalink
-  ├─ publish_confirmation (JSON: verificationMethod, publishDurationMs, ...)
-  └─ published_at, created_at
-
-post_events
-  ├─ event_type (article_selected, ai_generated, render_completed, publish_confirmed)
-  ├─ stage (selection, generation, render, publish)
-  └─ payload (JSON)
-
-post_engagement_snapshots (future)
-  ├─ likes, comments, views, saves, shares
-  └─ captured_at
-```
-
-### Metrics read path
-
-```
-MCP Tool: get_post_metrics({ platform, permalink })
-  └─> InstagramAdapter.getMetrics(permalink)
-       └─> (Phase 1) Returns null (live scraping not implemented)
-       └─> (Phase 2) Playwright scrape → { likes, comments, views, saves }
-```
-
-## Security and credentials
-
-### Instagram session
-
-- **File:** `storage.json` (Playwright session state)
-- **Bootstrap:** `INSTAGRAM_SESSION_B64` env (Railway deployment)
-- **Validation:** `validateInstagramSessionExpiry()` checks cookie expiry
-- **Re-auth:** Run `scripts/saveSession.ts` to refresh session
-
-### TikTok/YouTube (Phase 2)
-
-- **TikTok:** Session cookies in env or secure store
-- **YouTube:** OAuth 2.0 refresh token in env or secure store
-
-**Never log credentials.** MCP tools never return session tokens or cookies in responses.
-
-## Error handling
-
-All MCP tools return structured errors:
-
-```json
-{
-  "success": false,
-  "error": "Human-readable message",
-  "errorCode": "NOT_IMPLEMENTED" | "INVALID_NICHE" | "SESSION_EXPIRED" | ...,
-  "notImplemented": true  // For platform stubs
-}
-```
-
 ## Deployment
 
-### HTTP server (existing)
+### HTTP Server (Existing)
 
 ```
 Railway → Express server (server.ts)
   - POST /api/render
+  - POST /api/bot-render (bot manifest intake)
   - POST /api/schedule/run (cron trigger)
   - GET /api/renders/:filename (static serve)
 ```
 
-### MCP server (new)
+### MCP Server (New)
 
 ```
 MCP host (Claude Desktop, n8n, automation) → stdio
@@ -311,23 +349,35 @@ MCP host (Claude Desktop, n8n, automation) → stdio
        └─> Shares RENDER_DIR with HTTP server
 ```
 
-**Can run side-by-side:** Both servers use same resources (Postgres, Redis, Remotion bundle, render cache).
+**Can run side-by-side:** Both servers use same resources (Postgres, Redis, Remotion).
 
-## File references
+## File References
 
 | Layer | Files |
 |-------|-------|
 | MCP server | `src/mcp/server.ts` |
 | MCP tools | `src/mcp/tools/*.ts` |
 | Platform adapters | `src/mcp/adapters/{instagram,tiktok,youtube}.ts` |
+| Bot manifest types | `src/pipeline/botManifestTypes.ts` |
+| Bot manifest service | `src/pipeline/botManifestService.ts` |
+| Bot render script | `scripts/renderBotManifest.ts` |
 | Render pipeline | `server.ts`, `src/remotion/`, `src/templates/` |
 | Instagram automation | `src/automation/instagramPublisher.ts` |
 | Metrics store | `src/pipeline/publishedPostStore.ts` |
 | Scheduled pipeline | `src/pipelineRun.ts`, `src/pipeline/{rssService,aiService,newsFiltering}.ts` |
 
-## Related documentation
+## Phase 2 Roadmap
+
+- [ ] 9:16 vertical templates for TikTok/Shorts/Reels
+- [ ] TikTok Playwright automation
+- [ ] YouTube Data API v3 upload
+- [ ] Live metrics scraping (Instagram Graph API or Playwright)
+- [ ] Per-niche session management
+- [ ] Wire bot manifests into scheduled pipeline with feature flag
+
+## Related Documentation
 
 - MCP platform architecture: [context/mcp-platform.md](./context/mcp-platform.md)
+- Bot manifest guide: [fixtures/BOT_MANIFEST_GUIDE.md](./fixtures/BOT_MANIFEST_GUIDE.md)
 - API server and render: [context/api-server.md](./context/api-server.md)
 - Template contracts: [context/templates.md](./context/templates.md)
-- Instagram publisher: `src/automation/instagramPublisher.ts` (inline docs)

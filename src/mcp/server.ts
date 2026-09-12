@@ -88,7 +88,7 @@ class McpServer {
                   properties: {
                     niche: {
                       type: 'string',
-                      enum: ['technology', 'business', 'startup', 'ai', 'science'],
+                      enum: ['psychology-micro', 'history-flash', 'legal-rights-az', 'study-hacks', 'ai-tools-daily'],
                       description: 'Account niche for branding context',
                     },
                     manifest: {
@@ -218,7 +218,7 @@ class McpServer {
               },
               {
                 name: 'list_niches',
-                description: 'List available account niches with platform support. Returns 5 locked niches: technology, business, startup, ai, science.',
+                description: 'List available account niches with platform support. Returns 5 locked niches: psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily.',
                 inputSchema: {
                   type: 'object',
                   properties: {},

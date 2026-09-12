@@ -7,11 +7,11 @@
 import type { ListNichesOutput, NicheInfo, Niche } from '../types';
 
 const NICHES: Array<{ id: Niche; displayName: string; platforms: string[] }> = [
-  { id: 'technology', displayName: 'Technology', platforms: ['instagram'] },
-  { id: 'business', displayName: 'Business', platforms: ['instagram'] },
-  { id: 'startup', displayName: 'Startup', platforms: ['instagram'] },
-  { id: 'ai', displayName: 'AI', platforms: ['instagram'] },
-  { id: 'science', displayName: 'Science', platforms: ['instagram'] },
+  { id: 'psychology-micro', displayName: 'Psychology Micro', platforms: ['instagram'] },
+  { id: 'history-flash', displayName: 'History Flash', platforms: ['instagram'] },
+  { id: 'legal-rights-az', displayName: 'Legal Rights A-Z', platforms: ['instagram'] },
+  { id: 'study-hacks', displayName: 'Study Hacks', platforms: ['instagram'] },
+  { id: 'ai-tools-daily', displayName: 'AI Tools Daily', platforms: ['instagram'] },
 ];
 
 export async function listNiches(): Promise<ListNichesOutput> {

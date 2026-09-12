@@ -6,7 +6,7 @@
 
 import type { RenderNicheVoiceInput, RenderNicheVoiceOutput, Niche } from '../types';
 
-const VALID_NICHES: Set<Niche> = new Set(['technology', 'business', 'startup', 'ai', 'science']);
+const VALID_NICHES: Set<Niche> = new Set(['psychology-micro', 'history-flash', 'legal-rights-az', 'study-hacks', 'ai-tools-daily']);
 
 export async function renderNicheVoice(input: RenderNicheVoiceInput): Promise<RenderNicheVoiceOutput> {
   try {
