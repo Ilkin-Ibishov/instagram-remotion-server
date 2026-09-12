@@ -2,7 +2,11 @@
 
 ## Overview
 
-The **Editorial Composition** is a cinematic 1080×1350 (4:5 portrait) template system inspired by high-retention editorial design patterns. It features a dramatic image window, thin accent divider, and bold black-slab typography optimized for Instagram/TikTok/Shorts.
+The **Editorial Composition** is a cinematic 1080×1350 (4:5 portrait) template system inspired by high-retention editorial design patterns. It features a dramatic image window, thin accent divider, and bold black-slab typography.
+
+**Aspect ratio:** 1080×1350 (4:5) is optimized for **Instagram Feed posts and carousels**.
+
+**Note:** Instagram Reels, TikTok, and YouTube Shorts require **9:16 (1080×1920)** vertical format. A separate composition for 9:16 editorial templates will be needed for those platforms. This composition focuses on 4:5 Feed content.
 
 ---
 
@@ -162,8 +166,9 @@ All frames are **1080×1350 pixels** (4:5 portrait).
 
 ## Notes
 
-- Original **1080×1080 square** `Slide` composition remains fully functional.
-- Use `EditorialSlide` for Instagram Feed / TikTok portrait formats.
-- Use `Slide` for Instagram Reels / YouTube Shorts 1:1 crops.
+- Original **1080×1080 square** `Slide` composition remains fully functional for 1:1 content.
+- **`EditorialSlide` (1080×1350 / 4:5)** is optimized for **Instagram Feed posts and carousels**.
+- **Instagram Reels / TikTok / YouTube Shorts** require 9:16 (1080×1920) format — a separate composition will be needed for those platforms. Do not use 4:5 editorial for Reels/Shorts.
 - Custom images via `data.imageUrl` always override niche defaults.
 - Headlines should be **3–5 lines** of bold ALL-CAPS text for maximum impact.
+- Micro-label acts as profile/brand tag (evolving.ai style) — use niche handle or short niche name.

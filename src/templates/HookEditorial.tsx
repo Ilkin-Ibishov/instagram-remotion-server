@@ -144,18 +144,20 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                         boxShadow: `0 0 12px ${tokens.colors.primary}80`,
                     }}
                 />
-                {/* Micro-label: centered on divider */}
+                {/* Micro-label: profile/brand tag (evolving.ai style) */}
                 <div
                     style={{
-                        padding: '10px 32px',
-                        fontSize: 13,
+                        padding: '14px 32px',
+                        fontSize: 16,
                         fontWeight: 900,
-                        letterSpacing: '0.16em',
+                        letterSpacing: '0.18em',
                         color: tokens.colors.primary,
                         textTransform: 'uppercase',
                         fontFamily: "'Montserrat', sans-serif",
                         textAlign: 'center',
-                        textShadow: `0 2px 8px rgba(0,0,0,0.9), 0 0 20px ${tokens.colors.primary}40`,
+                        textShadow: `0 3px 12px rgba(0,0,0,1), 0 0 24px ${tokens.colors.primary}60`,
+                        backgroundColor: `${tokens.colors.background}e6`,
+                        backdropFilter: 'blur(4px)',
                     }}
                 >
                     {microLabel}
@@ -202,20 +204,20 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                     ))}
                 </div>
 
-                {/* CTA footer: higher contrast for readability */}
+                {/* CTA footer: larger text, high contrast (İlkin: readable ~18-24px) */}
                 <div
                     style={{
                         position: 'absolute',
-                        bottom: 14,
+                        bottom: 18,
                         left: 32,
-                        fontSize: 12,
+                        fontSize: 20,
                         fontWeight: 900,
-                        letterSpacing: '0.14em',
+                        letterSpacing: '0.16em',
                         color: '#fff',
                         textTransform: 'uppercase',
                         opacity: ctaOpacity,
                         fontFamily: "'Montserrat', sans-serif",
-                        textShadow: `0 2px 6px rgba(0,0,0,0.9), 0 0 16px ${tokens.colors.primary}60`,
+                        textShadow: `0 3px 10px rgba(0,0,0,1), 0 0 20px ${tokens.colors.primary}80`,
                     }}
                 >
                     {cta}
