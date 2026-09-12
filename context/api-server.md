@@ -18,6 +18,45 @@
 - Returns **`200`** with `{ "status": "ok", "bundle": true }` once the bundle is ready.
 - Returns **`503`** with `{ "status": "not_ready", "bundle": false }` before bundle initialization succeeds.
 
+## POST `/api/bot-render`
+
+**Bot manifest intake endpoint:** Accepts bot-produced content manifests and renders them, bypassing Gemini AI generation entirely.
+
+**Content-Type:** `application/json`
+
+### Request body
+
+Bot intake payload (`BotIntakePayload`):
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `manifest` | Yes | `BotProducedManifest`: complete content with `manifest`, `caption`, `hashtags` |
+| `sourceArticle` | No | Optional article metadata for tracking |
+
+See `fixtures/BOT_MANIFEST_GUIDE.md` for complete bot manifest specification.
+
+### Response
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "batchId": "a1b2c3d4",
+  "images": ["/api/renders/render-a1b2c3d4-0.mp4", ...],
+  "caption": "...",
+  "hashtags": "...",
+  "sourceArticle": {...}
+}
+```
+
+**Validation error (400):**
+```json
+{
+  "error": "Bot manifest validation failed",
+  "details": ["caption must be between 40 and 2200 characters", ...]
+}
+```
+
 ## POST `/api/render`
 
 **Content-Type:** `application/json` (large payloads supported via `express.json({ limit: '50mb' })`).
