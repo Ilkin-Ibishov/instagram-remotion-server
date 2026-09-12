@@ -2,38 +2,63 @@
 
 ## Overview
 
-The **Editorial Composition** is a cinematic 1080×1350 (4:5 portrait) template system inspired by high-retention editorial design patterns. It features a dramatic image window, thin accent divider, and bold black-slab typography.
+The **Editorial Composition** system provides cinematic templates inspired by high-retention editorial design patterns with dramatic image windows, thin accent dividers, and bold black-slab typography.
 
-**Aspect ratio:** 1080×1350 (4:5) is optimized for **Instagram Feed posts and carousels**.
+**Two formats available:**
 
-**Note:** Instagram Reels, TikTok, and YouTube Shorts require **9:16 (1080×1920)** vertical format. A separate composition for 9:16 editorial templates will be needed for those platforms. This composition focuses on 4:5 Feed content.
+1. **EditorialSlide (4:5)** — 1080×1350 for **Instagram Feed posts and carousels**
+2. **EditorialReel (9:16)** — 1080×1920 for **Instagram Reels, TikTok, and YouTube Shorts**
 
 ---
 
-## Composition ID
+## Composition IDs
 
-Use composition ID `EditorialSlide` when rendering via Remotion CLI or API.
+### EditorialSlide (4:5 Feed)
+Use composition ID `EditorialSlide` for Instagram Feed posts (1080×1350).
 
 ```bash
-# Example: render a single frame
+# Render single frame
 npx remotion still src/remotion/index.tsx EditorialSlide output.png --props='props.json'
 
-# Example: render video
+# Render video
 npx remotion render src/remotion/index.tsx EditorialSlide output.mp4 --props='props.json'
+```
+
+### EditorialReel (9:16 Reels/Shorts)
+Use composition ID `EditorialReel` for Instagram Reels, TikTok, Shorts (1080×1920).
+
+```bash
+# Render single frame
+npx remotion still src/remotion/index.tsx EditorialReel output.png --props='props.json'
+
+# Render video
+npx remotion render src/remotion/index.tsx EditorialReel output.mp4 --props='props.json'
 ```
 
 ---
 
 ## Available Templates
 
-### `HOOK_EDITORIAL`
+### `HOOK_EDITORIAL` (4:5 Feed)
 
-Cinematic hook template with:
+Cinematic hook template for Feed posts:
 - **Top 70%**: High-quality image with subtle Ken Burns zoom
-- **Thin divider**: Niche-colored accent line (3px)
-- **Micro-label**: Niche handle or custom label in ALL-CAPS
+- **Profile tag**: Straddles divider, sits in image area with dark plate
+- **Thin divider**: Niche-colored accent line (3px) at 70% mark
+- **Handle**: Below divider (e.g., `@mindHacks`)
 - **Bottom 30%**: Solid black slab with bold white ALL-CAPS headline (3–5 lines)
-- **CTA footer**: Small configurable call-to-action (e.g. "SWIPE FOR MORE")
+- **CTA footer**: "SWIPE FOR MORE" or custom (20px)
+
+### `HOOK_EDITORIAL_REEL` (9:16 Reels/Shorts)
+
+Cinematic hook template for Reels/TikTok/Shorts:
+- **Safe zones**: Top ~150px, bottom ~200px for platform UI
+- **Upper ~55%**: High-quality image with subtle Ken Burns zoom
+- **Profile tag**: Straddles divider, sits in image area with dark plate
+- **Thin divider**: Niche-colored accent line (3px) at ~55% mark
+- **Handle**: Below divider (e.g., `@mindHacks`)
+- **Lower ~35%**: Solid black slab with bold white ALL-CAPS headline (3–5 lines)
+- **CTA footer**: "FOLLOW FOR MORE" or custom (18px), respects bottom safe zone
 
 ---
 
@@ -164,11 +189,23 @@ All frames are **1080×1350 pixels** (4:5 portrait).
 
 ---
 
+## Format Selection Guide
+
+| Platform | Composition | Aspect Ratio | Dimensions | Template |
+|----------|-------------|--------------|------------|----------|
+| Instagram Feed | `EditorialSlide` | 4:5 | 1080×1350 | `HOOK_EDITORIAL` |
+| Instagram Carousel | `EditorialSlide` | 4:5 | 1080×1350 | `HOOK_EDITORIAL` |
+| Instagram Reels | `EditorialReel` | 9:16 | 1080×1920 | `HOOK_EDITORIAL_REEL` |
+| TikTok | `EditorialReel` | 9:16 | 1080×1920 | `HOOK_EDITORIAL_REEL` |
+| YouTube Shorts | `EditorialReel` | 9:16 | 1080×1920 | `HOOK_EDITORIAL_REEL` |
+| Square posts | `Slide` | 1:1 | 1080×1080 | `HOOK_A`, etc. |
+
 ## Notes
 
 - Original **1080×1080 square** `Slide` composition remains fully functional for 1:1 content.
-- **`EditorialSlide` (1080×1350 / 4:5)** is optimized for **Instagram Feed posts and carousels**.
-- **Instagram Reels / TikTok / YouTube Shorts** require 9:16 (1080×1920) format — a separate composition will be needed for those platforms. Do not use 4:5 editorial for Reels/Shorts.
+- **Do NOT use 4:5 editorial for Reels/Shorts** — use `EditorialReel` (9:16) instead.
+- **Safe zones** in 9:16 reel template account for TikTok/IG Reels/Shorts platform UI.
 - Custom images via `data.imageUrl` always override niche defaults.
 - Headlines should be **3–5 lines** of bold ALL-CAPS text for maximum impact.
-- Micro-label acts as profile/brand tag (evolving.ai style) — use niche handle or short niche name.
+- Profile tag (micro-label) acts as brand identifier (evolving.ai style) — use niche handle or short niche name.
+- CTA text adapts to format: "SWIPE FOR MORE" for Feed/carousel, "FOLLOW FOR MORE" for Reels/Shorts.

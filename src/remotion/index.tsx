@@ -2,6 +2,7 @@ import React from 'react';
 import { registerRoot, Composition } from 'remotion';
 import { SlideComposition } from './SlideComposition';
 import { EditorialSlideComposition } from './EditorialSlideComposition';
+import { EditorialReelComposition } from './EditorialReelComposition';
 
 const DEFAULT_FPS = 30;
 const DEFAULT_DURATION_SECONDS = 24;
@@ -62,7 +63,7 @@ const RemotionRoot: React.FC = () => {
                 }}
             />
 
-            {/* New 1080×1350 (4:5) editorial composition */}
+            {/* New 1080×1350 (4:5) editorial composition for Instagram Feed */}
             <Composition
                 id="EditorialSlide"
                 component={EditorialSlideComposition}
@@ -76,6 +77,30 @@ const RemotionRoot: React.FC = () => {
                         headline: 'BREAKING\nNEWS\nTODAY',
                         microLabel: 'PSYCHOLOGY',
                         cta: 'SWIPE FOR MORE',
+                    },
+                    branding: {
+                        niche: 'psychology-micro',
+                        accentColor: '#8b5cf6',
+                        handle: '@mindHacks',
+                        effects: [] as string[],
+                    },
+                }}
+            />
+
+            {/* New 1080×1920 (9:16) editorial reel for Instagram Reels / TikTok / Shorts */}
+            <Composition
+                id="EditorialReel"
+                component={EditorialReelComposition}
+                width={1080}
+                height={1920}
+                fps={FPS}
+                durationInFrames={DURATION_IN_FRAMES}
+                defaultProps={{
+                    templateId: 'HOOK_EDITORIAL_REEL',
+                    data: {
+                        headline: 'YOUR BRAIN\nLIES TO YOU\nEVERY DAY',
+                        microLabel: 'PSYCHOLOGY',
+                        cta: 'FOLLOW FOR MORE',
                     },
                     branding: {
                         niche: 'psychology-micro',

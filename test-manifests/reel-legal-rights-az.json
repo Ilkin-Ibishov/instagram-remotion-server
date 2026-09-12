@@ -1,0 +1,15 @@
+{
+  "templateId": "HOOK_EDITORIAL_REEL",
+  "data": {
+    "headline": "BU HAQQI\nBİLMƏSƏNİZ\nİTİRƏRSİNİZ",
+    "microLabel": "HÜQUQLARINIZ",
+    "cta": "İZLƏYİN",
+    "imageUrl": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=90"
+  },
+  "branding": {
+    "niche": "legal-rights-az",
+    "accentColor": "#3b82f6",
+    "handle": "@haqlarınız",
+    "effects": []
+  }
+}
