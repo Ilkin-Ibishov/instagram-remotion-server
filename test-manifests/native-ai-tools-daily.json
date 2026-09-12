@@ -1,0 +1,17 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "THIS AI TOOL",
+      "REPLACED MY",
+      "ENTIRE TEAM"
+    ],
+    "cta": "FOLLOW"
+  },
+  "branding": {
+    "niche": "ai-tools-daily",
+    "accentColor": "#14b8a6",
+    "handle": "@aiToolsDaily",
+    "effects": []
+  }
+}

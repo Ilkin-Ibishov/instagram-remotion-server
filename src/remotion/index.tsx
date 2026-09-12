@@ -3,6 +3,7 @@ import { registerRoot, Composition } from 'remotion';
 import { SlideComposition } from './SlideComposition';
 import { EditorialSlideComposition } from './EditorialSlideComposition';
 import { EditorialReelComposition } from './EditorialReelComposition';
+import { VerticalNativeComposition } from './VerticalNativeComposition';
 
 const DEFAULT_FPS = 30;
 const DEFAULT_DURATION_SECONDS = 24;
@@ -101,6 +102,29 @@ const RemotionRoot: React.FC = () => {
                         headline: 'YOUR BRAIN\nLIES TO YOU\nEVERY DAY',
                         microLabel: 'PSYCHOLOGY',
                         cta: 'FOLLOW FOR MORE',
+                    },
+                    branding: {
+                        niche: 'psychology-micro',
+                        accentColor: '#8b5cf6',
+                        handle: '@mindHacks',
+                        effects: [] as string[],
+                    },
+                }}
+            />
+
+            {/* New 1080×1920 (9:16) vertical native for TikTok / Shorts (motion-first) */}
+            <Composition
+                id="VerticalNative"
+                component={VerticalNativeComposition}
+                width={1080}
+                height={1920}
+                fps={FPS}
+                durationInFrames={DURATION_IN_FRAMES}
+                defaultProps={{
+                    templateId: 'HOOK_VERTICAL_NATIVE',
+                    data: {
+                        hookLines: ['YOUR BRAIN', 'LIES TO YOU', 'EVERY DAY'],
+                        cta: 'FOLLOW',
                     },
                     branding: {
                         niche: 'psychology-micro',

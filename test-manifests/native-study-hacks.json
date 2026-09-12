@@ -1,0 +1,17 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "STUDY LESS",
+      "LEARN MORE",
+      "ACE EXAMS"
+    ],
+    "cta": "FOLLOW"
+  },
+  "branding": {
+    "niche": "study-hacks",
+    "accentColor": "#06b6d4",
+    "handle": "@studySmart",
+    "effects": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "STOP",
+      "REREADING ≠",
+      "STUDYING"
+    ],
+    "karaoke": [
+      { "startFrame": 0, "endFrame": 30, "text": "STOP" },
+      { "startFrame": 30, "endFrame": 90, "text": "REREADING ≠ STUDYING" }
+    ],
+    "cta": "FOLLOW"
+  },
+  "branding": {
+    "niche": "study-hacks",
+    "accentColor": "#06b6d4",
+    "handle": "@studySmart",
+    "effects": []
+  }
+}

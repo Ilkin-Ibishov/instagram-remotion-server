@@ -1,0 +1,17 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "THEY HID",
+      "THIS HISTORY",
+      "FOR DECADES"
+    ],
+    "cta": "FOLLOW"
+  },
+  "branding": {
+    "niche": "history-flash",
+    "accentColor": "#f59e0b",
+    "handle": "@historyFlash",
+    "effects": []
+  }
+}

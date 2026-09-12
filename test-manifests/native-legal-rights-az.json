@@ -1,0 +1,17 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "BU HAQQI",
+      "BİLMƏSƏNİZ",
+      "İTİRƏRSİNİZ"
+    ],
+    "cta": "İZLƏYİN"
+  },
+  "branding": {
+    "niche": "legal-rights-az",
+    "accentColor": "#3b82f6",
+    "handle": "@haqlarınız",
+    "effects": []
+  }
+}

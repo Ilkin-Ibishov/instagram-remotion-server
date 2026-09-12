@@ -1,0 +1,17 @@
+{
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "data": {
+    "hookLines": [
+      "YOUR BRAIN",
+      "LIES TO YOU",
+      "EVERY DAY"
+    ],
+    "cta": "FOLLOW"
+  },
+  "branding": {
+    "niche": "psychology-micro",
+    "accentColor": "#8b5cf6",
+    "handle": "@mindHacks",
+    "effects": []
+  }
+}
