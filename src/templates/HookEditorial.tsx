@@ -41,25 +41,41 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
         extrapolateRight: 'clamp',
     });
 
-    // Micro-label snap in
-    const microLabelY = interpolate(frame, [0, 8], [-12, 0], {
+    // Micro-label + divider: VISIBLE AT FRAME 0 (for Instagram thumbnails)
+    const microLabelY = interpolate(frame, [0, 6], [-3, 0], {
         extrapolateRight: 'clamp',
     });
-    const microLabelOpacity = interpolate(frame, [0, 8], [0, 1], {
+    const microLabelOpacity = interpolate(frame, [0, 6], [0.9, 1], {
+        extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // Headline lines stagger in (3-5 lines)
+    // Headline lines: FIRST LINE VISIBLE AT FRAME 0, rest stagger
     const headlineLines = headline.split('\n').filter(Boolean);
     const getLineOpacity = (lineIndex: number) => {
-        const startFrame = 6 + lineIndex * 3;
+        if (lineIndex === 0) {
+            // First line: visible at frame 0 for thumbnail
+            return interpolate(frame, [0, 4], [0.95, 1], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+            });
+        }
+        // Later lines: stagger in for polish
+        const startFrame = 4 + lineIndex * 3;
         return interpolate(frame, [startFrame, startFrame + 6], [0, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
         });
     };
     const getLineY = (lineIndex: number) => {
-        const startFrame = 6 + lineIndex * 3;
+        if (lineIndex === 0) {
+            // First line: minimal movement
+            return interpolate(frame, [0, 4], [4, 0], {
+                extrapolateRight: 'clamp',
+            });
+        }
+        // Later lines: stagger motion
+        const startFrame = 4 + lineIndex * 3;
         return interpolate(frame, [startFrame, startFrame + 6], [12, 0], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
