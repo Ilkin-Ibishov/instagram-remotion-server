@@ -1,0 +1,33 @@
+{
+  "renderDate": "2026-09-12",
+  "renderTime": "19:16 UTC",
+  "niche": "study-hacks",
+  "composition": "VerticalNative",
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "dimensions": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16"
+  },
+  "duration": "24 seconds",
+  "handle": "@studyhackswithme",
+  "handleChange": "URGENT: Changed from @thestudyhacks to @studyhackswithme per İlkin/publisher confirmation",
+  "sourceCommit": "8339335fc98013721cb08e886ecd7e35f412d120",
+  "sourceManifest": "test-manifests/stop-study-hacks.json",
+  "watermarkVerified": true,
+  "watermarkText": "@STUDYHACKSWITHME",
+  "targetPlatforms": ["TikTok", "YouTube Shorts"],
+  "files": {
+    "video": "vertical-video.mp4",
+    "videoSize": "7.4M",
+    "videoMD5": "6736cf12cb72cb25544cca45b4df96f1",
+    "proofFrameMid": "watermark-frame-12s.png",
+    "proofFrameEnd": "watermark-frame-end.png"
+  },
+  "notes": [
+    "Handle changed from @thestudyhacks to @studyhackswithme",
+    "Re-rendered with corrected handle per publisher request",
+    "Watermark verified in extracted frames at 12s and end of video",
+    "Ready for immediate publisher upload to TikTok/Shorts"
+  ]
+}
