@@ -36,9 +36,10 @@ export interface BotManifestSourceArticle {
 }
 
 /**
- * Complete bot intake payload: manifest + optional source tracking
+ * Complete bot intake payload: manifest + niche + optional source tracking
  */
 export interface BotIntakePayload {
+  nicheId: string; // One of: psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily
   manifest: BotProducedManifest;
   sourceArticle?: BotManifestSourceArticle;
 }

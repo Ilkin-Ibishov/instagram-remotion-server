@@ -609,6 +609,7 @@ app.post('/api/bot-render', async (req, res) => {
 
         serverLogger.info('bot-render-api', 'Bot manifest intake request', {
             requestId,
+            nicheId: payload.nicheId,
             hasSourceArticle: Boolean(payload.sourceArticle),
         });
 
@@ -675,6 +676,7 @@ app.post('/api/bot-render', async (req, res) => {
 
         res.json({
             success: true,
+            nicheId: intake.nicheId,
             batchId: result.batchId,
             images: result.images,
             caption: intake.content.caption,

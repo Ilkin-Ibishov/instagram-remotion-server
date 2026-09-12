@@ -14,7 +14,8 @@
         "test:integration": "vitest run __tests__/integration",
         "clickup:audit": "tsx scripts/clickup-audit.ts",
         "posts:report": "tsx scripts/publishedPostsReport.ts",
-        "bot:render": "tsx scripts/renderBotManifest.ts"
+        "bot:render": "tsx scripts/renderBotManifest.ts",
+        "bot:test-multi": "tsx scripts/testMultiNiche.ts"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",

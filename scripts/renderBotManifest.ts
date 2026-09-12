@@ -107,6 +107,8 @@ async function main() {
 
   // Output results
   console.log('\n✅ Render complete!\n');
+  console.log(`Niche ID: ${intake.nicheId}`);
+  console.log(`Handle: ${intake.content.manifest.globalBranding.handle}`);
   console.log(`Batch ID: ${result.batchId}`);
   console.log(`Duration: ${elapsed}s`);
   console.log(`Media count: ${result.images.length}`);

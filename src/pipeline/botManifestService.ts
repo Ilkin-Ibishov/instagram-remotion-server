@@ -8,6 +8,7 @@
 import type { GeneratedContent } from './types';
 import type { BotProducedManifest, BotIntakePayload } from './botManifestTypes';
 import { scoreGeneratedContentQuality } from './contentGenerator';
+import { isValidNicheId, getNicheBrandProfile, type NicheId } from './nicheConfig';
 import Logger from '../utils/logger';
 
 const logger = new Logger('bot-manifest-service');
@@ -84,23 +85,42 @@ export function validateBotManifest(manifest: BotProducedManifest): {
 }
 
 /**
- * Process a bot intake payload: validate manifest + extract source article
+ * Process a bot intake payload: validate niche + manifest + extract source article
  */
 export function processBotIntake(payload: BotIntakePayload): {
   valid: boolean;
+  nicheId?: NicheId;
   content?: GeneratedContent;
   sourceArticle?: BotIntakePayload['sourceArticle'];
   errors?: string[];
 } {
   logger.info('bot-intake', 'Processing bot-produced manifest', {
+    nicheId: payload.nicheId,
     hasSourceArticle: Boolean(payload.sourceArticle),
     slideCount: payload.manifest?.manifest?.carousel?.length,
   });
 
+  // Validate niche ID
+  if (!payload.nicheId || !isValidNicheId(payload.nicheId)) {
+    logger.error('bot-intake', 'Invalid niche ID', {
+      nicheId: payload.nicheId,
+      validNiches: ['psychology-micro', 'history-flash', 'legal-rights-az', 'study-hacks', 'ai-tools-daily'],
+    });
+    return {
+      valid: false,
+      errors: [`Invalid nicheId: "${payload.nicheId}". Must be one of: psychology-micro, history-flash, legal-rights-az, study-hacks, ai-tools-daily`],
+    };
+  }
+
+  // Get niche brand profile
+  const brandProfile = getNicheBrandProfile(payload.nicheId);
+
+  // Validate manifest structure
   const validation = validateBotManifest(payload.manifest);
   
   if (!validation.valid) {
     logger.error('bot-intake', 'Bot manifest validation failed', {
+      nicheId: payload.nicheId,
       errors: validation.errors,
     });
     return {
@@ -109,19 +129,30 @@ export function processBotIntake(payload: BotIntakePayload): {
     };
   }
 
+  // Merge bot manifest with niche branding
   const content: GeneratedContent = {
-    manifest: payload.manifest.manifest,
+    manifest: {
+      ...payload.manifest.manifest,
+      globalBranding: {
+        accentColor: brandProfile.accentColor,
+        handle: brandProfile.handle,
+        effects: brandProfile.effects,
+      },
+    },
     caption: payload.manifest.caption,
     hashtags: payload.manifest.hashtags,
   };
 
   logger.info('bot-intake', 'Bot manifest validated successfully', {
+    nicheId: payload.nicheId,
+    handle: brandProfile.handle,
     qualityScore: validation.score,
     slideCount: content.manifest.carousel.length,
   });
 
   return {
     valid: true,
+    nicheId: payload.nicheId,
     content,
     sourceArticle: payload.sourceArticle,
   };

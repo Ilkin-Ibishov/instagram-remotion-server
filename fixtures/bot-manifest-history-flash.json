@@ -1,0 +1,58 @@
+{
+  "nicheId": "history-flash",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#D97706",
+        "handle": "@historyflash",
+        "effects": ["chromatic", "vignette"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "The Great Emu War of 1932",
+            "subheadline": "Australia declared war on birds. The birds won.",
+            "imageUrl": "https://images.unsplash.com/photo-1551721434-8b94ddff0e6d?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_GENERIC",
+          "data": {
+            "title": "This Actually Happened",
+            "body": "Australia deployed soldiers with machine guns to cull 20,000 emus destroying farms. The emus split into small groups, outsmarted the military, and survived. The operation was called off.",
+            "highlight": "Final score: Emus 1, Australia 0"
+          }
+        },
+        {
+          "templateId": "CONTENT_LISTICLE",
+          "data": {
+            "title": "Why the Emus Won",
+            "items": [
+              "Emus can run 30 mph and zigzag",
+              "Machine guns overheated constantly",
+              "Birds split into guerrilla groups",
+              "Military gave up after 1 month"
+            ],
+            "footnote": "Source: Australian National Archives"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Know any wilder historical events?",
+            "subtext": "Drop them below"
+          }
+        }
+      ]
+    },
+    "caption": "Australia went to war with emus in 1932.\n\nThey lost.\n\nSeriously.\n\nThe military fired 10,000 rounds and killed maybe 50 birds.\n\nThe emus outsmarted them and won.\n\nNature: 1, Humans: 0",
+    "hashtags": "#History #WeirdHistory #Australia #HistoricalFacts #TrueStory #HistoryLessons #FunFacts #DidYouKnow"
+  },
+  "sourceArticle": {
+    "title": "The Great Emu War: When Australia Lost to Birds",
+    "url": "https://example.com/great-emu-war",
+    "source": "Smithsonian Magazine"
+  }
+}

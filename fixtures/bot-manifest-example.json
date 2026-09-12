@@ -1,10 +1,11 @@
 {
+  "nicheId": "ai-tools-daily",
   "manifest": {
     "manifest": {
       "format": "mp4",
       "globalBranding": {
         "accentColor": "#3B82F6",
-        "handle": "@technewsbot",
+        "handle": "@aitoolsdaily",
         "effects": ["scanlines", "chromatic"]
       },
       "carousel": [

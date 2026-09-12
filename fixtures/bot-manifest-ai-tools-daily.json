@@ -1,0 +1,58 @@
+{
+  "nicheId": "ai-tools-daily",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#3B82F6",
+        "handle": "@aitoolsdaily",
+        "effects": ["scanlines", "chromatic"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "This AI writes your emails in 3 seconds",
+            "subheadline": "And sounds more human than you do",
+            "imageUrl": "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_GENERIC",
+          "data": {
+            "title": "Meet Superhuman AI",
+            "body": "Built into your email. Drafts replies based on context. Learns your writing style. Handles follow-ups automatically. Available in Gmail and Outlook.",
+            "highlight": "Free tier includes 50 AI emails/month"
+          }
+        },
+        {
+          "templateId": "CONTENT_LISTICLE",
+          "data": {
+            "title": "What It Can Do",
+            "items": [
+              "Write meeting follow-ups instantly",
+              "Tone-match your previous emails",
+              "Suggest smart replies",
+              "Auto-schedule with AI parsing"
+            ],
+            "footnote": "Source: Superhuman.com"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Using AI for emails yet?",
+            "subtext": "Share your favorite tool below"
+          }
+        }
+      ]
+    },
+    "caption": "Superhuman AI writes emails for you.\n\nIn 3 seconds.\n\nYour tone. Your style.\n\nNo more 'Hope this email finds you well.'\n\nJust hit tab and it drafts the whole thing.\n\nProductivity level: unlocked.",
+    "hashtags": "#AI #AITools #Productivity #EmailAutomation #TechTools #Superhuman #WorkSmarter #AIProductivity"
+  },
+  "sourceArticle": {
+    "title": "Superhuman Adds AI Email Writing to Premium Plans",
+    "url": "https://example.com/superhuman-ai-email",
+    "source": "TechCrunch"
+  }
+}
