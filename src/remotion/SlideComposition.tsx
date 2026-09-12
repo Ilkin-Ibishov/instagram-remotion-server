@@ -12,6 +12,7 @@ export type SlideProps = {
     templateId: string;
     data: Record<string, any>;
     branding: {
+        niche?: string;
         accentColor: string;
         handle: string;
         effects: string[];
@@ -55,6 +56,7 @@ export const SlideComposition: React.FC<SlideProps> = ({
     }
 
     const safeBranding = {
+        niche: branding?.niche,
         accentColor: branding?.accentColor || '#ef4444',
         handle: branding?.handle || '',
         effects: Array.isArray(branding?.effects) ? branding.effects : [],

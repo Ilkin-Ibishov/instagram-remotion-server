@@ -1,19 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Render proof frames for the design system
- * 
- * Generates still frames from test manifests to demonstrate:
- * - Niche-specific color palettes
- * - Safe zone implementation
- * - Hook frame readability
- * - Typography hierarchy
- * 
- * Usage:
- *   tsx scripts/render-proof-frames.ts
+ * Render proof frames using Remotion CLI (proven to work with --props)
  */
 
-import { bundle } from '@remotion/bundler';
-import { renderStill } from '@remotion/renderer';
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,21 +11,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const COMPOSITION_ID = 'Slide';
-const REMOTION_ENTRY = path.resolve(__dirname, '../src/remotion/index.tsx');
 const OUTPUT_DIR = path.resolve(__dirname, '../proof-frames');
 const TEST_MANIFESTS_DIR = path.resolve(__dirname, '../test-manifests');
-
-interface SlideProps {
-  templateId: string;
-  data: Record<string, any>;
-  branding: {
-    niche?: string;
-    handle: string;
-    accentColor: string;
-    effects: string[];
-  };
-}
 
 interface Manifest {
   global: {
@@ -53,13 +30,7 @@ interface Manifest {
 }
 
 async function renderProofFrames() {
-  console.log('📦 Bundling Remotion project...');
-  const bundleLocation = await bundle({
-    entryPoint: REMOTION_ENTRY,
-    webpackOverride: (config) => config,
-  });
-
-  console.log('✅ Bundle complete:', bundleLocation);
+  console.log('🎨 Rendering proof frames using Remotion CLI...');
   console.log('');
 
   // Ensure output directory exists
@@ -67,7 +38,6 @@ async function renderProofFrames() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  // Render frames for each test manifest
   const manifests = [
     'psychology-micro.json',
     'legal-rights-az.json',
@@ -96,10 +66,10 @@ async function renderProofFrames() {
     console.log(`   Handle: ${manifest.global.branding.handle}`);
     console.log('');
 
-    // Render hook frame (first slide, frame 0 - must be readable immediately)
+    // Render hook frame 0
     if (manifest.carousel.length > 0) {
       const hookSlide = manifest.carousel[0];
-      const hookProps: SlideProps = {
+      const hookProps = {
         templateId: hookSlide.templateId,
         data: hookSlide.data,
         branding: manifest.global.branding,
@@ -108,45 +78,42 @@ async function renderProofFrames() {
       const hookFramePath = path.join(nicheDir, 'hook-frame-0.png');
       console.log(`   → Rendering hook frame (${hookSlide.templateId})...`);
       
-      await renderStill({
-        serveUrl: bundleLocation,
-        composition: {
-          id: COMPOSITION_ID,
-          width: 1080,
-          height: 1080,
-          fps: 30,
-          durationInFrames: 720,
-        },
-        output: hookFramePath,
-        frame: 0,
-        inputProps: hookProps,
-      });
+      try {
+        // Write props to temp file to avoid shell escaping issues
+        const propsFile = path.join(nicheDir, '.props-hook-0.json');
+        fs.writeFileSync(propsFile, JSON.stringify(hookProps));
+        
+        execSync(
+          `npx remotion still src/remotion/index.tsx Slide "${hookFramePath}" --frame=0 --props="${propsFile}"`,
+          { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
+        );
+        fs.unlinkSync(propsFile);
+        console.log(`   ✓ Saved: ${hookFramePath}`);
+      } catch (error: any) {
+        console.error(`   ❌ Failed: ${error.message}`);
+      }
 
-      console.log(`   ✓ Saved: ${hookFramePath}`);
-
-      // Also render hook at frame 18 (fully settled)
+      // Hook frame 18
       const hookSettledPath = path.join(nicheDir, 'hook-frame-18.png');
-      await renderStill({
-        composition: {
-          id: COMPOSITION_ID,
-          width: 1080,
-          height: 1080,
-          fps: 30,
-          durationInFrames: 720,
-        },
-        serveUrl: bundleLocation,
-        output: hookSettledPath,
-        frame: 18,
-        inputProps: hookProps,
-      });
-
-      console.log(`   ✓ Saved: ${hookSettledPath}`);
+      try {
+        const propsFile = path.join(nicheDir, '.props-hook-18.json');
+        fs.writeFileSync(propsFile, JSON.stringify(hookProps));
+        
+        execSync(
+          `npx remotion still src/remotion/index.tsx Slide "${hookSettledPath}" --frame=18 --props="${propsFile}"`,
+          { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
+        );
+        fs.unlinkSync(propsFile);
+        console.log(`   ✓ Saved: ${hookSettledPath}`);
+      } catch (error: any) {
+        console.error(`   ❌ Failed: ${error.message}`);
+      }
     }
 
-    // Render mid-content frame (second slide if available)
+    // Mid frame
     if (manifest.carousel.length > 1) {
       const midSlide = manifest.carousel[1];
-      const midProps: SlideProps = {
+      const midProps = {
         templateId: midSlide.templateId,
         data: midSlide.data,
         branding: manifest.global.branding,
@@ -155,27 +122,25 @@ async function renderProofFrames() {
       const midFramePath = path.join(nicheDir, `mid-${midSlide.templateId}-frame-24.png`);
       console.log(`   → Rendering mid frame (${midSlide.templateId})...`);
       
-      await renderStill({
-        composition: {
-          id: COMPOSITION_ID,
-          width: 1080,
-          height: 1080,
-          fps: 30,
-          durationInFrames: 720,
-        },
-        serveUrl: bundleLocation,
-        output: midFramePath,
-        frame: 24,
-        inputProps: midProps,
-      });
-
-      console.log(`   ✓ Saved: ${midFramePath}`);
+      try {
+        const propsFile = path.join(nicheDir, '.props-mid.json');
+        fs.writeFileSync(propsFile, JSON.stringify(midProps));
+        
+        execSync(
+          `npx remotion still src/remotion/index.tsx Slide "${midFramePath}" --frame=24 --props="${propsFile}"`,
+          { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
+        );
+        fs.unlinkSync(propsFile);
+        console.log(`   ✓ Saved: ${midFramePath}`);
+      } catch (error: any) {
+        console.error(`   ❌ Failed: ${error.message}`);
+      }
     }
 
-    // Render end frame (last slide - typically CTA)
+    // End frame
     if (manifest.carousel.length > 2) {
       const endSlide = manifest.carousel[manifest.carousel.length - 1];
-      const endProps: SlideProps = {
+      const endProps = {
         templateId: endSlide.templateId,
         data: endSlide.data,
         branding: manifest.global.branding,
@@ -184,21 +149,19 @@ async function renderProofFrames() {
       const endFramePath = path.join(nicheDir, `end-${endSlide.templateId}-frame-24.png`);
       console.log(`   → Rendering end frame (${endSlide.templateId})...`);
       
-      await renderStill({
-        composition: {
-          id: COMPOSITION_ID,
-          width: 1080,
-          height: 1080,
-          fps: 30,
-          durationInFrames: 720,
-        },
-        serveUrl: bundleLocation,
-        output: endFramePath,
-        frame: 24,
-        inputProps: endProps,
-      });
-
-      console.log(`   ✓ Saved: ${endFramePath}`);
+      try {
+        const propsFile = path.join(nicheDir, '.props-end.json');
+        fs.writeFileSync(propsFile, JSON.stringify(endProps));
+        
+        execSync(
+          `npx remotion still src/remotion/index.tsx Slide "${endFramePath}" --frame=24 --props="${propsFile}"`,
+          { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
+        );
+        fs.unlinkSync(propsFile);
+        console.log(`   ✓ Saved: ${endFramePath}`);
+      } catch (error: any) {
+        console.error(`   ❌ Failed: ${error.message}`);
+      }
     }
 
     console.log('');
@@ -206,12 +169,6 @@ async function renderProofFrames() {
 
   console.log('✨ All proof frames rendered successfully!');
   console.log(`📁 Output directory: ${OUTPUT_DIR}`);
-  console.log('');
-  console.log('Next steps:');
-  console.log('  1. Review frames in proof-frames/ directory');
-  console.log('  2. Verify hook readability (frame 0)');
-  console.log('  3. Check safe zone compliance');
-  console.log('  4. Confirm niche-specific color palettes');
 }
 
 // Run
