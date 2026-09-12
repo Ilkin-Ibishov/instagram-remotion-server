@@ -76,7 +76,7 @@ export default function ContentGeneric({
                 overflow: 'hidden',
             }}
         >
-            {/* Optional subtle background texture for body content */}
+            {/* Optional background image: stronger presence for mid-slides */}
             {hasBackgroundImage && (
                 <>
                     <div
@@ -86,8 +86,20 @@ export default function ContentGeneric({
                             backgroundImage: `url(${data.backgroundImage})`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
-                            opacity: 0.12,
-                            filter: 'grayscale(60%) blur(2px)',
+                            opacity: 0.35,
+                            filter: 'saturate(0.8) brightness(0.7) blur(1.5px)',
+                        }}
+                    />
+                    {/* Edge vignette + niche tint for readability */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: `
+                                radial-gradient(ellipse at center, transparent 30%, ${tokens.colors.background}90 90%),
+                                linear-gradient(to bottom, ${tokens.colors.primary}10 0%, ${tokens.colors.background}e5 70%)
+                            `,
+                            zIndex: 5,
                         }}
                     />
                 </>
@@ -120,7 +132,7 @@ export default function ContentGeneric({
                     paddingRight: tokens.safeZones.sides,
                 }}
             >
-                {/* Title */}
+                {/* Title with stronger text shadow for readability */}
                 <h2
                     style={{
                         fontSize: tokens.typography.titleSize,
@@ -132,6 +144,11 @@ export default function ContentGeneric({
                         transform: `translateY(${titleY}px)`,
                         opacity: titleOpacity,
                         marginTop: 0,
+                        textShadow: `
+                            0 2px 8px rgba(0,0,0,0.7),
+                            0 4px 12px rgba(0,0,0,0.5),
+                            0 1px 2px rgba(0,0,0,0.9)
+                        `,
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
@@ -153,16 +170,17 @@ export default function ContentGeneric({
                     }}
                 />
 
-                {/* Body */}
+                {/* Body with text shadow for readability */}
                 <p
                     style={{
                         fontSize: tokens.typography.bodySize - 2,
-                        color: tokens.colors.textSecondary,
+                        color: tokens.colors.text,
                         lineHeight: tokens.typography.lineHeight.normal,
                         fontWeight: tokens.typography.weight.medium,
                         margin: 0,
                         transform: `translateY(${bodyY}px)`,
                         opacity: bodyOpacity,
+                        textShadow: `0 2px 6px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,1)`,
                         display: '-webkit-box',
                         WebkitLineClamp: 6,
                         WebkitBoxOrient: 'vertical',
@@ -172,18 +190,20 @@ export default function ContentGeneric({
                     {body}
                 </p>
 
-                {/* Highlight callout */}
+                {/* Highlight callout with stronger styling */}
                 {highlight && (
                     <div
                         style={{
                             marginTop: tokens.spacing.lg,
                             padding: tokens.spacing.md,
                             borderLeft: `5px solid ${tokens.colors.primary}`,
-                            backgroundColor: tokens.colors.surface,
-                            borderRadius: 4,
+                            backgroundColor: `${tokens.colors.background}dd`,
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 6,
                             transform: `translateX(${highlightX}px)`,
                             opacity: highlightOpacity,
                             overflow: 'hidden',
+                            boxShadow: `0 4px 16px ${tokens.colors.background}60`,
                         }}
                     >
                         <p
@@ -194,6 +214,7 @@ export default function ContentGeneric({
                                 color: tokens.colors.text,
                                 margin: 0,
                                 lineHeight: tokens.typography.lineHeight.normal,
+                                textShadow: `0 1px 4px rgba(0,0,0,0.8)`,
                                 display: '-webkit-box',
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: 'vertical',

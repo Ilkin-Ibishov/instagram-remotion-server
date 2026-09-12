@@ -20,58 +20,69 @@ export default function HookA({
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';
 
-    // Niche-specific default background images
+    // Niche-specific default background images (stronger thematic matches)
+    // TODO: Replace with staticFile('backgrounds/{niche}.jpg') for stable bundled renders
     const nicheBackgrounds: Record<string, string> = {
-        'psychology-micro': 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1080&q=80', // Brain/mind abstract
-        'history-flash': 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1080&q=80', // Ancient books/library
-        'legal-rights-az': 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=80', // Justice/law books
-        'study-hacks': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1080&q=80', // Study desk/notes
-        'ai-tools-daily': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&q=80', // AI/tech abstract
+        'psychology-micro': 'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1080&q=85', // Neurons/brain abstract (not creepy)
+        'history-flash': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1080&q=85', // Ancient manuscripts/archive
+        'legal-rights-az': 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=85', // Courthouse/scales abstract
+        'study-hacks': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=85', // Study desk/notes/highlighter
+        'ai-tools-daily': 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1080&q=85', // Circuit board/AI glow
     };
 
     const backgroundImage = data.imageUrl || nicheBackgrounds[niche] || nicheBackgrounds['psychology-micro'];
 
-    // Faster, punchier motion for hook retention (<1s to full visibility)
-    const hookDuration = tokens.motion.hookDuration;
+    // PUNCHIER motion: faster settle (0.4-0.5s = ~12-15 frames @ 30fps)
+    const punchyDuration = 15; // ~0.5s
     
-    const imgScale = interpolate(frame, [0, hookDuration * 1.5], [1.05, 1], {
+    // Ken Burns: more present zoom
+    const imgScale = interpolate(frame, [0, punchyDuration * 1.8], [1.08, 1], {
         extrapolateRight: 'clamp',
     });
-    // More visible backgrounds: 0.45-0.6 opacity range
-    const imgOpacity = interpolate(frame, [0, hookDuration], [0.45, 0.6], {
-        extrapolateRight: 'clamp',
-    });
-
-    // Badge: instant at frame 0, subtle motion
-    const badgeY = interpolate(frame, [0, hookDuration * 0.8], [-6, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const badgeOpacity = interpolate(frame, [0, hookDuration * 0.5], [0.7, 1], {
-        extrapolateLeft: 'clamp',
+    
+    // STRONGER backgrounds: 0.65-0.8 opacity (clearly readable as scene)
+    const imgOpacity = interpolate(frame, [0, punchyDuration * 0.8], [0.65, 0.8], {
         extrapolateRight: 'clamp',
     });
 
-    // Headline: readable immediately, gentle settle
-    const headlineY = interpolate(frame, [0, hookDuration], [8, 0], {
+    // Badge: SNAP entrance (faster, snappier)
+    const badgeY = interpolate(frame, [0, punchyDuration * 0.5], [-4, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const headlineOpacity = interpolate(frame, [0, hookDuration * 0.7], [0.75, 1], {
+    const badgeOpacity = interpolate(frame, [0, punchyDuration * 0.4], [0.85, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const badgeScale = interpolate(frame, [0, punchyDuration * 0.5], [0.96, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const subY = interpolate(frame, [0, hookDuration * 1.2], [6, 0], {
+    // Headline: PUNCHY scale entrance (1.04 → 1)
+    const headlineY = interpolate(frame, [0, punchyDuration], [6, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const subOpacity = interpolate(frame, [0, hookDuration], [0.6, 1], {
+    const headlineOpacity = interpolate(frame, [0, punchyDuration * 0.6], [0.85, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const headlineScale = interpolate(frame, [0, punchyDuration], [1.04, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const brandOpacity = interpolate(frame, [0, hookDuration * 1.5], [0.5, 0.8], {
+    const subY = interpolate(frame, [0, punchyDuration * 1.2], [4, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const subOpacity = interpolate(frame, [0, punchyDuration * 0.8], [0.75, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandOpacity = interpolate(frame, [0, punchyDuration * 1.5], [0.65, 0.9], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -90,7 +101,7 @@ export default function HookA({
                 overflow: 'hidden',
             }}
         >
-            {/* Background image with niche default */}
+            {/* Background image: STRONGER presence (clearly readable scene) */}
             <Img
                 src={backgroundImage}
                 style={{
@@ -99,18 +110,21 @@ export default function HookA({
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    filter: `saturate(0.7) brightness(0.7)`, // Light desaturate, darker for contrast
+                    filter: `saturate(0.85) brightness(0.75)`, // Less filtering = more readable bg
                     transform: `scale(${imgScale})`,
                     opacity: imgOpacity,
                 }}
             />
 
-            {/* Niche-tinted overlay for color wash + strong scrim for text readability */}
+            {/* Niche-tinted overlay + edge vignette for text contrast WITHOUT crushing image */}
             <div
                 style={{
                     position: 'absolute',
                     inset: 0,
-                    background: `linear-gradient(to bottom, ${tokens.colors.primary}15 0%, ${tokens.colors.background}dd 70%)`,
+                    background: `
+                        radial-gradient(ellipse at center, transparent 20%, ${tokens.colors.background}88 85%),
+                        linear-gradient(to bottom, ${tokens.colors.primary}12 0%, ${tokens.colors.background}cc 75%)
+                    `,
                     zIndex: 10,
                 }}
             />
@@ -129,7 +143,7 @@ export default function HookA({
                     maxWidth: 1080 - tokens.safeZones.sides * 2,
                 }}
             >
-                {/* Category badge - niche-specific color */}
+                {/* Category badge - SNAP animation */}
                 <div
                     style={{
                         paddingLeft: tokens.spacing.md,
@@ -140,18 +154,19 @@ export default function HookA({
                         borderWidth: 3,
                         borderStyle: 'solid',
                         borderColor: tokens.colors.primary,
-                        backgroundColor: tokens.colors.surface,
+                        backgroundColor: `${tokens.colors.background}e6`,
                         color: tokens.colors.primary,
-                        transform: `translateY(${badgeY}px)`,
+                        transform: `translateY(${badgeY}px) scale(${badgeScale})`,
                         opacity: badgeOpacity,
-                        borderRadius: 4,
+                        borderRadius: 6,
+                        boxShadow: `0 4px 16px ${tokens.colors.primary}40`,
                     }}
                 >
                     <h2
                         style={{
                             fontSize: tokens.typography.captionSize,
-                            fontWeight: tokens.typography.weight.bold,
-                            letterSpacing: '0.1em',
+                            fontWeight: tokens.typography.weight.black,
+                            letterSpacing: '0.12em',
                             textTransform: 'uppercase',
                             margin: 0,
                         }}
@@ -160,35 +175,55 @@ export default function HookA({
                     </h2>
                 </div>
 
-                {/* Headline - large, instantly readable */}
-                <h1
+                {/* Headline - STRONG text shadows + soft dark plate for readability */}
+                <div
                     style={{
-                        fontSize: tokens.typography.hookSize,
-                        fontWeight: tokens.typography.weight.black,
-                        color: tokens.colors.text,
-                        lineHeight: tokens.typography.lineHeight.tight,
-                        letterSpacing: '-0.02em',
+                        position: 'relative',
                         marginBottom: tokens.spacing.lg,
-                        fontFamily: "'Montserrat', sans-serif",
-                        transform: `translateY(${headlineY}px)`,
-                        opacity: headlineOpacity,
-                        textShadow: '0 2px 12px rgba(0,0,0,0.4)',
-                        ...lineClamp(2),
+                        padding: `${tokens.spacing.md}px ${tokens.spacing.lg}px`,
+                        background: `linear-gradient(135deg, ${tokens.colors.background}95 0%, ${tokens.colors.background}85 100%)`,
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 12,
+                        boxShadow: `0 8px 32px ${tokens.colors.background}80`,
                     }}
                 >
-                    {headline}
-                </h1>
+                    <h1
+                        style={{
+                            fontSize: tokens.typography.hookSize,
+                            fontWeight: tokens.typography.weight.black,
+                            color: tokens.colors.text,
+                            lineHeight: tokens.typography.lineHeight.tight,
+                            letterSpacing: '-0.02em',
+                            margin: 0,
+                            fontFamily: "'Montserrat', sans-serif",
+                            transform: `translateY(${headlineY}px) scale(${headlineScale})`,
+                            opacity: headlineOpacity,
+                            textShadow: `
+                                0 2px 8px rgba(0,0,0,0.8),
+                                0 4px 16px rgba(0,0,0,0.6),
+                                0 1px 2px rgba(0,0,0,0.9)
+                            `,
+                            ...lineClamp(2),
+                        }}
+                    >
+                        {headline}
+                    </h1>
+                </div>
 
-                {/* Subheadline - supporting context */}
+                {/* Subheadline - readable with text shadows */}
                 <p
                     style={{
                         fontSize: tokens.typography.bodySize,
-                        color: tokens.colors.textSecondary,
+                        color: tokens.colors.text,
                         fontWeight: tokens.typography.weight.semibold,
                         lineHeight: tokens.typography.lineHeight.normal,
                         margin: 0,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
+                        textShadow: `
+                            0 2px 8px rgba(0,0,0,0.9),
+                            0 1px 3px rgba(0,0,0,1)
+                        `,
                         ...lineClamp(3),
                     }}
                 >
