@@ -1,0 +1,30 @@
+{
+  "fps": 30,
+  "aspectRatio": "9:16",
+  "durationSec": 30,
+  "format": "faceless-slideshow",
+  "generatedBy": "niche-voice",
+  "date": "2026-09-12",
+  "niche": "study-hacks",
+  "title": "Stop rereading. Do the 8-minute dump.",
+  "topic": "8-minute closed-book brain dump before notes",
+  "voice": {
+    "tone": "older-sibling exam coach for teens",
+    "style": "stop-doing-X → failure mode → 3 steps → try tonight; no aesthetic desk porn",
+    "banned": ["hustle porn", "just grind harder", "aesthetic notes flex"]
+  },
+  "slides": [
+    {"id": "stop", "role": "STOP", "startSec": 0, "durationSec": 3, "headline": "STOP", "body": "Stop rereading your notes like a comfort show.", "karaoke": ["STOP", "rereading ≠ studying"], "visual": {"palette": "hot contrarian", "motif": "big STOP stamp", "cutHint": "punch"}},
+    {"id": "why", "role": "WHY IT FAILS", "startSec": 3, "durationSec": 7, "headline": "Why it fails", "body": "Highlighting everything feels productive. Your brain never has to retrieve — so quiz day hits blank.", "karaoke": ["Why it fails", "feels productive", "quiz day blank"], "visual": {"palette": "red→gray fail cards", "motif": "highlighter scribble wrong", "cutHint": "~2s"}},
+    {"id": "s1", "role": "STEP_1", "startSec": 10, "durationSec": 5, "headline": "1 · Timer: 8 min", "body": "Close the book. Write everything you remember about tomorrow's topic.", "karaoke": ["1 Timer 8 min", "close the book", "write everything"], "visual": {"palette": "bright right-path", "motif": "timer UI + handwriting", "cutHint": "numeral punch"}},
+    {"id": "s2", "role": "STEP_2", "startSec": 15, "durationSec": 4, "headline": "2 · Open & check", "body": "Compare to notes. Mark only the gaps — that's your real study list.", "karaoke": ["2 Open & check", "mark the gaps"], "visual": {"palette": "bright right-path", "motif": "checklist gaps glow", "cutHint": "numeral punch"}},
+    {"id": "s3", "role": "STEP_3", "startSec": 19, "durationSec": 5, "headline": "3 · Study the blanks", "body": "Only then open notes / video — aimed at holes, not the whole chapter.", "karaoke": ["3 Study the blanks", "holes not chapter"], "visual": {"palette": "bright right-path", "motif": "target on blanks", "cutHint": "numeral punch"}},
+    {"id": "cta", "role": "TRY TONIGHT", "startSec": 24, "durationSec": 6, "headline": "Try tonight · 1 chapter", "body": "Comment cooked / not cooked after one dump.", "karaoke": ["Try tonight", "cooked or not"], "visual": {"palette": "end-card teen energy", "motif": "CTA chip", "cutHint": "hold"}}
+  ],
+  "captions": {
+    "instagram": "Stop rereading your notes like a comfort show.\n\nDo the 8-minute closed-book dump:\n1) Timer 8 min — write what you remember\n2) Open notes — mark only gaps\n3) Study the blanks\n\nTry tonight for one chapter. Comment cooked / not cooked.\n\nWhich subject should we adapt this for?\n\nexam rescue · one hack",
+    "tiktok": "stop rereading\n\n8-min closed-book dump > highlighting everything\n\ntry tonight → comment cooked/not cooked",
+    "youtubeShorts": "The 8-minute closed-book dump: retrieve first, then study only the gaps.\n\nTry it for one chapter tonight.",
+    "hashtags": ["studyhacks", "studytok", "examtips", "activeretrieval", "shorts"]
+  }
+}

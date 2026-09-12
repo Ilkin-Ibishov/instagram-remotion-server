@@ -17,6 +17,7 @@
         "bot:render": "tsx scripts/renderBotManifest.ts",
         "bot:test-multi": "tsx scripts/testMultiNiche.ts",
         "bot:render-voice": "tsx scripts/botRenderVoice.ts",
+        "render:vertical": "tsx scripts/renderVerticalNative.ts",
         "mcp:serve": "tsx src/mcp/server.ts"
     },
     "dependencies": {

@@ -2,6 +2,7 @@ import React from 'react';
 import { registerRoot, Composition } from 'remotion';
 import { SlideComposition } from './SlideComposition';
 import { EditorialSlideComposition } from './EditorialSlideComposition';
+import { VerticalNativeComposition } from './VerticalNativeComposition';
 
 const DEFAULT_FPS = 30;
 const DEFAULT_DURATION_SECONDS = 24;
@@ -82,6 +83,34 @@ const RemotionRoot: React.FC = () => {
                         accentColor: '#8b5cf6',
                         handle: '@mindHacks',
                         effects: [] as string[],
+                    },
+                }}
+            />
+
+            {/* New 1080×1920 (9:16) vertical native composition */}
+            <Composition
+                id="VerticalNative"
+                component={VerticalNativeComposition}
+                width={1080}
+                height={1920}
+                fps={FPS}
+                durationInFrames={DURATION_IN_FRAMES}
+                defaultProps={{
+                    slides: [
+                        {
+                            templateId: 'HOOK_A',
+                            data: {
+                                headline: 'STOP',
+                                subheadline: 'Stop rereading your notes like a comfort show.',
+                            },
+                            durationSeconds: 3,
+                        },
+                    ],
+                    branding: {
+                        niche: 'study-hacks',
+                        accentColor: '#06b6d4',
+                        handle: '@studySmart',
+                        effects: ['vignette', 'chromatic'],
                     },
                 }}
             />
