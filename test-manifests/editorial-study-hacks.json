@@ -1,0 +1,15 @@
+{
+  "templateId": "HOOK_EDITORIAL",
+  "data": {
+    "headline": "STUDY LESS\nLEARN MORE\nACE EXAMS",
+    "microLabel": "STUDY SMART",
+    "cta": "SWIPE FOR MORE",
+    "imageUrl": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=90"
+  },
+  "branding": {
+    "niche": "study-hacks",
+    "accentColor": "#06b6d4",
+    "handle": "@studySmart",
+    "effects": []
+  }
+}

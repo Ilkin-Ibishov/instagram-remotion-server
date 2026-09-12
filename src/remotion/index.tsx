@@ -1,6 +1,7 @@
 import React from 'react';
 import { registerRoot, Composition } from 'remotion';
 import { SlideComposition } from './SlideComposition';
+import { EditorialSlideComposition } from './EditorialSlideComposition';
 
 const DEFAULT_FPS = 30;
 const DEFAULT_DURATION_SECONDS = 24;
@@ -39,6 +40,7 @@ const DURATION_IN_FRAMES = parseDurationSeconds() * FPS;
 const RemotionRoot: React.FC = () => {
     return (
         <>
+            {/* Original 1080×1080 square composition */}
             <Composition
                 id="Slide"
                 component={SlideComposition}
@@ -55,6 +57,30 @@ const RemotionRoot: React.FC = () => {
                     branding: {
                         accentColor: '#ef4444',
                         handle: '@theinitial.dev',
+                        effects: [] as string[],
+                    },
+                }}
+            />
+
+            {/* New 1080×1350 (4:5) editorial composition */}
+            <Composition
+                id="EditorialSlide"
+                component={EditorialSlideComposition}
+                width={1080}
+                height={1350}
+                fps={FPS}
+                durationInFrames={DURATION_IN_FRAMES}
+                defaultProps={{
+                    templateId: 'HOOK_EDITORIAL',
+                    data: {
+                        headline: 'BREAKING\nNEWS\nTODAY',
+                        microLabel: 'PSYCHOLOGY',
+                        cta: 'SWIPE FOR MORE',
+                    },
+                    branding: {
+                        niche: 'psychology-micro',
+                        accentColor: '#8b5cf6',
+                        handle: '@mindHacks',
                         effects: [] as string[],
                     },
                 }}

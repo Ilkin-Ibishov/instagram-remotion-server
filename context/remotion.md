@@ -3,13 +3,24 @@
 ## Root entry
 
 - **File:** `src/remotion/index.tsx`
-- Calls **`registerRoot`** with a single **`Composition`**:
+- Calls **`registerRoot`** with two **`Composition`** entries:
+  
+  ### 1. `Slide` (1080×1080 square)
   - **`id`:** `"Slide"` — must stay in sync with `COMPOSITION_ID` in `server.ts`.
   - **`component`:** `SlideComposition`
   - **Dimensions:** 1080×1080
   - **`fps`:** `COMPOSITION_FPS` (default `30`, valid range `1..120`)
   - **`durationInFrames`:** `COMPOSITION_DURATION_SECONDS * COMPOSITION_FPS` (default 720 / 24 seconds)
   - **`defaultProps`:** Example `templateId`, `data`, `branding` for Studio preview
+  
+  ### 2. `EditorialSlide` (1080×1350 portrait / 4:5)
+  - **`id`:** `"EditorialSlide"` — cinematic editorial format
+  - **`component`:** `EditorialSlideComposition`
+  - **Dimensions:** 1080×1350 (4:5 portrait, optimized for Instagram Feed / TikTok)
+  - **`fps`:** Same as `Slide`
+  - **`durationInFrames`:** Same as `Slide`
+  - **Templates:** `HOOK_EDITORIAL` (cinematic image window + black slab typography)
+  - See **`EDITORIAL_COMPOSITION.md`** for full API and usage
 
 ## Slide router
 

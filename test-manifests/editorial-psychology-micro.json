@@ -1,0 +1,15 @@
+{
+  "templateId": "HOOK_EDITORIAL",
+  "data": {
+    "headline": "YOUR BRAIN\nLIES TO YOU\nEVERY DAY",
+    "microLabel": "PSYCHOLOGY",
+    "cta": "SWIPE FOR MORE",
+    "imageUrl": "https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1080&q=90"
+  },
+  "branding": {
+    "niche": "psychology-micro",
+    "accentColor": "#8b5cf6",
+    "handle": "@mindHacks",
+    "effects": []
+  }
+}

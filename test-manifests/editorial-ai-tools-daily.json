@@ -1,0 +1,15 @@
+{
+  "templateId": "HOOK_EDITORIAL",
+  "data": {
+    "headline": "THIS AI TOOL\nREPLACED MY\nENTIRE TEAM",
+    "microLabel": "AI TOOLS",
+    "cta": "SWIPE FOR MORE",
+    "imageUrl": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1080&q=90"
+  },
+  "branding": {
+    "niche": "ai-tools-daily",
+    "accentColor": "#14b8a6",
+    "handle": "@aiToolsDaily",
+    "effects": []
+  }
+}
