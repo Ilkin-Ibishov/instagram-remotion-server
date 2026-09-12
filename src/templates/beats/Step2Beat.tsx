@@ -19,7 +19,7 @@ export const Step2Beat: React.FC<Step2BeatProps> = ({ startFrame, endFrame, capt
         extrapolateRight: 'clamp',
     });
 
-    const checklistOpacity = interpolate(relativeFrame, [10, 25], [0, 1], {
+    const checklistOpacity = interpolate(relativeFrame, [0, 10], [0.9, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });

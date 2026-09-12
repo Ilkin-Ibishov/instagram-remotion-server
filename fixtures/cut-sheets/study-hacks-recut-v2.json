@@ -8,6 +8,7 @@
   "vision": {
     "principle": "each beat is a SCENE with a motif; karaoke is caption support, never the whole frame",
     "subtract": "Drop slow multi-phrase cards that pad to 43s. One visual idea per beat. Hard cuts.",
+    "blankFrameBan": "BAN fade-to-empty. Motif SCENES always on screen for every frame of each beat. NO mid-timeline gradient+watermark alone. Visual elements start at opacity 0.8-0.95 (never 0) for instant presence.",
     "safeZones": {
       "topPx": 150,
       "bottomPx": 220

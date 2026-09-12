@@ -19,12 +19,12 @@ export const Step1Beat: React.FC<Step1BeatProps> = ({ startFrame, endFrame, capt
         extrapolateRight: 'clamp',
     });
 
-    const timerOpacity = interpolate(relativeFrame, [10, 25], [0, 1], {
+    const timerOpacity = interpolate(relativeFrame, [0, 12], [0.9, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const bookOpacity = interpolate(relativeFrame, [25, 40], [0, 1], {
+    const bookOpacity = interpolate(relativeFrame, [8, 20], [0.85, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
