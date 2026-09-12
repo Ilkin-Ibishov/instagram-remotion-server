@@ -1,0 +1,51 @@
+{
+  "format": "mp4",
+  "globalBranding": {
+    "handle": "@psychmicro",
+    "accentColor": "#9333ea",
+    "effects": []
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "headline": "Your Brain is Lying to You About Procrastination",
+        "subheadline": "It's not laziness—it's a protection mechanism gone wrong"
+      }
+    },
+    {
+      "templateId": "CONTENT_GENERIC",
+      "data": {
+        "title": "Why We Procrastinate",
+        "body": "When you procrastinate, your brain is trying to protect you from perceived threats. But modern threats (deadlines, responsibilities) trigger the same fight-or-flight response as ancient dangers. Your amygdala hijacks rational thinking, making 'later' feel safer than 'now'.",
+        "highlight": "Procrastination is emotional regulation, not time management"
+      }
+    },
+    {
+      "templateId": "CONTENT_MYTH_VS_FACT",
+      "data": {
+        "myth": "Procrastinators are just lazy and need more discipline",
+        "fact": "Procrastination is linked to anxiety, perfectionism, and fear of failure—not character flaws",
+        "proof": "Research shows procrastinators have higher activity in the amygdala (emotion center) when facing tasks"
+      }
+    },
+    {
+      "templateId": "CONTENT_STAT_SNAPSHOT",
+      "data": {
+        "kicker": "The Procrastination Epidemic",
+        "stat": "95%",
+        "context": "of college students report procrastinating on academic work regularly",
+        "takeaway": "Nearly everyone struggles with it—you're not broken"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "Ready to understand your mind better?",
+        "subtext": "Follow for psychology insights that actually make sense"
+      }
+    }
+  ],
+  "caption": "Your brain isn't lazy—it's scared. Here's the neuroscience behind procrastination and why 'just do it' advice fails.\n\nProcrastination activates your amygdala (fear center), not your prefrontal cortex (planning center). That's why willpower alone doesn't work.\n\nThe fix? Reduce the emotional threat. Break tasks into tiny steps, forgive past delays, and focus on starting—not finishing.",
+  "hashtags": "#Psychology #Procrastination #MentalHealth #Neuroscience #SelfImprovement #Productivity #BrainScience #MindsetShift"
+}
