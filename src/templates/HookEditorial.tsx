@@ -124,17 +124,43 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                 />
             </div>
 
-            {/* Thin divider + micro-label */}
+            {/* Divider + micro-label: STRADDLES the 70% line, mostly in image area, z-index above slab */}
             <div
                 style={{
                     position: 'absolute',
                     top: '70%',
                     left: 0,
                     width: '100%',
-                    transform: `translateY(${microLabelY}px)`,
+                    transform: `translateY(calc(${microLabelY}px - 60px))`, // Position above the 70% line
                     opacity: microLabelOpacity,
+                    zIndex: 20, // Above black slab
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
                 }}
             >
+                {/* Profile/brand tag: dark plate straddling divider */}
+                <div
+                    style={{
+                        padding: '12px 24px',
+                        marginBottom: 6,
+                        fontSize: 16,
+                        fontWeight: 900,
+                        letterSpacing: '0.18em',
+                        color: tokens.colors.primary,
+                        textTransform: 'uppercase',
+                        fontFamily: "'Montserrat', sans-serif",
+                        textAlign: 'center',
+                        textShadow: `0 3px 12px rgba(0,0,0,1), 0 0 24px ${tokens.colors.primary}60`,
+                        backgroundColor: `${tokens.colors.background}f0`,
+                        backdropFilter: 'blur(6px)',
+                        borderRadius: 4,
+                        boxShadow: `0 4px 16px rgba(0,0,0,0.8)`,
+                    }}
+                >
+                    {microLabel}
+                </div>
+                
                 {/* Thin accent divider */}
                 <div
                     style={{
@@ -144,23 +170,22 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                         boxShadow: `0 0 12px ${tokens.colors.primary}80`,
                     }}
                 />
-                {/* Micro-label: profile/brand tag (evolving.ai style) */}
+                
+                {/* Handle below divider (optional, smaller) */}
                 <div
                     style={{
-                        padding: '14px 32px',
-                        fontSize: 16,
-                        fontWeight: 900,
-                        letterSpacing: '0.18em',
+                        marginTop: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
                         color: tokens.colors.primary,
                         textTransform: 'uppercase',
                         fontFamily: "'Montserrat', sans-serif",
-                        textAlign: 'center',
-                        textShadow: `0 3px 12px rgba(0,0,0,1), 0 0 24px ${tokens.colors.primary}60`,
-                        backgroundColor: `${tokens.colors.background}e6`,
-                        backdropFilter: 'blur(4px)',
+                        textShadow: `0 2px 8px rgba(0,0,0,1)`,
+                        opacity: 0.85,
                     }}
                 >
-                    {microLabel}
+                    {branding.handle}
                 </div>
             </div>
 
@@ -178,6 +203,7 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                     justifyContent: 'center',
                     alignItems: 'flex-start',
                     padding: '0 32px 40px 32px',
+                    zIndex: 10, // Below divider/label (which is zIndex 20)
                 }}
             >
                 {/* Headline: left-aligned ALL-CAPS slab text (consistent grammar) */}
