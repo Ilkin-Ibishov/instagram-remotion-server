@@ -11,9 +11,7 @@ type StopBeatProps = {
 export const StopBeat: React.FC<StopBeatProps> = ({ startFrame, endFrame, captions, tokens }) => {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
-    const relativeFrame = frame - startFrame;
-
-    if (frame < startFrame || frame >= endFrame) return null;
+    const relativeFrame = frame;
 
     const stampRotation = interpolate(relativeFrame, [0, 10], [-2, -2.5], {
         extrapolateLeft: 'clamp',

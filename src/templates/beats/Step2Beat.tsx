@@ -10,9 +10,7 @@ type Step2BeatProps = {
 
 export const Step2Beat: React.FC<Step2BeatProps> = ({ startFrame, endFrame, captions, tokens }) => {
     const frame = useCurrentFrame();
-    const relativeFrame = frame - startFrame;
-
-    if (frame < startFrame || frame >= endFrame) return null;
+    const relativeFrame = frame;
 
     const numeralScale = interpolate(relativeFrame, [0, 10], [0.8, 1], {
         extrapolateLeft: 'clamp',

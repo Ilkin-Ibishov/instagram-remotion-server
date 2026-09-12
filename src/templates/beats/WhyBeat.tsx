@@ -10,9 +10,7 @@ type WhyBeatProps = {
 
 export const WhyBeat: React.FC<WhyBeatProps> = ({ startFrame, endFrame, captions, tokens }) => {
     const frame = useCurrentFrame();
-    const relativeFrame = frame - startFrame;
-
-    if (frame < startFrame || frame >= endFrame) return null;
+    const relativeFrame = frame;
 
     const highlighterOpacity = interpolate(relativeFrame, [0, 15], [0.8, 1], {
         extrapolateLeft: 'clamp',
