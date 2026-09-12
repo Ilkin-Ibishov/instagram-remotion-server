@@ -1,0 +1,44 @@
+{
+  "global": {
+    "branding": {
+      "niche": "history-flash",
+      "handle": "@historyFlash",
+      "accentColor": "#f59e0b",
+      "effects": ["vignette", "halftone"]
+    }
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "badge": "HISTORY",
+        "headline": "The Library of Alexandria",
+        "subheadline": "What really happened to the ancient world's knowledge"
+      }
+    },
+    {
+      "templateId": "CONTENT_MYTH_VS_FACT",
+      "data": {
+        "myth": "Julius Caesar burned down the Library in a single catastrophic fire",
+        "fact": "The Library declined gradually over centuries through multiple incidents",
+        "proof": "Historical records show fires in 48 BCE, 270s CE, and final destruction around 640 CE"
+      }
+    },
+    {
+      "templateId": "CONTENT_STAT_SNAPSHOT",
+      "data": {
+        "kicker": "Lost Knowledge",
+        "stat": "400,000+",
+        "context": "scrolls estimated to have been housed at the Library's peak",
+        "takeaway": "Represented the accumulated knowledge of the ancient Mediterranean world"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "More history facts?",
+        "subtext": "Follow for quick history lessons"
+      }
+    }
+  ]
+}

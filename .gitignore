@@ -16,6 +16,9 @@ logs/*.log.*
 .env.development.local
 
 --- png files ---
+# Exception: proof frames are artifacts that should be committed
+!proof-frames/**/*.png
+
 *.png
 *.jpg
 *.jpeg

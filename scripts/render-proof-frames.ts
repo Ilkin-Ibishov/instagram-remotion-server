@@ -71,6 +71,9 @@ async function renderProofFrames() {
   const manifests = [
     'psychology-micro.json',
     'legal-rights-az.json',
+    'study-hacks.json',
+    'history-flash.json',
+    'ai-tools-daily.json',
   ];
 
   for (const manifestFile of manifests) {
