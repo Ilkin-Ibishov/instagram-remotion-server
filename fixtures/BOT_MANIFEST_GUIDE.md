@@ -335,3 +335,23 @@ import { BOT_MANIFEST_JSON_SCHEMA } from './src/pipeline/botManifestTypes';
 - Template documentation: `context/templates.md`
 - API documentation: `context/api-server.md`
 - Remotion composition: `context/remotion.md`
+
+## Niche-Voice Bot Integration
+
+For content bots using the **niche-voice schema** (faceless slideshow format with slide roles like `MYTH`, `FACT`, `HOOK`, `CTA`), see the [Niche Voice Adapter](./NICHE_VOICE_ADAPTER.md) guide.
+
+The adapter converts niche-voice manifests to the bot intake format described in this guide:
+
+```bash
+# Convert niche-voice JSON to bot intake format
+npm run bot:render-voice fixtures/niche-voice/psychology-micro.json
+
+# Convert and render
+npm run bot:render-voice -- fixtures/niche-voice/psychology-micro.json --render
+```
+
+The adapter handles:
+- Heuristic mapping of slide roles to Remotion template IDs
+- Quality gate enforcement (3-5 slides, 3+ templates, caption/hashtag ranges)
+- Niche-specific branding for locked niches
+

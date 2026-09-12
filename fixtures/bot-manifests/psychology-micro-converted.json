@@ -1,0 +1,59 @@
+{
+  "nicheId": "psychology-micro",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#ef4444",
+        "handle": "@psych.bites",
+        "effects": [
+          "grain",
+          "vignette"
+        ]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "MYTH",
+            "subheadline": "If it's everywhere in my feed… it's happening to everyone.",
+            "imageUrl": null
+          }
+        },
+        {
+          "templateId": "CONTENT_GENERIC",
+          "data": {
+            "title": "Sounds right. Brains love loud.",
+            "body": "One dramatic story sticks. Quiet base rates don't. So your brain upgrades \"I saw it\" into \"it's everywhere.\"",
+            "highlight": ""
+          }
+        },
+        {
+          "templateId": "CONTENT_MYTH_VS_FACT",
+          "data": {
+            "myth": "If it's everywhere in my feed… it's happening to everyone.",
+            "fact": "Repeat a vivid claim → it feels common → people talk → it feels even more common. Frequency in attention ≠ frequency in reality.",
+            "proof": "FACT · availability cascade"
+          }
+        },
+        {
+          "templateId": "CONTENT_GENERIC",
+          "data": {
+            "title": "Catch it today",
+            "body": "Exam rumor: three group chats panic. Base rate? Still one quiz, same week, same curve. Drama traveled. Numbers didn't.",
+            "highlight": ""
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Which myth next?",
+            "subtext": "Save this. Comment the bias you catch yourself using this week."
+          }
+        }
+      ]
+    },
+    "caption": "Myth: if it's all over my feed, it's happening to everyone.\n\nFact: that's an availability cascade — loud stories feel common even when base rates barely moved.\n\nCatch yourself today: drama can travel farther than the numbers.\n\nWhich bias should we bust next? Comment it.\n\nmyth vs fact · bias you used today",
+    "hashtags": "#psychology #cognitivebias #mythvsfact #availabilityheuristic #shorts"
+  }
+}
