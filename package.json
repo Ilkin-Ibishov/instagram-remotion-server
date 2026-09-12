@@ -13,7 +13,8 @@
         "test": "vitest",
         "test:integration": "vitest run __tests__/integration",
         "clickup:audit": "tsx scripts/clickup-audit.ts",
-        "posts:report": "tsx scripts/publishedPostsReport.ts"
+        "posts:report": "tsx scripts/publishedPostsReport.ts",
+        "mcp:serve": "tsx src/mcp/server.ts"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",

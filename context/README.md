@@ -9,6 +9,7 @@ This folder splits project knowledge by **concern** so agents can load only what
 | [remotion.md](./remotion.md) | Composition `Slide`, studio preview, timing (fps/duration) |
 | [templates.md](./templates.md) | `templateId` values, expected `data` shapes, adding slides |
 | [effects.md](./effects.md) | `branding.effects`, overlay stack, z-index |
+| [mcp-platform.md](./mcp-platform.md) | MCP server tools, platform adapters, niche system, bot integration |
 | [development.md](./development.md) | Scripts, tests, TypeScript, environment caveats |
 | [lesson-learned.md](./lesson-learned.md) | Mistakes and corrections (append-only habit for agents) |
 
