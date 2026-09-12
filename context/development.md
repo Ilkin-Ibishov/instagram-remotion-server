@@ -10,6 +10,7 @@
 | `preview` | `npx remotion studio src/remotion/index.tsx` | Remotion Studio (see [remotion.md](./remotion.md)) |
 | `test:integration` | `vitest run __tests__/integration` | Run integration-oriented tests (Railway test auto-skips without env) |
 | `posts:report` | `tsx scripts/publishedPostsReport.ts` | Read-only recent published-post intelligence report |
+| `bot:render` | `tsx scripts/renderBotManifest.ts` | Render a bot-produced manifest (bypasses Gemini) — see `fixtures/BOT_MANIFEST_GUIDE.md` |
 
 ## Tests
 

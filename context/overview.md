@@ -8,6 +8,8 @@ Typical flow: an automation service fetches news or LLM output, builds the manif
 
 Current pipeline behavior is **RSS-first ingestion with GNews fallback** for article sourcing during scheduled runs, including Redis-backed source cooldown guardrails and optional Postgres telemetry persistence for RSS runs.
 
+**Bot manifest intake:** The service now supports bypassing Gemini AI generation via `/api/bot-render` endpoint or CLI (`npm run bot:render`). Teammate bots or Cursor/Grok agents can produce complete content manifests that render directly through the same Remotion pipeline. See `fixtures/BOT_MANIFEST_GUIDE.md` for the bot manifest contract.
+
 ## Tech stack
 
 | Layer | Technology |

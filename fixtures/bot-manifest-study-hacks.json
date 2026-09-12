@@ -1,0 +1,59 @@
+{
+  "nicheId": "study-hacks",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#10B981",
+        "handle": "@studyhacks",
+        "effects": ["grain", "chromatic"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "Stop highlighting",
+            "subheadline": "You're wasting your time and learning nothing",
+            "imageUrl": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_STAT_SNAPSHOT",
+          "data": {
+            "kicker": "Learning Science",
+            "stat": "80%",
+            "context": "Students who highlight retain the same amount as students who just read — around 20% after 24 hours",
+            "takeaway": "Highlighting gives the illusion of work without actual learning"
+          }
+        },
+        {
+          "templateId": "CONTENT_LISTICLE",
+          "data": {
+            "title": "What Actually Works",
+            "items": [
+              "Active recall: Quiz yourself",
+              "Spaced repetition: Review over days",
+              "Feynman technique: Explain it simply",
+              "Interleaving: Mix topics together"
+            ],
+            "footnote": "Source: Cognitive Psychology Research"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Still highlighting your notes?",
+            "subtext": "Try active recall instead"
+          }
+        }
+      ]
+    },
+    "caption": "Highlighting = fake productivity.\n\nYou're not learning.\n\nYou're just coloring.\n\nActive recall beats passive review every time.\n\nQuiz yourself. Struggle. Remember.\n\nThat's how learning works.",
+    "hashtags": "#StudyTips #LearningScience #Productivity #StudentLife #StudyHacks #ActiveRecall #ExamPrep #MemoryTechniques"
+  },
+  "sourceArticle": {
+    "title": "Why Highlighting Doesn't Help You Learn",
+    "url": "https://example.com/highlighting-ineffective",
+    "source": "Journal of Educational Psychology"
+  }
+}

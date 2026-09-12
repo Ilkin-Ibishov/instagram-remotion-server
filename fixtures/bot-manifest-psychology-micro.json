@@ -1,0 +1,54 @@
+{
+  "nicheId": "psychology-micro",
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#8B5CF6",
+        "handle": "@psychmicro",
+        "effects": ["scanlines", "grain"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "You're not lazy",
+            "subheadline": "Your brain just hates uncertainty more than effort",
+            "imageUrl": "https://images.unsplash.com/photo-1516302752625-fcc3c50ae61f?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_STAT_SNAPSHOT",
+          "data": {
+            "kicker": "Cognitive Science",
+            "stat": "73%",
+            "context": "People procrastinate not because they're lazy, but because uncertain outcomes trigger anxiety",
+            "takeaway": "Your brain would rather do nothing than risk doing the wrong thing"
+          }
+        },
+        {
+          "templateId": "CONTENT_MYTH_VS_FACT",
+          "data": {
+            "myth": "Procrastination means you're unmotivated or lazy",
+            "fact": "Procrastination is an emotional regulation problem, not a time management problem",
+            "proof": "Studies show procrastinators often care MORE about the task — the fear of failure paralyzes them"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "What task are you avoiding right now?",
+            "subtext": "Drop it in the comments"
+          }
+        }
+      ]
+    },
+    "caption": "You're not lazy.\n\nYour brain is just trying to protect you from uncertainty.\n\nProcrastination = emotional regulation.\n\nNot a character flaw.\n\nWhat are you avoiding today?",
+    "hashtags": "#Psychology #Procrastination #MentalHealth #CognitiveBias #SelfImprovement #Mindset #BehavioralScience #Productivity"
+  },
+  "sourceArticle": {
+    "title": "The Science Behind Why We Procrastinate",
+    "url": "https://example.com/procrastination-psychology",
+    "source": "Psychology Today"
+  }
+}
