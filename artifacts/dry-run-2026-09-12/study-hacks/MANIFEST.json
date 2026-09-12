@@ -1,0 +1,116 @@
+{
+  "artifact": "study-hacks-vertical-video-recut",
+  "version": "v2",
+  "createdAt": "2026-09-12T20:08:00Z",
+  "composition": {
+    "id": "VerticalBeatScenes",
+    "templateId": "VERTICAL_BEAT_SCENES",
+    "dimensions": "1080x1920",
+    "fps": 30,
+    "durationSec": 28.05
+  },
+  "files": {
+    "video": {
+      "path": "vertical-video-recut.mp4",
+      "size": "1.6M",
+      "md5": "39864e46762b614dd45e22576d9f92cd",
+      "rawUrl": "https://raw.githubusercontent.com/Ilkin-Ibishov/instagram-remotion-server/artifacts/study-hacks-recut-v2-20260912/artifacts/dry-run-2026-09-12/study-hacks/vertical-video-recut.mp4"
+    },
+    "frames": [
+      {
+        "timestamp": "1s",
+        "beat": "stop",
+        "path": "frame-1s.jpg",
+        "size": "87K"
+      },
+      {
+        "timestamp": "4s",
+        "beat": "why",
+        "path": "frame-4s.jpg",
+        "size": "15K"
+      },
+      {
+        "timestamp": "7s",
+        "beat": "why",
+        "path": "frame-7s.jpg",
+        "size": "47K"
+      },
+      {
+        "timestamp": "11s",
+        "beat": "s1",
+        "path": "frame-11s.jpg",
+        "size": "15K"
+      },
+      {
+        "timestamp": "16s",
+        "beat": "s2",
+        "path": "frame-16s.jpg",
+        "size": "15K"
+      },
+      {
+        "timestamp": "20s",
+        "beat": "s3",
+        "path": "frame-20s.jpg",
+        "size": "15K"
+      },
+      {
+        "timestamp": "25s",
+        "beat": "cta",
+        "path": "frame-25s.jpg",
+        "size": "15K"
+      }
+    ]
+  },
+  "beats": [
+    {
+      "id": "stop",
+      "sec": [0, 2.5],
+      "visual": "Giant red STOP stamp with rotation on dark red gradient background",
+      "captions": ["STOP", "rereading ≠ studying"]
+    },
+    {
+      "id": "why",
+      "sec": [2.5, 9],
+      "visual": "Highlighter FAIL motif: yellow mark on notes, X mark, gray-out sequence",
+      "captions": ["feels productive", "quiz day blank"]
+    },
+    {
+      "id": "s1",
+      "sec": [9, 14],
+      "visual": "Big '1' + timer (8:00) + book and handwriting animation",
+      "captions": ["close the book", "write everything"]
+    },
+    {
+      "id": "s2",
+      "sec": [14, 18],
+      "visual": "Checklist with glowing GAP highlights + Big '2'",
+      "captions": ["mark the gaps"]
+    },
+    {
+      "id": "s3",
+      "sec": [18, 23],
+      "visual": "Crosshair target on chapter blank spots + Big '3'",
+      "captions": ["holes not chapter"]
+    },
+    {
+      "id": "cta",
+      "sec": [23, 28],
+      "visual": "End card: 'Try tonight · 1 chapter' + chips (cooked/not cooked) + handle",
+      "captions": ["Try tonight", "cooked or not"]
+    }
+  ],
+  "auditNotes": {
+    "cutSheetSource": "fixtures/cut-sheets/study-hacks-recut-v2.json",
+    "proofGate": "FULL_MP4_PROOF - PASS",
+    "distinctScenes": true,
+    "notKaraokeOnDark": true,
+    "allBeatsHaveMotifs": true,
+    "framesExtracted": 7,
+    "verdict": "SUCCESS - Each beat shows distinct visual motif, not gradient+phrase box"
+  },
+  "branding": {
+    "niche": "study-hacks",
+    "handle": "@studyhackswithme",
+    "accentColor": "#06b6d4"
+  }
+}

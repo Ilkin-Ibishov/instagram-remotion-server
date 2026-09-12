@@ -154,6 +154,44 @@ const RemotionRoot: React.FC = () => {
                     },
                 }}
             />
+
+            {/* New 1080×1920 (9:16) vertical beat scenes for TikTok / Shorts (study-hacks) */}
+            <Composition
+                id="VerticalBeatScenes"
+                component={VerticalNativeComposition}
+                width={1080}
+                height={1920}
+                fps={FPS}
+                calculateMetadata={({ props }) => {
+                    const beats = props.data?.beats || [];
+                    if (beats.length === 0) return { durationInFrames: DURATION_IN_FRAMES, fps: FPS };
+                    const lastBeat = beats[beats.length - 1];
+                    const totalDuration = Math.ceil(lastBeat.sec[1] * FPS);
+                    return {
+                        durationInFrames: totalDuration,
+                        fps: FPS,
+                    };
+                }}
+                defaultProps={{
+                    templateId: 'VERTICAL_BEAT_SCENES',
+                    data: {
+                        beats: [
+                            { id: 'stop', sec: [0, 2.5], captionKaraoke: ['STOP', 'rereading ≠ studying'] },
+                            { id: 'why', sec: [2.5, 9], captionKaraoke: ['feels productive', 'quiz day blank'] },
+                            { id: 's1', sec: [9, 14], captionKaraoke: ['close the book', 'write everything'] },
+                            { id: 's2', sec: [14, 18], captionKaraoke: ['mark the gaps'] },
+                            { id: 's3', sec: [18, 23], captionKaraoke: ['holes not chapter'] },
+                            { id: 'cta', sec: [23, 28], captionKaraoke: ['Try tonight', 'cooked or not'] },
+                        ],
+                    },
+                    branding: {
+                        niche: 'study-hacks',
+                        accentColor: '#06b6d4',
+                        handle: '@studyhackswithme',
+                        effects: [] as string[],
+                    },
+                }}
+            />
         </>
     );
 };

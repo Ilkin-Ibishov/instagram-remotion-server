@@ -1,5 +1,6 @@
 import React from 'react';
 import HookVerticalNative from '../templates/HookVerticalNative';
+import VerticalBeatScenes from '../templates/VerticalBeatScenes';
 import { EffectsOverlay } from '../components/EffectsOverlay';
 
 export type VerticalNativeProps = {
@@ -20,7 +21,7 @@ export const VerticalNativeComposition: React.FC<VerticalNativeProps> = ({
 }) => {
     const templateMap: Record<string, React.FC<{ data: any; branding: any }>> = {
         HOOK_VERTICAL_NATIVE: HookVerticalNative,
-        // Future: BEAT_VERTICAL, etc.
+        VERTICAL_BEAT_SCENES: VerticalBeatScenes,
     };
 
     const Template = templateMap[templateId];

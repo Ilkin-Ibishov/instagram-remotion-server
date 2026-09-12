@@ -1,0 +1,71 @@
+{
+  "niche": "study-hacks",
+  "handle": "@studyhackswithme",
+  "target": "vertical-video",
+  "platforms": ["TikTok", "YouTube Shorts"],
+  "targetDurationSec": 28,
+  "fps": 30,
+  "vision": {
+    "principle": "each beat is a SCENE with a motif; karaoke is caption support, never the whole frame",
+    "subtract": "Drop slow multi-phrase cards that pad to 43s. One visual idea per beat. Hard cuts.",
+    "safeZones": {
+      "topPx": 150,
+      "bottomPx": 220
+    }
+  },
+  "beats": [
+    {
+      "id": "stop",
+      "sec": [0, 2.5],
+      "onScreen": "Giant red STOP stamp fills mid-frame (slight rotate), desk/notebook texture or hot red field behind — NOT empty black",
+      "captionKaraoke": ["STOP", "rereading ≠ studying"],
+      "captionZone": "lower-third",
+      "cut": "punch"
+    },
+    {
+      "id": "why",
+      "sec": [2.5, 9],
+      "onScreen": "Highlighter scribble FAIL motif: yellow highlighter mark over notes graphic, then X / gray-out. Headline 'Why it fails' secondary.",
+      "captionKaraoke": ["feels productive", "quiz day blank"],
+      "captionZone": "lower-third",
+      "cut": "~1.5–2s visual changes inside beat"
+    },
+    {
+      "id": "s1",
+      "sec": [9, 14],
+      "onScreen": "Big '1' + timer UI (8:00) + closed book / blank paper handwriting stroke. Bright right-path palette.",
+      "captionKaraoke": ["close the book", "write everything"],
+      "captionZone": "lower-third",
+      "cut": "numeral punch"
+    },
+    {
+      "id": "s2",
+      "sec": [14, 18],
+      "onScreen": "Checklist with only GAPS glowing; other lines dim. Big '2'.",
+      "captionKaraoke": ["mark the gaps"],
+      "captionZone": "lower-third",
+      "cut": "numeral punch"
+    },
+    {
+      "id": "s3",
+      "sec": [18, 23],
+      "onScreen": "Target/crosshair on blank spots in a chapter graphic. Big '3'. Not whole-chapter stack.",
+      "captionKaraoke": ["holes not chapter"],
+      "captionZone": "lower-third",
+      "cut": "numeral punch"
+    },
+    {
+      "id": "cta",
+      "sec": [23, 28],
+      "onScreen": "End card: 'Try tonight · 1 chapter' + chip 'cooked / not cooked'. Handle @studyhackswithme. Hold energy, not fade-to-black.",
+      "captionKaraoke": ["Try tonight", "cooked or not"],
+      "captionZone": "integrated in card",
+      "cut": "hold"
+    }
+  ],
+  "doNotUse": {
+    "composition": "VerticalNative / HOOK_VERTICAL_NATIVE as sole scene",
+    "pattern": "one outlined phrase card per cut on empty radial black"
+  },
+  "proofGate": "FULL_MP4_PROOF — if mid frames are only gradient+watermark+phrase box = FAIL"
+}
