@@ -14,7 +14,7 @@ export const CtaBeat: React.FC<CtaBeatProps> = ({ startFrame, endFrame, handle, 
 
     if (frame < startFrame || frame >= endFrame) return null;
 
-    const cardOpacity = interpolate(relativeFrame, [0, 15], [0, 1], {
+    const cardOpacity = interpolate(relativeFrame, [0, 8], [0.95, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });

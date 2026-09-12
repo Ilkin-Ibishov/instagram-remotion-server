@@ -14,7 +14,7 @@ export const WhyBeat: React.FC<WhyBeatProps> = ({ startFrame, endFrame, captions
 
     if (frame < startFrame || frame >= endFrame) return null;
 
-    const highlighterOpacity = interpolate(relativeFrame, [0, 20], [0, 1], {
+    const highlighterOpacity = interpolate(relativeFrame, [0, 15], [0.8, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -31,7 +31,7 @@ export const WhyBeat: React.FC<WhyBeatProps> = ({ startFrame, endFrame, captions
         extrapolateRight: 'clamp',
     });
 
-    const headlineOpacity = interpolate(relativeFrame, [10, 25], [0, 1], {
+    const headlineOpacity = interpolate(relativeFrame, [0, 12], [0.9, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });

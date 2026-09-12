@@ -19,7 +19,7 @@ export const Step3Beat: React.FC<Step3BeatProps> = ({ startFrame, endFrame, capt
         extrapolateRight: 'clamp',
     });
 
-    const chapterOpacity = interpolate(relativeFrame, [10, 25], [0, 1], {
+    const chapterOpacity = interpolate(relativeFrame, [0, 10], [0.9, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
