@@ -21,13 +21,14 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
     const microLabel = data.microLabel || data.badge || branding.handle || niche.toUpperCase();
     const cta = data.cta || 'SWIPE FOR MORE';
 
-    // Niche-specific cinematic backgrounds (thematically matched, faceless)
+    // Niche-specific cinematic backgrounds (VERIFIED thematic matches, faceless)
+    // TODO: Replace with staticFile('backgrounds/editorial/{niche}.jpg') for stable bundled renders
     const nicheBackgrounds: Record<string, string> = {
-        'psychology-micro': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=1080&q=90', // Brain/mind silhouette
-        'history-flash': 'https://images.unsplash.com/photo-1568667256549-094345857637?w=1080&q=90', // Dark archive/old documents
-        'legal-rights-az': 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=90', // Gavel (kept)
-        'study-hacks': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=90', // Writing hand (kept)
-        'ai-tools-daily': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&q=90', // AI/laptop/digital UI glow
+        'psychology-micro': 'https://images.unsplash.com/photo-1559757175-5700dde675bc?w=1080&q=90', // Brain/neural network (actual brain scan)
+        'history-flash': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1080&q=90', // Old books/archive (aged documents)
+        'legal-rights-az': 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=90', // Law books/gavel
+        'study-hacks': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1080&q=90', // Study notebook/desk
+        'ai-tools-daily': 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=1080&q=90', // Laptop/tech workspace (coding environment)
     };
 
     const imageUrl = data.imageUrl || nicheBackgrounds[niche] || nicheBackgrounds['psychology-micro'];
