@@ -1,0 +1,31 @@
+{
+  "renderDate": "2026-09-12",
+  "niche": "study-hacks",
+  "composition": "VerticalNative",
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "dimensions": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16"
+  },
+  "duration": "24 seconds",
+  "handle": "@thestudyhacks",
+  "commitSHA": "8339335fc98013721cb08e886ecd7e35f412d120",
+  "commitMessage": "URGENT: Fix study-hacks handle → @thestudyhacks",
+  "sourceManifest": "test-manifests/stop-study-hacks.json",
+  "watermarkVerified": true,
+  "watermarkText": "@THESTUDYHACKS",
+  "targetPlatforms": ["TikTok", "YouTube Shorts"],
+  "files": {
+    "video": "vertical-video.mp4",
+    "videoSize": "7.4M",
+    "proofFrameMid": "watermark-frame-12s.png",
+    "proofFrameEnd": "watermark-frame-end.png"
+  },
+  "notes": [
+    "Re-rendered with corrected handle after discovering @study.hacks was taken on TikTok",
+    "Previous publisher handoff had wrong handle (@study.hacks)",
+    "This render replaces the incorrect version",
+    "Watermark verified in extracted frames at 12s and end of video"
+  ]
+}
