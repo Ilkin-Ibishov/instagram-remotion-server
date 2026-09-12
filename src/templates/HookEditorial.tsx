@@ -21,13 +21,13 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
     const microLabel = data.microLabel || data.badge || branding.handle || niche.toUpperCase();
     const cta = data.cta || 'SWIPE FOR MORE';
 
-    // Niche-specific cinematic backgrounds (faceless, high-quality)
+    // Niche-specific cinematic backgrounds (thematically matched, faceless)
     const nicheBackgrounds: Record<string, string> = {
-        'psychology-micro': 'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1080&q=90',
-        'history-flash': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1080&q=90',
-        'legal-rights-az': 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=90',
-        'study-hacks': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=90',
-        'ai-tools-daily': 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1080&q=90',
+        'psychology-micro': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=1080&q=90', // Brain/mind silhouette
+        'history-flash': 'https://images.unsplash.com/photo-1568667256549-094345857637?w=1080&q=90', // Dark archive/old documents
+        'legal-rights-az': 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=90', // Gavel (kept)
+        'study-hacks': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=90', // Writing hand (kept)
+        'ai-tools-daily': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&q=90', // AI/laptop/digital UI glow
     };
 
     const imageUrl = data.imageUrl || nicheBackgrounds[niche] || nicheBackgrounds['psychology-micro'];
@@ -82,8 +82,8 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
         });
     };
 
-    // CTA fade in
-    const ctaOpacity = interpolate(frame, [20, 28], [0, 0.6], {
+    // CTA fade in: higher opacity for readability on black
+    const ctaOpacity = interpolate(frame, [18, 26], [0, 0.85], {
         extrapolateRight: 'clamp',
     });
 
@@ -143,16 +143,18 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                         boxShadow: `0 0 12px ${tokens.colors.primary}80`,
                     }}
                 />
-                {/* Micro-label */}
+                {/* Micro-label: centered on divider */}
                 <div
                     style={{
-                        padding: '8px 32px',
-                        fontSize: 12,
+                        padding: '10px 32px',
+                        fontSize: 13,
                         fontWeight: 900,
-                        letterSpacing: '0.15em',
+                        letterSpacing: '0.16em',
                         color: tokens.colors.primary,
                         textTransform: 'uppercase',
                         fontFamily: "'Montserrat', sans-serif",
+                        textAlign: 'center',
+                        textShadow: `0 2px 8px rgba(0,0,0,0.9), 0 0 20px ${tokens.colors.primary}40`,
                     }}
                 >
                     {microLabel}
@@ -175,7 +177,7 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                     padding: '0 32px 40px 32px',
                 }}
             >
-                {/* Headline: staggered lines */}
+                {/* Headline: left-aligned ALL-CAPS slab text (consistent grammar) */}
                 <div style={{ width: '100%' }}>
                     {headlineLines.map((line, idx) => (
                         <div
@@ -188,6 +190,7 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                                 letterSpacing: '-0.02em',
                                 textTransform: 'uppercase',
                                 fontFamily: "'Montserrat', sans-serif",
+                                textAlign: 'left',
                                 marginBottom: idx < headlineLines.length - 1 ? 8 : 0,
                                 transform: `translateY(${getLineY(idx)}px)`,
                                 opacity: getLineOpacity(idx),
@@ -198,19 +201,20 @@ const HookEditorial: React.FC<HookEditorialProps> = ({ data, branding }) => {
                     ))}
                 </div>
 
-                {/* CTA footer */}
+                {/* CTA footer: higher contrast for readability */}
                 <div
                     style={{
                         position: 'absolute',
-                        bottom: 12,
+                        bottom: 14,
                         left: 32,
-                        fontSize: 11,
-                        fontWeight: 800,
-                        letterSpacing: '0.12em',
-                        color: tokens.colors.primary,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        letterSpacing: '0.14em',
+                        color: '#fff',
                         textTransform: 'uppercase',
                         opacity: ctaOpacity,
                         fontFamily: "'Montserrat', sans-serif",
+                        textShadow: `0 2px 6px rgba(0,0,0,0.9), 0 0 16px ${tokens.colors.primary}60`,
                     }}
                 >
                     {cta}
