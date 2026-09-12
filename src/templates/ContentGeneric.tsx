@@ -61,6 +61,9 @@ export default function ContentGeneric({
         extrapolateRight: 'clamp',
     });
 
+    // Optional subtle background texture
+    const hasBackgroundImage = typeof data.backgroundImage === 'string' && data.backgroundImage;
+
     return (
         <div
             style={{
@@ -73,6 +76,22 @@ export default function ContentGeneric({
                 overflow: 'hidden',
             }}
         >
+            {/* Optional subtle background texture for body content */}
+            {hasBackgroundImage && (
+                <>
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundImage: `url(${data.backgroundImage})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            opacity: 0.12,
+                            filter: 'grayscale(60%) blur(2px)',
+                        }}
+                    />
+                </>
+            )}
             {/* Top accent bar */}
             <div
                 style={{

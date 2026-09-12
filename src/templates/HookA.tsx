@@ -20,13 +20,25 @@ export default function HookA({
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';
 
+    // Niche-specific default background images
+    const nicheBackgrounds: Record<string, string> = {
+        'psychology-micro': 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1080&q=80', // Brain/mind abstract
+        'history-flash': 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=1080&q=80', // Ancient books/library
+        'legal-rights-az': 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=80', // Justice/law books
+        'study-hacks': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1080&q=80', // Study desk/notes
+        'ai-tools-daily': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&q=80', // AI/tech abstract
+    };
+
+    const backgroundImage = data.imageUrl || nicheBackgrounds[niche] || nicheBackgrounds['psychology-micro'];
+
     // Faster, punchier motion for hook retention (<1s to full visibility)
     const hookDuration = tokens.motion.hookDuration;
     
-    const imgScale = interpolate(frame, [0, hookDuration * 1.5], [1.08, 1], {
+    const imgScale = interpolate(frame, [0, hookDuration * 1.5], [1.05, 1], {
         extrapolateRight: 'clamp',
     });
-    const imgOpacity = interpolate(frame, [0, hookDuration], [0.2, 0.35], {
+    // More visible backgrounds: 0.45-0.6 opacity range
+    const imgOpacity = interpolate(frame, [0, hookDuration], [0.45, 0.6], {
         extrapolateRight: 'clamp',
     });
 
@@ -78,32 +90,30 @@ export default function HookA({
                 overflow: 'hidden',
             }}
         >
-            {/* Subtle gradient overlay */}
+            {/* Background image with niche default */}
+            <Img
+                src={backgroundImage}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    filter: `saturate(0.7) brightness(0.7)`, // Light desaturate, darker for contrast
+                    transform: `scale(${imgScale})`,
+                    opacity: imgOpacity,
+                }}
+            />
+
+            {/* Niche-tinted overlay for color wash + strong scrim for text readability */}
             <div
                 style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5))',
+                    background: `linear-gradient(to bottom, ${tokens.colors.primary}15 0%, ${tokens.colors.background}dd 70%)`,
                     zIndex: 10,
                 }}
             />
-
-            {/* Background image (optional) */}
-            {data.imageUrl && (
-                <Img
-                    src={data.imageUrl}
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        filter: 'grayscale(100%) blur(1px)',
-                        transform: `scale(${imgScale})`,
-                        opacity: imgOpacity,
-                    }}
-                />
-            )}
 
             {/* Content - positioned in safe zone */}
             <div
