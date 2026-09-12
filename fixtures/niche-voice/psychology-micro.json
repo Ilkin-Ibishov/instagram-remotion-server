@@ -1,0 +1,94 @@
+{
+    "fps": 30,
+    "aspectRatio": "9:16",
+    "durationSec": 30,
+    "format": "faceless-slideshow",
+    "generatedBy": "niche-voice",
+    "date": "2026-09-12",
+    "niche": "psychology-micro",
+    "title": "Why one viral story feels like EVERYONE",
+    "topic": "Availability cascade vs base rates",
+    "voice": {
+        "tone": "calm-smart friend who catches you mid-spiral",
+        "style": "short punch lines; name the bias once; one everyday mirror; never clinical lecture",
+        "banned": ["you are broken", "everyone is stupid", "diagnosing the viewer"]
+    },
+    "slides": [
+        {
+            "id": "myth",
+            "role": "MYTH",
+            "startSec": 0,
+            "durationSec": 3,
+            "headline": "MYTH",
+            "body": "If it's everywhere in my feed… it's happening to everyone.",
+            "karaoke": ["MYTH", "everywhere = everyone"],
+            "visual": {
+                "palette": "warning-red on black",
+                "motif": "bold MYTH stamp card",
+                "cutHint": "hard punch in"
+            }
+        },
+        {
+            "id": "why",
+            "role": "WHY",
+            "startSec": 3,
+            "durationSec": 7,
+            "headline": "Sounds right. Brains love loud.",
+            "body": "One dramatic story sticks. Quiet base rates don't. So your brain upgrades \"I saw it\" into \"it's everywhere.\"",
+            "karaoke": ["Sounds right", "brains love loud", "one story sticks"],
+            "visual": {
+                "palette": "amber tension",
+                "motif": "volume bars / brain icon flash",
+                "cutHint": "~2s cuts"
+            }
+        },
+        {
+            "id": "fact",
+            "role": "FACT",
+            "startSec": 10,
+            "durationSec": 8,
+            "headline": "FACT · availability cascade",
+            "body": "Repeat a vivid claim → it feels common → people talk → it feels even more common. Frequency in attention ≠ frequency in reality.",
+            "karaoke": ["FACT", "availability cascade", "attention ≠ reality"],
+            "visual": {
+                "palette": "calm green",
+                "motif": "FACT card + keyword flash AVAILABILITY",
+                "cutHint": "zoom on bias name"
+            }
+        },
+        {
+            "id": "example",
+            "role": "EXAMPLE",
+            "startSec": 18,
+            "durationSec": 6,
+            "headline": "Catch it today",
+            "body": "Exam rumor: three group chats panic. Base rate? Still one quiz, same week, same curve. Drama traveled. Numbers didn't.",
+            "karaoke": ["Catch it today", "drama traveled", "numbers didn't"],
+            "visual": {
+                "palette": "neutral slate",
+                "motif": "chat bubbles → tiny base-rate chip",
+                "cutHint": "1 diagram max"
+            }
+        },
+        {
+            "id": "cta",
+            "role": "CTA",
+            "startSec": 24,
+            "durationSec": 6,
+            "headline": "Which myth next?",
+            "body": "Save this. Comment the bias you catch yourself using this week.",
+            "karaoke": ["Which myth next?", "comment the bias"],
+            "visual": {
+                "palette": "soft series end-card",
+                "motif": "series chip: myth vs fact",
+                "cutHint": "hold"
+            }
+        }
+    ],
+    "captions": {
+        "instagram": "Myth: if it's all over my feed, it's happening to everyone.\n\nFact: that's an availability cascade — loud stories feel common even when base rates barely moved.\n\nCatch yourself today: drama can travel farther than the numbers.\n\nWhich bias should we bust next? Comment it.\n\nmyth vs fact · bias you used today",
+        "tiktok": "your feed lied (kind of)\n\none viral story ≠ everyone\nthat's availability cascade vs real base rates\n\ncomment the bias you catch yourself doing",
+        "youtubeShorts": "Why one dramatic story feels like everyone — even when the stats didn't move.\n\nAvailability cascade vs base rates, in 30 seconds.\n\nWhich myth should we do next?",
+        "hashtags": ["psychology", "cognitivebias", "mythvsfact", "availabilityheuristic", "shorts"]
+    }
+}
