@@ -31,7 +31,8 @@ Current pipeline behavior is **RSS-first ingestion with GNews fallback** for art
 | `src/pipeline/rssTelemetryStore.ts` | RSS telemetry persistence + source-health cooldown helpers |
 | `src/remotion/index.tsx` | Remotion root: registers composition |
 | `src/remotion/SlideComposition.tsx` | Routes `templateId` → template component + effects |
-| `src/templates/*.tsx` | One React component per slide type |
+| `src/remotion/designTokens.ts` | Design token system: niche-specific colors, typography, spacing, safe zones |
+| `src/templates/*.tsx` | One React component per slide type (consumes design tokens) |
 | `src/components/EffectsOverlay.tsx` | Post-process visual effects |
 | `__tests__/server.test.ts` | API validation tests (no full render) |
 | `__tests__/rssService.test.ts` | RSS ingestion and fallback behavior tests |

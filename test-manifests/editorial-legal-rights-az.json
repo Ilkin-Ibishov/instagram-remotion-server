@@ -1,0 +1,15 @@
+{
+  "templateId": "HOOK_EDITORIAL",
+  "data": {
+    "headline": "BU HAQQI\nBİLMƏSƏNİZ\nİTİRƏRSİNİZ",
+    "microLabel": "HÜQUQLARINIZ",
+    "cta": "DAVAM EDIN",
+    "imageUrl": "https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=90"
+  },
+  "branding": {
+    "niche": "legal-rights-az",
+    "accentColor": "#3b82f6",
+    "handle": "@haqlarınız",
+    "effects": []
+  }
+}

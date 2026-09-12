@@ -1,6 +1,7 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
 import { lineClamp, singleLineEllipsis } from './textOverflow';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 export default function ContentMythVsFact({
     data,
@@ -10,20 +11,25 @@ export default function ContentMythVsFact({
     branding: any;
 }) {
     const frame = useCurrentFrame();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const myth = data.myth || 'Myth';
     const fact = data.fact || 'Fact';
     const proof = data.proof || '';
 
-    const leftX = interpolate(frame, [0, 20], [-14, 0], {
+    const transitionDur = tokens.motion.transitionDuration;
+
+    const leftX = interpolate(frame, [0, transitionDur * 0.8], [-12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const rightX = interpolate(frame, [0, 20], [14, 0], {
+    const rightX = interpolate(frame, [0, transitionDur * 0.8], [12, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const proofOpacity = interpolate(frame, [0, 24], [0.4, 1], {
+    const proofOpacity = interpolate(frame, [0, transitionDur], [0.5, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -35,24 +41,27 @@ export default function ContentMythVsFact({
                 height: 1080,
                 position: 'relative',
                 overflow: 'hidden',
-                background: 'linear-gradient(135deg, #111 0%, #171717 60%, #0d0d0d 100%)',
+                background: tokens.colors.backgroundGradient,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
-                gap: 28,
-                padding: 72,
+                gap: tokens.spacing.lg,
+                paddingTop: tokens.safeZones.top,
+                paddingBottom: tokens.safeZones.bottom + tokens.spacing.xl,
+                paddingLeft: tokens.safeZones.sides,
+                paddingRight: tokens.safeZones.sides,
             }}
         >
             <div
                 style={{
                     position: 'absolute',
-                    top: 34,
-                    left: 40,
-                    fontSize: 22,
+                    top: tokens.safeZones.top - tokens.spacing.md,
+                    left: tokens.safeZones.sides,
+                    fontSize: tokens.typography.captionSize - 2,
                     letterSpacing: '0.1em',
                     textTransform: 'uppercase',
-                    color: '#bdbdbd',
-                    fontWeight: 700,
+                    color: tokens.colors.textSecondary,
+                    fontWeight: tokens.typography.weight.bold,
                 }}
             >
                 Myth vs Fact
@@ -60,20 +69,20 @@ export default function ContentMythVsFact({
 
             <div
                 style={{
-                    borderRadius: 28,
-                    border: '2px solid rgba(255,255,255,0.16)',
-                    padding: '28px 32px',
-                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: 16,
+                    border: `2px solid ${tokens.colors.border}`,
+                    padding: `${tokens.spacing.md}px ${tokens.spacing.lg}px`,
+                    backgroundColor: tokens.colors.surface,
                     transform: `translateX(${leftX}px)`,
                 }}
             >
                 <p
                     style={{
                         margin: 0,
-                        color: '#ff9ca3',
-                        fontSize: 22,
+                        color: tokens.colors.accent,
+                        fontSize: tokens.typography.captionSize - 2,
                         textTransform: 'uppercase',
-                        fontWeight: 800,
+                        fontWeight: tokens.typography.weight.black,
                         letterSpacing: '0.08em',
                     }}
                 >
@@ -81,11 +90,11 @@ export default function ContentMythVsFact({
                 </p>
                 <p
                     style={{
-                        margin: '14px 0 0',
-                        fontSize: 44,
-                        lineHeight: 1.35,
-                        color: '#f2f2f2',
-                        fontWeight: 700,
+                        margin: `${tokens.spacing.sm}px 0 0`,
+                        fontSize: tokens.typography.bodySize + 6,
+                        lineHeight: tokens.typography.lineHeight.tight,
+                        color: tokens.colors.text,
+                        fontWeight: tokens.typography.weight.bold,
                         fontFamily: "'Montserrat', sans-serif",
                         ...lineClamp(3, '100%'),
                     }}
@@ -96,20 +105,20 @@ export default function ContentMythVsFact({
 
             <div
                 style={{
-                    borderRadius: 28,
-                    border: `2px solid ${branding.accentColor}`,
-                    padding: '28px 32px',
-                    background: `${branding.accentColor}1f`,
+                    borderRadius: 16,
+                    border: `3px solid ${tokens.colors.primary}`,
+                    padding: `${tokens.spacing.md}px ${tokens.spacing.lg}px`,
+                    backgroundColor: tokens.colors.surface,
                     transform: `translateX(${rightX}px)`,
                 }}
             >
                 <p
                     style={{
                         margin: 0,
-                        color: branding.accentColor,
-                        fontSize: 22,
+                        color: tokens.colors.primary,
+                        fontSize: tokens.typography.captionSize - 2,
                         textTransform: 'uppercase',
-                        fontWeight: 800,
+                        fontWeight: tokens.typography.weight.black,
                         letterSpacing: '0.08em',
                     }}
                 >
@@ -117,11 +126,11 @@ export default function ContentMythVsFact({
                 </p>
                 <p
                     style={{
-                        margin: '14px 0 0',
-                        fontSize: 44,
-                        lineHeight: 1.35,
-                        color: '#fafafa',
-                        fontWeight: 700,
+                        margin: `${tokens.spacing.sm}px 0 0`,
+                        fontSize: tokens.typography.bodySize + 6,
+                        lineHeight: tokens.typography.lineHeight.tight,
+                        color: tokens.colors.text,
+                        fontWeight: tokens.typography.weight.bold,
                         fontFamily: "'Montserrat', sans-serif",
                         ...lineClamp(3, '100%'),
                     }}
@@ -132,12 +141,12 @@ export default function ContentMythVsFact({
 
             <p
                 style={{
-                    margin: '8px 4px 0',
-                    fontSize: 30,
-                    lineHeight: 1.45,
-                    color: '#d6d6d6',
+                    margin: `${tokens.spacing.sm}px 0 0`,
+                    fontSize: tokens.typography.bodySize - 6,
+                    lineHeight: tokens.typography.lineHeight.normal,
+                    color: tokens.colors.textSecondary,
                     opacity: proofOpacity,
-                    fontWeight: 500,
+                    fontWeight: tokens.typography.weight.medium,
                     ...lineClamp(4, '100%'),
                 }}
             >
@@ -147,14 +156,14 @@ export default function ContentMythVsFact({
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 44,
-                    right: 48,
-                    color: '#d4d4d4',
-                    fontSize: 22,
-                    fontWeight: 700,
+                    bottom: tokens.safeZones.bottom,
+                    right: tokens.safeZones.sides,
+                    color: tokens.colors.textSecondary,
+                    fontSize: tokens.typography.captionSize - 2,
+                    fontWeight: tokens.typography.weight.bold,
                     letterSpacing: '0.05em',
-                    ...singleLineEllipsis(360),
-                    opacity: interpolate(frame, [0, 24], [0.3, 0.75], {
+                    ...singleLineEllipsis(340),
+                    opacity: interpolate(frame, [0, transitionDur], [0.4, 0.8], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),

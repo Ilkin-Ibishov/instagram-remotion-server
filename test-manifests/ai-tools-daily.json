@@ -1,0 +1,49 @@
+{
+  "global": {
+    "branding": {
+      "niche": "ai-tools-daily",
+      "handle": "@aiToolsDaily",
+      "accentColor": "#14b8a6",
+      "effects": ["vignette", "chromatic"]
+    }
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "badge": "NEW TOOL",
+        "headline": "NotebookLM",
+        "subheadline": "Google's AI that turns docs into podcasts",
+        "imageUrl": "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&q=80"
+      }
+    },
+    {
+      "templateId": "CONTENT_GENERIC",
+      "data": {
+        "title": "What It Does",
+        "body": "Upload your documents, research papers, or notes. NotebookLM analyzes them and generates a natural-sounding podcast discussion between two AI hosts explaining the key concepts.",
+        "highlight": "Perfect for learning complex topics while commuting"
+      }
+    },
+    {
+      "templateId": "CONTENT_LISTICLE",
+      "data": {
+        "title": "Quick Start",
+        "items": [
+          "Go to notebooklm.google.com",
+          "Upload your PDFs, docs, or paste text",
+          "Click 'Generate Audio Overview'",
+          "Get a 5-10 minute podcast in minutes"
+        ],
+        "footnote": "Free to use with a Google account"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "Discover daily AI tools?",
+        "subtext": "Follow for the latest AI productivity hacks"
+      }
+    }
+  ]
+}

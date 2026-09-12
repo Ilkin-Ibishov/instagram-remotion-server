@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCurrentFrame, interpolate } from 'remotion';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 export default function ContentGeneric({
     data,
@@ -9,52 +10,59 @@ export default function ContentGeneric({
     branding: any;
 }) {
     const frame = useCurrentFrame();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const title = data.title || 'Details';
     const body = data.body || '';
     const highlight = typeof data.highlight === 'string' ? data.highlight : '';
 
-    // Keep a visible baseline on frame 0 for reliable Instagram thumbnails.
-    const barScaleX = interpolate(frame, [0, 24], [0.25, 1], {
+    const transitionDur = tokens.motion.transitionDuration;
+    
+    const barScaleX = interpolate(frame, [0, transitionDur * 0.7], [0.4, 1], {
         extrapolateRight: 'clamp',
     });
 
-    const titleY = interpolate(frame, [0, 24], [12, 0], {
+    const titleY = interpolate(frame, [0, transitionDur], [10, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const titleOpacity = interpolate(frame, [0, 24], [0.55, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-
-    const dividerScaleX = interpolate(frame, [0, 24], [0.35, 1], {
+    const titleOpacity = interpolate(frame, [0, transitionDur * 0.7], [0.7, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const bodyY = interpolate(frame, [0, 30], [8, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const bodyOpacity = interpolate(frame, [0, 30], [0.42, 1], {
+    const dividerScaleX = interpolate(frame, [0, transitionDur * 0.8], [0.5, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const highlightX = interpolate(frame, [0, 24], [-8, 0], {
+    const bodyY = interpolate(frame, [0, transitionDur * 1.2], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const highlightOpacity = interpolate(frame, [0, 24], [0.4, 1], {
+    const bodyOpacity = interpolate(frame, [0, transitionDur], [0.6, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const brandOpacity = interpolate(frame, [0, 30], [0.3, 0.5], {
+    const highlightX = interpolate(frame, [0, transitionDur * 0.9], [-8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
+    const highlightOpacity = interpolate(frame, [0, transitionDur * 0.8], [0.5, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandOpacity = interpolate(frame, [0, transitionDur], [0.4, 0.7], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    // Optional subtle background texture
+    const hasBackgroundImage = typeof data.backgroundImage === 'string' && data.backgroundImage;
 
     return (
         <div
@@ -63,12 +71,39 @@ export default function ContentGeneric({
                 height: 1080,
                 display: 'flex',
                 flexDirection: 'column',
-                padding: 80,
                 position: 'relative',
-                background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}22 0%, transparent 42%), #0f1217`,
+                background: tokens.colors.backgroundGradient,
                 overflow: 'hidden',
             }}
         >
+            {/* Optional background image: stronger presence for mid-slides */}
+            {hasBackgroundImage && (
+                <>
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundImage: `url(${data.backgroundImage})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            opacity: 0.35,
+                            filter: 'saturate(0.8) brightness(0.7) blur(1.5px)',
+                        }}
+                    />
+                    {/* Edge vignette + niche tint for readability */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: `
+                                radial-gradient(ellipse at center, transparent 30%, ${tokens.colors.background}90 90%),
+                                linear-gradient(to bottom, ${tokens.colors.primary}10 0%, ${tokens.colors.background}e5 70%)
+                            `,
+                            zIndex: 5,
+                        }}
+                    />
+                </>
+            )}
             {/* Top accent bar */}
             <div
                 style={{
@@ -76,14 +111,14 @@ export default function ContentGeneric({
                     top: 0,
                     left: 0,
                     width: '100%',
-                    height: 8,
-                    backgroundColor: branding.accentColor,
+                    height: 6,
+                    backgroundColor: tokens.colors.primary,
                     transformOrigin: 'left',
                     transform: `scaleX(${barScaleX})`,
                 }}
             />
 
-            {/* Main content */}
+            {/* Main content in safe zone */}
             <div
                 style={{
                     zIndex: 20,
@@ -91,23 +126,29 @@ export default function ContentGeneric({
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    paddingBottom: 120,
-                    width: '100%',
-                    maxWidth: 920,
+                    paddingTop: tokens.safeZones.top,
+                    paddingBottom: tokens.safeZones.bottom + tokens.spacing.xl,
+                    paddingLeft: tokens.safeZones.sides,
+                    paddingRight: tokens.safeZones.sides,
                 }}
             >
-                {/* Title */}
+                {/* Title with stronger text shadow for readability */}
                 <h2
                     style={{
-                        fontSize: 64,
-                        fontWeight: 900,
-                        color: 'white',
-                        marginBottom: 40,
-                        lineHeight: 1.15,
+                        fontSize: tokens.typography.titleSize,
+                        fontWeight: tokens.typography.weight.black,
+                        color: tokens.colors.text,
+                        marginBottom: tokens.spacing.lg,
+                        lineHeight: tokens.typography.lineHeight.tight,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${titleY}px)`,
                         opacity: titleOpacity,
                         marginTop: 0,
+                        textShadow: `
+                            0 2px 8px rgba(0,0,0,0.7),
+                            0 4px 12px rgba(0,0,0,0.5),
+                            0 1px 2px rgba(0,0,0,0.9)
+                        `,
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
@@ -120,25 +161,26 @@ export default function ContentGeneric({
                 {/* Divider */}
                 <div
                     style={{
-                        width: 96,
-                        height: 8,
-                        marginBottom: 48,
-                        backgroundColor: branding.accentColor,
+                        width: 80,
+                        height: 5,
+                        marginBottom: tokens.spacing.xl,
+                        backgroundColor: tokens.colors.primary,
                         transformOrigin: 'left',
                         transform: `scaleX(${dividerScaleX})`,
                     }}
                 />
 
-                {/* Body */}
+                {/* Body with text shadow for readability */}
                 <p
                     style={{
-                        fontSize: 34,
-                        color: '#e5e7eb',
-                        lineHeight: 1.5,
-                        fontWeight: 500,
+                        fontSize: tokens.typography.bodySize - 2,
+                        color: tokens.colors.text,
+                        lineHeight: tokens.typography.lineHeight.normal,
+                        fontWeight: tokens.typography.weight.medium,
                         margin: 0,
                         transform: `translateY(${bodyY}px)`,
                         opacity: bodyOpacity,
+                        textShadow: `0 2px 6px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,1)`,
                         display: '-webkit-box',
                         WebkitLineClamp: 6,
                         WebkitBoxOrient: 'vertical',
@@ -148,27 +190,31 @@ export default function ContentGeneric({
                     {body}
                 </p>
 
-                {/* Highlight */}
+                {/* Highlight callout with stronger styling */}
                 {highlight && (
                     <div
                         style={{
-                            marginTop: 32,
-                            padding: 24,
-                            borderLeft: `6px solid ${branding.accentColor}`,
-                            background: 'rgba(255,255,255,0.05)',
+                            marginTop: tokens.spacing.lg,
+                            padding: tokens.spacing.md,
+                            borderLeft: `5px solid ${tokens.colors.primary}`,
+                            backgroundColor: `${tokens.colors.background}dd`,
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 6,
                             transform: `translateX(${highlightX}px)`,
                             opacity: highlightOpacity,
                             overflow: 'hidden',
+                            boxShadow: `0 4px 16px ${tokens.colors.background}60`,
                         }}
                     >
                         <p
                             style={{
-                                fontSize: 28,
-                                fontWeight: 700,
+                                fontSize: tokens.typography.bodySize - 6,
+                                fontWeight: tokens.typography.weight.bold,
                                 fontStyle: 'italic',
-                                color: 'white',
+                                color: tokens.colors.text,
                                 margin: 0,
-                                lineHeight: 1.35,
+                                lineHeight: tokens.typography.lineHeight.normal,
+                                textShadow: `0 1px 4px rgba(0,0,0,0.8)`,
                                 display: '-webkit-box',
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: 'vertical',
@@ -181,22 +227,22 @@ export default function ContentGeneric({
                 )}
             </div>
 
-            {/* Brand handle */}
+            {/* Brand handle in bottom safe zone */}
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 48,
-                    right: 48,
+                    bottom: tokens.safeZones.bottom,
+                    right: tokens.safeZones.sides,
                     zIndex: 20,
                     opacity: brandOpacity,
                 }}
             >
                 <span
                     style={{
-                        fontSize: 24,
-                        fontWeight: 700,
+                        fontSize: tokens.typography.captionSize,
+                        fontWeight: tokens.typography.weight.bold,
                         letterSpacing: '0.05em',
-                        color: 'white',
+                        color: tokens.colors.text,
                     }}
                 >
                     {branding.handle}

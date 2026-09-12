@@ -1,14 +1,8 @@
 import React from 'react';
-import HookA from '../templates/HookA';
-import ContentGeneric from '../templates/ContentGeneric';
-import ContentListicle from '../templates/ContentListicle';
-import ContentStatSnapshot from '../templates/ContentStatSnapshot';
-import ContentMythVsFact from '../templates/ContentMythVsFact';
-import ContentVideo from '../templates/ContentVideo';
-import CtaFinal from '../templates/CtaFinal';
+import HookEditorial from '../templates/HookEditorial';
 import { EffectsOverlay } from '../components/EffectsOverlay';
 
-export type SlideProps = {
+export type EditorialSlideProps = {
     templateId: string;
     data: Record<string, any>;
     branding: {
@@ -19,19 +13,14 @@ export type SlideProps = {
     };
 };
 
-export const SlideComposition: React.FC<SlideProps> = ({
+export const EditorialSlideComposition: React.FC<EditorialSlideProps> = ({
     templateId,
     data,
     branding,
 }) => {
     const templateMap: Record<string, React.FC<{ data: any; branding: any }>> = {
-        HOOK_A: HookA,
-        CONTENT_GENERIC: ContentGeneric,
-        CONTENT_LISTICLE: ContentListicle,
-        CONTENT_STAT_SNAPSHOT: ContentStatSnapshot,
-        CONTENT_MYTH_VS_FACT: ContentMythVsFact,
-        CONTENT_VIDEO: ContentVideo,
-        CTA_FINAL: CtaFinal,
+        HOOK_EDITORIAL: HookEditorial,
+        // Future: CONTENT_EDITORIAL, etc.
     };
 
     const Template = templateMap[templateId];
@@ -41,7 +30,7 @@ export const SlideComposition: React.FC<SlideProps> = ({
             <div
                 style={{
                     width: 1080,
-                    height: 1080,
+                    height: 1350,
                     background: '#0a0a0a',
                     color: '#fff',
                     display: 'flex',
@@ -50,7 +39,7 @@ export const SlideComposition: React.FC<SlideProps> = ({
                     fontSize: 32,
                 }}
             >
-                Unknown template: {templateId}
+                Unknown editorial template: {templateId}
             </div>
         );
     }
@@ -66,7 +55,7 @@ export const SlideComposition: React.FC<SlideProps> = ({
         <div
             style={{
                 width: 1080,
-                height: 1080,
+                height: 1350,
                 position: 'relative',
                 overflow: 'hidden',
             }}

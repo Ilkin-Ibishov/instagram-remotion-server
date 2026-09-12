@@ -1,0 +1,49 @@
+{
+  "global": {
+    "branding": {
+      "niche": "study-hacks",
+      "handle": "@studySmart",
+      "accentColor": "#06b6d4",
+      "effects": ["vignette", "chromatic"]
+    }
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "badge": "STUDY TIP",
+        "headline": "Pomodoro Technique",
+        "subheadline": "Boost focus in 25-minute sprints",
+        "imageUrl": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1080&q=80"
+      }
+    },
+    {
+      "templateId": "CONTENT_LISTICLE",
+      "data": {
+        "title": "How It Works",
+        "items": [
+          "Set timer for 25 minutes (one Pomodoro)",
+          "Work with full focus—no interruptions",
+          "Take a 5-minute break when timer ends",
+          "After 4 Pomodoros, take a longer 15-30 min break"
+        ],
+        "footnote": "Developed by Francesco Cirillo in the 1980s"
+      }
+    },
+    {
+      "templateId": "CONTENT_MYTH_VS_FACT",
+      "data": {
+        "myth": "You need hours of uninterrupted time to study effectively",
+        "fact": "Short, focused bursts with breaks are more productive than marathon sessions",
+        "proof": "Studies show focused 25-min intervals improve retention by up to 30%"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "Ready to study smarter?",
+        "subtext": "Follow for daily study hacks and productivity tips"
+      }
+    }
+  ]
+}

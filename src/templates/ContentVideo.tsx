@@ -2,13 +2,16 @@ import React from 'react';
 import { useCurrentFrame, interpolate, Video, Img, useVideoConfig } from 'remotion';
 import { Play } from 'lucide-react';
 import { lineClamp, singleLineEllipsis } from './textOverflow';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 function VideoWithFallback({
     videoUrl,
     fallbackImageUrl,
+    backgroundColor,
 }: {
     videoUrl?: string;
     fallbackImageUrl?: string;
+    backgroundColor: string;
 }) {
     const [hasError, setHasError] = React.useState(false);
 
@@ -31,7 +34,7 @@ function VideoWithFallback({
                 style={{
                     width: '100%',
                     height: '100%',
-                    background: 'linear-gradient(135deg, #1a1a2e 0%, #0a0a0a 100%)',
+                    background: backgroundColor,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -84,42 +87,46 @@ export default function ContentVideo({
 }) {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const title = data.title || 'Video Details';
 
-    const frameBorderScale = interpolate(frame, [0, 18], [0.35, 1], {
+    const transitionDur = tokens.motion.transitionDuration;
+
+    const frameBorderScale = interpolate(frame, [0, transitionDur * 0.7], [0.5, 1], {
         extrapolateRight: 'clamp',
     });
 
-    const videoOpacity = interpolate(frame, [0, 18], [0.5, 1], {
+    const videoOpacity = interpolate(frame, [0, transitionDur * 0.7], [0.6, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const titleY = interpolate(frame, [0, 24], [12, 0], {
+    const titleY = interpolate(frame, [0, transitionDur], [10, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const titleOpacity = interpolate(frame, [0, 24], [0.5, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-
-    const captionOpacity = interpolate(frame, [0, 24], [0.3, 1], {
+    const titleOpacity = interpolate(frame, [0, transitionDur], [0.6, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const sourceOpacity = interpolate(frame, [0, 30], [0.25, 0.6], {
+    const captionOpacity = interpolate(frame, [0, transitionDur], [0.4, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    // "LIVE" / play indicator pulse
+    const sourceOpacity = interpolate(frame, [0, transitionDur * 1.2], [0.3, 0.7], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
     const pulseOpacity = interpolate(
         frame % 30,
         [0, 15, 30],
-        [1, 0.4, 1],
+        [1, 0.5, 1],
         { extrapolateRight: 'clamp' }
     );
 
@@ -132,10 +139,13 @@ export default function ContentVideo({
                 flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
-                padding: 60,
                 position: 'relative',
-                background: `radial-gradient(circle at 20% 14%, ${branding.accentColor}24 0%, transparent 44%), #091018`,
+                background: tokens.colors.backgroundGradient,
                 overflow: 'hidden',
+                paddingTop: tokens.safeZones.top,
+                paddingBottom: tokens.safeZones.bottom,
+                paddingLeft: tokens.safeZones.sides,
+                paddingRight: tokens.safeZones.sides,
             }}
         >
             {/* Top accent bar */}
@@ -146,7 +156,7 @@ export default function ContentVideo({
                     left: 0,
                     width: '100%',
                     height: 4,
-                    backgroundColor: branding.accentColor,
+                    backgroundColor: tokens.colors.primary,
                     transformOrigin: 'left',
                     transform: `scaleX(${frameBorderScale})`,
                 }}
@@ -155,30 +165,30 @@ export default function ContentVideo({
             {/* Video frame container */}
             <div
                 style={{
-                    width: 960,
-                    height: 540,
+                    width: Math.min(920, 1080 - tokens.safeZones.sides * 2),
+                    height: 520,
                     position: 'relative',
-                    borderRadius: 8,
+                    borderRadius: 12,
                     overflow: 'hidden',
-                    border: `2px solid rgba(255,255,255,0.1)`,
+                    border: `3px solid ${tokens.colors.border}`,
                     opacity: videoOpacity,
                 }}
             >
-                {/* Video element with runtime fallback on load/codec errors */}
                 <VideoWithFallback
                     videoUrl={data.videoUrl}
                     fallbackImageUrl={data.imageUrl}
+                    backgroundColor={tokens.colors.background}
                 />
 
-                {/* LIVE indicator (top-left corner of video) */}
+                {/* LIVE indicator */}
                 <div
                     style={{
                         position: 'absolute',
-                        top: 16,
-                        left: 16,
+                        top: tokens.spacing.sm,
+                        left: tokens.spacing.sm,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8,
+                        gap: tokens.spacing.xs,
                         opacity: titleOpacity,
                     }}
                 >
@@ -187,16 +197,16 @@ export default function ContentVideo({
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            backgroundColor: branding.accentColor,
+                            backgroundColor: tokens.colors.primary,
                             opacity: pulseOpacity,
                         }}
                     />
                     <span
                         style={{
-                            fontSize: 16,
-                            fontWeight: 800,
+                            fontSize: 14,
+                            fontWeight: tokens.typography.weight.black,
                             letterSpacing: '0.1em',
-                            color: 'white',
+                            color: tokens.colors.text,
                             textTransform: 'uppercase',
                         }}
                     >
@@ -204,29 +214,28 @@ export default function ContentVideo({
                     </span>
                 </div>
 
-                {/* Title overlay — bottom of video frame */}
+                {/* Title overlay */}
                 <div
                     style={{
                         position: 'absolute',
                         bottom: 0,
                         left: 0,
                         right: 0,
-                        padding: '48px 24px 20px 24px',
-                        background:
-                            'linear-gradient(transparent, rgba(0,0,0,0.9))',
+                        padding: `${tokens.spacing.xl}px ${tokens.spacing.md}px ${tokens.spacing.md}px`,
+                        background: 'linear-gradient(transparent, rgba(0,0,0,0.92))',
                         transform: `translateY(${titleY}px)`,
                         opacity: titleOpacity,
                     }}
                 >
                     <h2
                         style={{
-                            fontSize: 36,
-                            fontWeight: 800,
-                            color: 'white',
-                            lineHeight: 1.2,
+                            fontSize: tokens.typography.bodySize - 2,
+                            fontWeight: tokens.typography.weight.black,
+                            color: tokens.colors.text,
+                            lineHeight: tokens.typography.lineHeight.tight,
                             margin: 0,
                             fontFamily: "'Montserrat', sans-serif",
-                            ...lineClamp(2, 900),
+                            ...lineClamp(2, 860),
                         }}
                     >
                         {title}
@@ -238,15 +247,15 @@ export default function ContentVideo({
             {data.caption && (
                 <p
                     style={{
-                        fontSize: 28,
-                        color: '#d1d5db',
+                        fontSize: tokens.typography.bodySize - 8,
+                        color: tokens.colors.textSecondary,
                         textAlign: 'center',
-                        maxWidth: 800,
-                        lineHeight: 1.5,
-                        marginTop: 40,
-                        fontWeight: 500,
+                        maxWidth: 760,
+                        lineHeight: tokens.typography.lineHeight.normal,
+                        marginTop: tokens.spacing.lg,
+                        fontWeight: tokens.typography.weight.medium,
                         opacity: captionOpacity,
-                        ...lineClamp(3, 800),
+                        ...lineClamp(3, 760),
                     }}
                 >
                     {data.caption}
@@ -257,11 +266,11 @@ export default function ContentVideo({
             {data.source && (
                 <p
                     style={{
-                        fontSize: 20,
-                        color: '#6b7280',
-                        marginTop: 16,
+                        fontSize: tokens.typography.captionSize - 4,
+                        color: tokens.colors.textSecondary,
+                        marginTop: tokens.spacing.sm,
                         opacity: sourceOpacity,
-                        ...singleLineEllipsis(900),
+                        ...singleLineEllipsis(800),
                     }}
                 >
                     Source: {data.source}
@@ -272,21 +281,21 @@ export default function ContentVideo({
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 40,
-                    left: 60,
+                    bottom: tokens.safeZones.bottom - tokens.spacing.sm,
+                    left: tokens.safeZones.sides,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
+                    gap: tokens.spacing.sm,
                     opacity: sourceOpacity,
                 }}
             >
                 <span
                     style={{
-                        fontSize: 22,
-                        fontWeight: 700,
+                        fontSize: tokens.typography.captionSize - 2,
+                        fontWeight: tokens.typography.weight.bold,
                         letterSpacing: '0.05em',
-                        color: 'white',
-                        ...singleLineEllipsis(420),
+                        color: tokens.colors.text,
+                        ...singleLineEllipsis(400),
                     }}
                 >
                     {branding.handle}

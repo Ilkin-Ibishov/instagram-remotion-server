@@ -2,6 +2,7 @@ import React from 'react';
 import { useCurrentFrame, interpolate, Img, useVideoConfig } from 'remotion';
 import { Zap } from 'lucide-react';
 import { lineClamp, singleLineEllipsis } from './textOverflow';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 export default function HookA({
     data,
@@ -12,51 +13,76 @@ export default function HookA({
 }) {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';
 
-    // Background image: keep a visible base at frame 0 for non-black poster frames.
-    const imgScale = interpolate(frame, [0, 2 * fps], [1.1, 1], {
+    // Niche-specific default background images (stronger thematic matches)
+    // TODO: Replace with staticFile('backgrounds/{niche}.jpg') for stable bundled renders
+    const nicheBackgrounds: Record<string, string> = {
+        'psychology-micro': 'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1080&q=85', // Neurons/brain abstract (not creepy)
+        'history-flash': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1080&q=85', // Ancient manuscripts/archive
+        'legal-rights-az': 'https://images.unsplash.com/photo-1589391886645-d51941baf7fb?w=1080&q=85', // Courthouse/scales abstract
+        'study-hacks': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1080&q=85', // Study desk/notes/highlighter
+        'ai-tools-daily': 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1080&q=85', // Circuit board/AI glow
+    };
+
+    const backgroundImage = data.imageUrl || nicheBackgrounds[niche] || nicheBackgrounds['psychology-micro'];
+
+    // PUNCHIER motion: faster settle (0.4-0.5s = ~12-15 frames @ 30fps)
+    const punchyDuration = 15; // ~0.5s
+    
+    // Ken Burns: more present zoom
+    const imgScale = interpolate(frame, [0, punchyDuration * 1.8], [1.08, 1], {
         extrapolateRight: 'clamp',
     });
-    const imgOpacity = interpolate(frame, [0, 2 * fps], [0.15, 0.4], {
+    
+    // STRONGER backgrounds: 0.65-0.8 opacity (clearly readable as scene)
+    const imgOpacity = interpolate(frame, [0, punchyDuration * 0.8], [0.65, 0.8], {
         extrapolateRight: 'clamp',
     });
 
-    // Keep core content visible from frame 0 while preserving motion.
-    const badgeY = interpolate(frame, [0, 18], [-8, 0], {
+    // Badge: SNAP entrance (faster, snappier)
+    const badgeY = interpolate(frame, [0, punchyDuration * 0.5], [-4, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const badgeOpacity = interpolate(frame, [0, 18], [0.45, 1], {
+    const badgeOpacity = interpolate(frame, [0, punchyDuration * 0.4], [0.85, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-
-    const headlineY = interpolate(frame, [0, 24], [12, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const headlineOpacity = interpolate(frame, [0, 24], [0.55, 1], {
+    const badgeScale = interpolate(frame, [0, punchyDuration * 0.5], [0.96, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const subY = interpolate(frame, [0, 30], [8, 0], {
+    // Headline: PUNCHY scale entrance (1.04 → 1)
+    const headlineY = interpolate(frame, [0, punchyDuration], [6, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const subOpacity = interpolate(frame, [0, 30], [0.45, 1], {
+    const headlineOpacity = interpolate(frame, [0, punchyDuration * 0.6], [0.85, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+    const headlineScale = interpolate(frame, [0, punchyDuration], [1.04, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const brandX = interpolate(frame, [0, 24], [-10, 0], {
+    const subY = interpolate(frame, [0, punchyDuration * 1.2], [4, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const brandOpacity = interpolate(frame, [0, 24], [0.35, 1], {
+    const subOpacity = interpolate(frame, [0, punchyDuration * 0.8], [0.75, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandOpacity = interpolate(frame, [0, punchyDuration * 1.5], [0.65, 0.9], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -68,42 +94,42 @@ export default function HookA({
                 height: 1080,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
+                justifyContent: 'flex-start',
                 alignItems: 'center',
-                padding: 64,
                 position: 'relative',
-                background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}2e 0%, transparent 45%), #0a0f16`,
+                background: tokens.colors.backgroundGradient,
                 overflow: 'hidden',
             }}
         >
-            {/* Gradient overlay */}
+            {/* Background image: STRONGER presence (clearly readable scene) */}
+            <Img
+                src={backgroundImage}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    filter: `saturate(0.85) brightness(0.75)`, // Less filtering = more readable bg
+                    transform: `scale(${imgScale})`,
+                    opacity: imgOpacity,
+                }}
+            />
+
+            {/* Niche-tinted overlay + edge vignette for text contrast WITHOUT crushing image */}
             <div
                 style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.65))',
+                    background: `
+                        radial-gradient(ellipse at center, transparent 20%, ${tokens.colors.background}88 85%),
+                        linear-gradient(to bottom, ${tokens.colors.primary}12 0%, ${tokens.colors.background}cc 75%)
+                    `,
                     zIndex: 10,
                 }}
             />
 
-            {/* Background image */}
-            {data.imageUrl && (
-                <Img
-                    src={data.imageUrl}
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        filter: 'grayscale(100%)',
-                        transform: `scale(${imgScale})`,
-                        opacity: imgOpacity,
-                    }}
-                />
-            )}
-
-            {/* Content */}
+            {/* Content - positioned in safe zone */}
             <div
                 style={{
                     zIndex: 20,
@@ -111,67 +137,93 @@ export default function HookA({
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    paddingTop: tokens.safeZones.top + tokens.spacing.xl,
+                    paddingLeft: tokens.safeZones.sides,
+                    paddingRight: tokens.safeZones.sides,
+                    maxWidth: 1080 - tokens.safeZones.sides * 2,
                 }}
             >
-                {/* BREAKING badge */}
+                {/* Category badge - SNAP animation */}
                 <div
                     style={{
-                        paddingLeft: 24,
-                        paddingRight: 24,
-                        paddingTop: 8,
-                        paddingBottom: 8,
-                        marginBottom: 32,
-                        borderWidth: 2,
+                        paddingLeft: tokens.spacing.md,
+                        paddingRight: tokens.spacing.md,
+                        paddingTop: tokens.spacing.xs,
+                        paddingBottom: tokens.spacing.xs,
+                        marginBottom: tokens.spacing.lg,
+                        borderWidth: 3,
                         borderStyle: 'solid',
-                        borderColor: branding.accentColor,
-                        color: branding.accentColor,
-                        transform: `translateY(${badgeY}px)`,
+                        borderColor: tokens.colors.primary,
+                        backgroundColor: `${tokens.colors.background}e6`,
+                        color: tokens.colors.primary,
+                        transform: `translateY(${badgeY}px) scale(${badgeScale})`,
                         opacity: badgeOpacity,
+                        borderRadius: 6,
+                        boxShadow: `0 4px 16px ${tokens.colors.primary}40`,
                     }}
                 >
                     <h2
                         style={{
-                            fontSize: 24,
-                            fontWeight: 700,
-                            letterSpacing: '0.1em',
+                            fontSize: tokens.typography.captionSize,
+                            fontWeight: tokens.typography.weight.black,
+                            letterSpacing: '0.12em',
                             textTransform: 'uppercase',
                             margin: 0,
                         }}
                     >
-                        Breaking
+                        {data.badge || 'New'}
                     </h2>
                 </div>
 
-                {/* Headline */}
-                <h1
+                {/* Headline - STRONG text shadows + soft dark plate for readability */}
+                <div
                     style={{
-                        fontSize: 96,
-                        fontWeight: 900,
-                        color: 'white',
-                        lineHeight: 1.3,
-                        letterSpacing: '-0.02em',
-                        marginBottom: 40,
-                        fontFamily: "'Montserrat', sans-serif",
-                        transform: `translateY(${headlineY}px)`,
-                        opacity: headlineOpacity,
-                        maxWidth: 952,
-                        ...lineClamp(2),
+                        position: 'relative',
+                        marginBottom: tokens.spacing.lg,
+                        padding: `${tokens.spacing.md}px ${tokens.spacing.lg}px`,
+                        background: `linear-gradient(135deg, ${tokens.colors.background}95 0%, ${tokens.colors.background}85 100%)`,
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 12,
+                        boxShadow: `0 8px 32px ${tokens.colors.background}80`,
                     }}
                 >
-                    {headline}
-                </h1>
+                    <h1
+                        style={{
+                            fontSize: tokens.typography.hookSize,
+                            fontWeight: tokens.typography.weight.black,
+                            color: tokens.colors.text,
+                            lineHeight: tokens.typography.lineHeight.tight,
+                            letterSpacing: '-0.02em',
+                            margin: 0,
+                            fontFamily: "'Montserrat', sans-serif",
+                            transform: `translateY(${headlineY}px) scale(${headlineScale})`,
+                            opacity: headlineOpacity,
+                            textShadow: `
+                                0 2px 8px rgba(0,0,0,0.8),
+                                0 4px 16px rgba(0,0,0,0.6),
+                                0 1px 2px rgba(0,0,0,0.9)
+                            `,
+                            ...lineClamp(2),
+                        }}
+                    >
+                        {headline}
+                    </h1>
+                </div>
 
-                {/* Subheadline */}
+                {/* Subheadline - readable with text shadows */}
                 <p
                     style={{
-                        fontSize: 38,
-                        color: '#d1d5db',
-                        fontWeight: 600,
-                        maxWidth: 900,
-                        lineHeight: 1.6,
+                        fontSize: tokens.typography.bodySize,
+                        color: tokens.colors.text,
+                        fontWeight: tokens.typography.weight.semibold,
+                        lineHeight: tokens.typography.lineHeight.normal,
                         margin: 0,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
+                        textShadow: `
+                            0 2px 8px rgba(0,0,0,0.9),
+                            0 1px 3px rgba(0,0,0,1)
+                        `,
                         ...lineClamp(3),
                     }}
                 >
@@ -179,40 +231,39 @@ export default function HookA({
                 </p>
             </div>
 
-            {/* Brand handle */}
+            {/* Brand handle - bottom safe zone */}
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 48,
-                    left: 48,
+                    bottom: tokens.safeZones.bottom + tokens.spacing.sm,
+                    left: tokens.safeZones.sides,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 16,
+                    gap: tokens.spacing.sm,
                     zIndex: 20,
-                    transform: `translateX(${brandX}px)`,
                     opacity: brandOpacity,
                 }}
             >
                 <div
                     style={{
-                        width: 48,
-                        height: 48,
+                        width: 40,
+                        height: 40,
                         borderRadius: '50%',
-                        background: 'white',
+                        backgroundColor: tokens.colors.primary,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                     }}
                 >
-                    <Zap style={{ color: 'black', width: 24, height: 24 }} />
+                    <Zap style={{ color: tokens.colors.background, width: 20, height: 20 }} />
                 </div>
                 <span
                     style={{
-                        fontSize: 24,
-                        fontWeight: 700,
+                        fontSize: tokens.typography.captionSize,
+                        fontWeight: tokens.typography.weight.bold,
                         letterSpacing: '0.05em',
-                        color: 'white',
-                        maxWidth: 520,
+                        color: tokens.colors.text,
+                        maxWidth: 460,
                         ...singleLineEllipsis,
                     }}
                 >
