@@ -57,19 +57,12 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
     // Past words (for subtle trail effect)
     const pastWords = autoKaraoke.filter((word) => frame >= word.endFrame);
 
-    // Word entrance animation (scale + opacity)
-    // CRITICAL: First word MUST be visible at frame 0 (thumbnail requirement)
+    // Word scale animation: hard-cut punch (no slow fade)
     const getWordScale = (word: KaraokeWord) => {
         const relativeFrame = frame - word.startFrame;
-        // First word (STOP): immediately at full scale at frame 0
-        if (word.startFrame === 0) {
-            return interpolate(relativeFrame, [0, 4], [1.05, 1], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-            });
-        }
-        // Later words: punch entrance
-        return interpolate(relativeFrame, [0, 8], [0.92, 1], {
+        if (relativeFrame < 0) return 1;
+        // Subtle punch: 1.02 → 1 over 3 frames (fast settle, not soft fade)
+        return interpolate(relativeFrame, [0, 3], [1.02, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
         });
@@ -77,28 +70,18 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
 
     const getWordOpacity = (word: KaraokeWord) => {
         const relativeFrame = frame - word.startFrame;
-        // CRITICAL: First word (STOP) must be VISIBLE at frame 0
-        if (word.startFrame === 0 && relativeFrame >= 0) {
-            // Immediately visible, then fade out at end
-            const exitFrame = word.endFrame - word.startFrame;
-            if (relativeFrame > exitFrame - 10) {
-                return interpolate(relativeFrame, [exitFrame - 10, exitFrame], [1, 0], {
-                    extrapolateRight: 'clamp',
-                });
-            }
-            return 1; // Full opacity at frame 0
-        }
-        // Later words: fade in fast
-        if (relativeFrame < 6) {
-            return interpolate(relativeFrame, [0, 6], [0, 1], { extrapolateLeft: 'clamp' });
-        }
+        // HARD-CUT KARAOKE: All words visible at startFrame (no fade from 0)
+        // TikTok/Shorts style = punch cut, not soft fade-in blank
+        if (relativeFrame < 0) return 0; // Before word starts
+        
         const exitFrame = word.endFrame - word.startFrame;
-        if (relativeFrame > exitFrame - 8) {
-            return interpolate(relativeFrame, [exitFrame - 8, exitFrame], [1, 0.2], {
+        // Fade out only at end
+        if (relativeFrame > exitFrame - 10) {
+            return interpolate(relativeFrame, [exitFrame - 10, exitFrame], [1, 0], {
                 extrapolateRight: 'clamp',
             });
         }
-        return 1;
+        return 1; // Full opacity throughout (hard cut at startFrame)
     };
 
     // Handle watermark (small, bottom corner)
@@ -106,8 +89,8 @@ const HookVerticalNative: React.FC<HookVerticalNativeProps> = ({ data, branding 
         extrapolateRight: 'clamp',
     });
 
-    // CTA end card (last 2s = ~60 frames)
-    const totalFrames = Math.max(...autoKaraoke.map(w => w.endFrame)) + 60;
+    // CTA end card (last 3s = ~90 frames, align with calculateMetadata)
+    const totalFrames = Math.max(...autoKaraoke.map(w => w.endFrame)) + 90;
     const ctaOpacity = interpolate(frame, [totalFrames - 60, totalFrames - 45], [0, 0.9], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
