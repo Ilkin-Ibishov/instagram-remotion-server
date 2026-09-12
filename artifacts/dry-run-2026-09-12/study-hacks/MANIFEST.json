@@ -1,0 +1,52 @@
+{
+  "renderDate": "2026-09-12",
+  "renderTime": "19:38 UTC",
+  "sourceCommit": "acd803836b76d87a3715ed9a38655b3f9af84c50",
+  "sourceMessage": "FIX PROOF AUDIT: Hard-cut karaoke + mid-phrase stills (all distinct MD5s)",
+  "niche": "study-hacks",
+  "composition": "VerticalNative",
+  "templateId": "HOOK_VERTICAL_NATIVE",
+  "dimensions": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16"
+  },
+  "duration": "43.05 seconds",
+  "totalFrames": 1290,
+  "fps": 30,
+  "handle": "@studyhackswithme",
+  "targetPlatforms": ["TikTok", "YouTube Shorts"],
+  "files": {
+    "video": "vertical-video.mp4",
+    "videoSize": "14M",
+    "videoMD5": "9233a2787e8285538f15571706353868",
+    "timelineProof": "timeline-proof/*.png (9 frames extracted at 0s, 5s, 10s, 15s, 20s, 25s, 30s, 35s, 40s)"
+  },
+  "fullMP4Proof": {
+    "status": "PASS",
+    "durationCheck": "✅ 43.05s (NOT 24s empty stretch)",
+    "timelineCheck": "✅ 9 distinct frames extracted across full timeline",
+    "contentCheck": "✅ All mid-timeline stills show readable distinct beats",
+    "md5Check": "✅ 9 unique MD5s - no duplicate empty frames",
+    "emptyStretchCheck": "✅ NO long black/empty stretch after hook",
+    "beatsVerified": [
+      "0s: STOP red stamp",
+      "5s: STOP REREADING YOUR NOTES",
+      "10s: HIGHLIGHTING FEELS PRODUCTIVE",
+      "15s: WHY IT FAILS / QUIZ DAY HITS BLANK",
+      "20s: WRITE EVERYTHING YOU REMEMBER",
+      "25s: COMPARE TO NOTES",
+      "30s: 3 · STUDY THE BLANKS",
+      "35s: NOT THE WHOLE CHAPTER",
+      "40s: FOLLOW CTA (end section)"
+    ]
+  },
+  "watermarkVerified": true,
+  "watermarkText": "@STUDYHACKSWITHME",
+  "notes": [
+    "Full 6-beat story with hard-cut karaoke (TikTok/Shorts style)",
+    "Designer verified 9 mid-phrase stills with distinct MD5s",
+    "No empty-tail MP4 - all beats present with readable content",
+    "Ready for immediate publisher upload"
+  ]
+}
