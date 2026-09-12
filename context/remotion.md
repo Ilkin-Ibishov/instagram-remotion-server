@@ -3,7 +3,7 @@
 ## Root entry
 
 - **File:** `src/remotion/index.tsx`
-- Calls **`registerRoot`** with two **`Composition`** entries:
+- Calls **`registerRoot`** with multiple **`Composition`** entries:
   
   ### 1. `Slide` (1080×1080 square)
   - **`id`:** `"Slide"` — must stay in sync with `COMPOSITION_ID` in `server.ts`.
@@ -21,6 +21,30 @@
   - **`durationInFrames`:** Same as `Slide`
   - **Templates:** `HOOK_EDITORIAL` (cinematic image window + black slab typography)
   - See **`EDITORIAL_COMPOSITION.md`** for full API and usage
+
+  ### 3. `EditorialReel` (1080×1920 portrait / 9:16)
+  - **`id`:** `"EditorialReel"` — cinematic editorial reel format
+  - **`component`:** `EditorialReelComposition`
+  - **Dimensions:** 1080×1920 (9:16 vertical, optimized for Instagram Reels / TikTok / Shorts)
+  - **`fps`:** Same as `Slide`
+  - **`durationInFrames`:** Same as `Slide`
+  - **Templates:** `HOOK_EDITORIAL_REEL`
+
+  ### 4. `VerticalNative` (1080×1920 portrait / 9:16)
+  - **`id`:** `"VerticalNative"` — karaoke-style vertical video
+  - **`component`:** `VerticalNativeComposition`
+  - **Dimensions:** 1080×1920 (9:16 vertical)
+  - **`fps`:** Same as `Slide`
+  - **`calculateMetadata`:** Dynamic duration from karaoke content + 3s CTA hold
+  - **Templates:** `HOOK_VERTICAL_NATIVE` (word-by-word karaoke animation)
+
+  ### 5. `VerticalBeatScenes` (1080×1920 portrait / 9:16)
+  - **`id`:** `"VerticalBeatScenes"` — TikTok-native beat scenes
+  - **`component`:** `VerticalNativeComposition`
+  - **Dimensions:** 1080×1920 (9:16 vertical)
+  - **`fps`:** Same as `Slide`
+  - **`calculateMetadata`:** Dynamic duration from beat timings (sum of beat `sec` values)
+  - **Templates:** `VERTICAL_BEAT_SCENES` (6 distinct visual scenes per beat)
 
 ## Slide router
 

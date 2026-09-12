@@ -61,6 +61,31 @@ Adding a new slide type: implement a component, import it in `SlideComposition.t
 
 Validation note: `CTA_FINAL.callToAction` is now expected to end with `?` so the final card invites an explicit audience response.
 
+### `HOOK_VERTICAL_NATIVE`
+
+- **`karaoke`:** array of `{startFrame, endFrame, text}` objects (optional; auto-generated from hookLines if missing)
+- **`hookLines`:** `string[]` (fallback phrases for karaoke animation)
+- **`cta`:** string (end card call-to-action)
+
+Karaoke-style vertical video (9:16) with word-by-word animation. Each word appears with hard-cut punch timing. Uses design tokens from `branding.niche`. Safe zones enforced (top 150px, bottom 220px).
+
+### `VERTICAL_BEAT_SCENES`
+
+- **`beats`:** array of beat objects with:
+  - **`id`:** string (beat identifier: `stop`, `why`, `s1`, `s2`, `s3`, `cta`)
+  - **`sec`:** `[number, number]` (start and end time in seconds)
+  - **`captionKaraoke`:** `string[]` (lower-third captions)
+
+TikTok-native vertical composition (9:16) with 6 distinct visual beat scenes. Each beat renders a unique motif:
+- **stop**: Giant red STOP stamp with rotation
+- **why**: Highlighter FAIL animation (yellow mark, X, gray-out)
+- **s1**: Big '1' + timer (8:00) + book/handwriting animation
+- **s2**: Checklist with glowing GAP highlights + Big '2'
+- **s3**: Crosshair target on chapter blank spots + Big '3'
+- **cta**: End card with "Try tonight" + chips (cooked/not cooked) + handle
+
+Duration calculated from beat timings via `calculateMetadata`. Captions in lower-third safe zone (bottom ~220px). Uses study-hacks design tokens (#06b6d4 cyan).
+
 ## Design notes
 
 - Layouts are **fixed 1080×1080** with inline styles; typography uses **Montserrat** (ensure webfonts if rendering off a machine without them — not configured in-repo).
