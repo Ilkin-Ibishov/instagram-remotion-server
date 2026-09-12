@@ -1,0 +1,55 @@
+{
+  "manifest": {
+    "manifest": {
+      "format": "mp4",
+      "globalBranding": {
+        "accentColor": "#3B82F6",
+        "handle": "@technewsbot",
+        "effects": ["scanlines", "chromatic"]
+      },
+      "carousel": [
+        {
+          "templateId": "HOOK_A",
+          "data": {
+            "headline": "AI is reshaping software development",
+            "subheadline": "GitHub Copilot now writes 40% of all code commits",
+            "imageUrl": "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1080&h=1080&fit=crop"
+          }
+        },
+        {
+          "templateId": "CONTENT_STAT_SNAPSHOT",
+          "data": {
+            "kicker": "Developer Productivity",
+            "stat": "40%",
+            "context": "GitHub reports that Copilot now generates 40% of all code in files where it's enabled",
+            "takeaway": "AI pair programming is becoming the norm, not the exception"
+          }
+        },
+        {
+          "templateId": "CONTENT_GENERIC",
+          "data": {
+            "title": "What This Means for Developers",
+            "body": "AI coding assistants are shifting the role of developers from writing every line to reviewing and directing AI-generated code. The skill gap is widening between those who adapt and those who don't.",
+            "highlight": "Adapt or fall behind"
+          }
+        },
+        {
+          "templateId": "CTA_FINAL",
+          "data": {
+            "callToAction": "Are you using AI to code yet?",
+            "subtext": "Share your experience in the comments"
+          }
+        }
+      ]
+    },
+    "caption": "AI is now writing 40% of code on GitHub.\n\nThat's not a prediction.\n\nIt's happening right now.\n\nDevelopers who embrace AI assistants are 10x more productive.\n\nAre you adapting?",
+    "hashtags": "#AI #SoftwareDevelopment #GitHub #Copilot #TechNews #DeveloperTools #Automation #FutureOfWork"
+  },
+  "sourceArticle": {
+    "title": "GitHub Copilot is now writing 40% of code",
+    "url": "https://example.com/github-copilot-stats",
+    "description": "New data shows AI pair programming is rapidly becoming mainstream in software development",
+    "source": "TechCrunch",
+    "publishedAt": "2026-09-10T12:00:00Z"
+  }
+}

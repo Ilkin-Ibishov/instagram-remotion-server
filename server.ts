@@ -17,6 +17,8 @@ import {
     renderManifest,
     validateRenderManifest,
 } from './src/render/renderService';
+import { processBotIntake } from './src/pipeline/botManifestService';
+import type { BotIntakePayload } from './src/pipeline/botManifestTypes';
 
 function tryParseJson(value: string): boolean {
     try {
@@ -595,6 +597,100 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
     serverLogger.error('process', 'Uncaught exception', error);
     process.exit(1);
+});
+
+// ─── POST /api/bot-render ────────────────────────────────
+// Bot manifest intake endpoint: accepts bot-produced content, validates, and renders
+// This bypasses Gemini AI generation entirely
+app.post('/api/bot-render', async (req, res) => {
+    const requestId = res.locals.requestId;
+    try {
+        const payload: BotIntakePayload = req.body;
+
+        serverLogger.info('bot-render-api', 'Bot manifest intake request', {
+            requestId,
+            hasSourceArticle: Boolean(payload.sourceArticle),
+        });
+
+        // Validate bot manifest
+        const intake = processBotIntake(payload);
+        if (!intake.valid || !intake.content) {
+            serverLogger.warn('bot-render-api', 'Bot manifest validation failed', {
+                requestId,
+                errors: intake.errors,
+            });
+            return res.status(400).json({
+                error: 'Bot manifest validation failed',
+                details: intake.errors,
+            });
+        }
+
+        // Prepare render input
+        const renderInput = {
+            globalBranding: intake.content.manifest.globalBranding,
+            carousel: intake.content.manifest.carousel,
+            format: (intake.content.manifest.format === 'mp4' ? 'mp4' : 'png') as 'png' | 'mp4',
+        };
+
+        const renderValidation = validateRenderManifest(renderInput);
+        if (renderValidation.error || !renderValidation.normalized) {
+            serverLogger.error('bot-render-api', 'Render validation failed', {
+                requestId,
+                error: renderValidation.error,
+            });
+            return res.status(400).json({
+                error: 'Render validation failed',
+                details: renderValidation.error,
+            });
+        }
+
+        const batchId = crypto.randomBytes(4).toString('hex');
+        serverLogger.info('bot-render-api', 'Bot manifest validated, starting render', {
+            requestId,
+            batchId,
+            slideCount: renderValidation.normalized.carousel.length,
+            format: renderValidation.normalized.format,
+        });
+
+        const renderStartTime = Date.now();
+        let result;
+        try {
+            result = await renderManifest(renderValidation.normalized, batchId);
+        } finally {
+            await cleanupChromeProcessesWithRetries('bot-render cleanup');
+            warnIfTooManyChromeProcesses();
+            serverLogger.info('cleanup', 'Bot render batch completed', {
+                requestId,
+                batchId,
+                durationMs: Date.now() - renderStartTime,
+            });
+        }
+
+        serverLogger.info('bot-render-api', 'Bot manifest rendered successfully', {
+            requestId,
+            batchId,
+            mediaCount: result.images.length,
+            durationMs: Date.now() - renderStartTime,
+        });
+
+        res.json({
+            success: true,
+            batchId: result.batchId,
+            images: result.images,
+            caption: intake.content.caption,
+            hashtags: intake.content.hashtags,
+            sourceArticle: intake.sourceArticle,
+        });
+    } catch (error) {
+        serverLogger.error('bot-render-api', 'Bot render request failed', {
+            requestId,
+            error: serializeError(error),
+        });
+        res.status(500).json({
+            error: 'Failed to render bot manifest',
+            details: error instanceof Error ? error.message : String(error),
+        });
+    }
 });
 
 app.post('/api/render', async (req, res) => {
