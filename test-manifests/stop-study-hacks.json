@@ -3,12 +3,31 @@
   "data": {
     "hookLines": [
       "STOP",
-      "REREADING ≠",
-      "STUDYING"
+      "WHY IT FAILS",
+      "1 · TIMER: 8 MIN",
+      "2 · OPEN & CHECK",
+      "3 · STUDY BLANKS",
+      "TRY TONIGHT"
     ],
     "karaoke": [
-      { "startFrame": 0, "endFrame": 30, "text": "STOP" },
-      { "startFrame": 30, "endFrame": 90, "text": "REREADING ≠ STUDYING" }
+      { "startFrame": 0, "endFrame": 45, "text": "STOP" },
+      { "startFrame": 45, "endFrame": 105, "text": "STOP REREADING YOUR NOTES" },
+      { "startFrame": 105, "endFrame": 165, "text": "LIKE A COMFORT SHOW" },
+      { "startFrame": 165, "endFrame": 240, "text": "WHY IT FAILS" },
+      { "startFrame": 240, "endFrame": 315, "text": "HIGHLIGHTING FEELS PRODUCTIVE" },
+      { "startFrame": 315, "endFrame": 375, "text": "YOUR BRAIN NEVER RETRIEVES" },
+      { "startFrame": 375, "endFrame": 435, "text": "QUIZ DAY HITS BLANK" },
+      { "startFrame": 435, "endFrame": 510, "text": "1 · TIMER: 8 MIN" },
+      { "startFrame": 510, "endFrame": 585, "text": "CLOSE THE BOOK" },
+      { "startFrame": 585, "endFrame": 660, "text": "WRITE EVERYTHING YOU REMEMBER" },
+      { "startFrame": 660, "endFrame": 735, "text": "2 · OPEN & CHECK" },
+      { "startFrame": 735, "endFrame": 810, "text": "COMPARE TO NOTES" },
+      { "startFrame": 810, "endFrame": 870, "text": "MARK THE GAPS" },
+      { "startFrame": 870, "endFrame": 945, "text": "3 · STUDY THE BLANKS" },
+      { "startFrame": 945, "endFrame": 1005, "text": "AIMED AT HOLES" },
+      { "startFrame": 1005, "endFrame": 1065, "text": "NOT THE WHOLE CHAPTER" },
+      { "startFrame": 1065, "endFrame": 1140, "text": "TRY TONIGHT · 1 CHAPTER" },
+      { "startFrame": 1140, "endFrame": 1200, "text": "COMMENT COOKED / NOT COOKED" }
     ],
     "cta": "FOLLOW"
   },

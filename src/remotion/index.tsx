@@ -39,6 +39,19 @@ function parseDurationSeconds(): number {
 const FPS = parseCompositionFps();
 const DURATION_IN_FRAMES = parseDurationSeconds() * FPS;
 
+// Calculate duration from karaoke content + CTA hold window
+function calculateVerticalNativeDuration(data: any, fps: number): number {
+    const karaoke = data?.karaoke || [];
+    if (karaoke.length === 0) {
+        return DURATION_IN_FRAMES; // Fallback to default
+    }
+    // Find last karaoke endFrame
+    const lastKaraokeEnd = Math.max(...karaoke.map((k: any) => k.endFrame));
+    // Add CTA hold window (~3s = 90 frames @ 30fps)
+    const ctaHoldFrames = Math.floor(3 * fps);
+    return lastKaraokeEnd + ctaHoldFrames;
+}
+
 const RemotionRoot: React.FC = () => {
     return (
         <>
@@ -120,6 +133,13 @@ const RemotionRoot: React.FC = () => {
                 height={1920}
                 fps={FPS}
                 durationInFrames={DURATION_IN_FRAMES}
+                calculateMetadata={({ props }) => {
+                    const duration = calculateVerticalNativeDuration(props.data, FPS);
+                    return {
+                        durationInFrames: duration,
+                        fps: FPS,
+                    };
+                }}
                 defaultProps={{
                     templateId: 'HOOK_VERTICAL_NATIVE',
                     data: {
