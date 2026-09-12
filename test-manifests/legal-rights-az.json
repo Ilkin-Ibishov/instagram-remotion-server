@@ -1,0 +1,48 @@
+{
+  "global": {
+    "branding": {
+      "niche": "legal-rights-az",
+      "handle": "@haqlarınız",
+      "accentColor": "#3b82f6",
+      "effects": ["vignette"]
+    }
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "badge": "HÜQUQLARıNıZ",
+        "headline": "İş Yerində Hüququnuz",
+        "subheadline": "İşçi kimi bildiyiniz hüquqlar"
+      }
+    },
+    {
+      "templateId": "CONTENT_LISTICLE",
+      "data": {
+        "title": "Əsas İşçi Hüquqları",
+        "items": [
+          "Məzuniyyət hüququ: ildə minimum 21 təqvim günü",
+          "Əmək müqaviləsi: yazılı şəkildə olmalıdır",
+          "İş saatları: həftədə 40 saatdan çox ola bilməz",
+          "Əmək haqqı: minimum əmək haqqından az ola bilməz"
+        ],
+        "footnote": "Əmək Məcəlləsi, Maddə 156-159"
+      }
+    },
+    {
+      "templateId": "CONTENT_MYTH_VS_FACT",
+      "data": {
+        "myth": "İşəgötürən istənilən vaxt işdən çıxara bilər",
+        "fact": "Qanuni əsas olmadan işdən çıxarmaq qanunsuz sayılır",
+        "proof": "İşçi məhkəməyə müraciət edərək işə bərpa oluna və kompensasiya ala bilər"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "Hüquqlarınızı bilin?",
+        "subtext": "Daha çox hüquqi məlumat üçün izləyin"
+      }
+    }
+  ]
+}

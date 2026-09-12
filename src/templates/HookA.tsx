@@ -2,6 +2,7 @@ import React from 'react';
 import { useCurrentFrame, interpolate, Img, useVideoConfig } from 'remotion';
 import { Zap } from 'lucide-react';
 import { lineClamp, singleLineEllipsis } from './textOverflow';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 export default function HookA({
     data,
@@ -12,51 +13,53 @@ export default function HookA({
 }) {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const headline = data.headline || 'Breaking News';
     const subheadline = data.subheadline || '';
 
-    // Background image: keep a visible base at frame 0 for non-black poster frames.
-    const imgScale = interpolate(frame, [0, 2 * fps], [1.1, 1], {
+    // Faster, punchier motion for hook retention (<1s to full visibility)
+    const hookDuration = tokens.motion.hookDuration;
+    
+    const imgScale = interpolate(frame, [0, hookDuration * 1.5], [1.08, 1], {
         extrapolateRight: 'clamp',
     });
-    const imgOpacity = interpolate(frame, [0, 2 * fps], [0.15, 0.4], {
-        extrapolateRight: 'clamp',
-    });
-
-    // Keep core content visible from frame 0 while preserving motion.
-    const badgeY = interpolate(frame, [0, 18], [-8, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-    });
-    const badgeOpacity = interpolate(frame, [0, 18], [0.45, 1], {
-        extrapolateLeft: 'clamp',
+    const imgOpacity = interpolate(frame, [0, hookDuration], [0.2, 0.35], {
         extrapolateRight: 'clamp',
     });
 
-    const headlineY = interpolate(frame, [0, 24], [12, 0], {
+    // Badge: instant at frame 0, subtle motion
+    const badgeY = interpolate(frame, [0, hookDuration * 0.8], [-6, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const headlineOpacity = interpolate(frame, [0, 24], [0.55, 1], {
+    const badgeOpacity = interpolate(frame, [0, hookDuration * 0.5], [0.7, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const subY = interpolate(frame, [0, 30], [8, 0], {
+    // Headline: readable immediately, gentle settle
+    const headlineY = interpolate(frame, [0, hookDuration], [8, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const subOpacity = interpolate(frame, [0, 30], [0.45, 1], {
+    const headlineOpacity = interpolate(frame, [0, hookDuration * 0.7], [0.75, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
 
-    const brandX = interpolate(frame, [0, 24], [-10, 0], {
+    const subY = interpolate(frame, [0, hookDuration * 1.2], [6, 0], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const brandOpacity = interpolate(frame, [0, 24], [0.35, 1], {
+    const subOpacity = interpolate(frame, [0, hookDuration], [0.6, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+    });
+
+    const brandOpacity = interpolate(frame, [0, hookDuration * 1.5], [0.5, 0.8], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -68,25 +71,24 @@ export default function HookA({
                 height: 1080,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
+                justifyContent: 'flex-start',
                 alignItems: 'center',
-                padding: 64,
                 position: 'relative',
-                background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}2e 0%, transparent 45%), #0a0f16`,
+                background: tokens.colors.backgroundGradient,
                 overflow: 'hidden',
             }}
         >
-            {/* Gradient overlay */}
+            {/* Subtle gradient overlay */}
             <div
                 style={{
                     position: 'absolute',
                     inset: 0,
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.65))',
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5))',
                     zIndex: 10,
                 }}
             />
 
-            {/* Background image */}
+            {/* Background image (optional) */}
             {data.imageUrl && (
                 <Img
                     src={data.imageUrl}
@@ -96,14 +98,14 @@ export default function HookA({
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
-                        filter: 'grayscale(100%)',
+                        filter: 'grayscale(100%) blur(1px)',
                         transform: `scale(${imgScale})`,
                         opacity: imgOpacity,
                     }}
                 />
             )}
 
-            {/* Content */}
+            {/* Content - positioned in safe zone */}
             <div
                 style={{
                     zIndex: 20,
@@ -111,64 +113,69 @@ export default function HookA({
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    paddingTop: tokens.safeZones.top + tokens.spacing.xl,
+                    paddingLeft: tokens.safeZones.sides,
+                    paddingRight: tokens.safeZones.sides,
+                    maxWidth: 1080 - tokens.safeZones.sides * 2,
                 }}
             >
-                {/* BREAKING badge */}
+                {/* Category badge - niche-specific color */}
                 <div
                     style={{
-                        paddingLeft: 24,
-                        paddingRight: 24,
-                        paddingTop: 8,
-                        paddingBottom: 8,
-                        marginBottom: 32,
-                        borderWidth: 2,
+                        paddingLeft: tokens.spacing.md,
+                        paddingRight: tokens.spacing.md,
+                        paddingTop: tokens.spacing.xs,
+                        paddingBottom: tokens.spacing.xs,
+                        marginBottom: tokens.spacing.lg,
+                        borderWidth: 3,
                         borderStyle: 'solid',
-                        borderColor: branding.accentColor,
-                        color: branding.accentColor,
+                        borderColor: tokens.colors.primary,
+                        backgroundColor: tokens.colors.surface,
+                        color: tokens.colors.primary,
                         transform: `translateY(${badgeY}px)`,
                         opacity: badgeOpacity,
+                        borderRadius: 4,
                     }}
                 >
                     <h2
                         style={{
-                            fontSize: 24,
-                            fontWeight: 700,
+                            fontSize: tokens.typography.captionSize,
+                            fontWeight: tokens.typography.weight.bold,
                             letterSpacing: '0.1em',
                             textTransform: 'uppercase',
                             margin: 0,
                         }}
                     >
-                        Breaking
+                        {data.badge || 'New'}
                     </h2>
                 </div>
 
-                {/* Headline */}
+                {/* Headline - large, instantly readable */}
                 <h1
                     style={{
-                        fontSize: 96,
-                        fontWeight: 900,
-                        color: 'white',
-                        lineHeight: 1.3,
+                        fontSize: tokens.typography.hookSize,
+                        fontWeight: tokens.typography.weight.black,
+                        color: tokens.colors.text,
+                        lineHeight: tokens.typography.lineHeight.tight,
                         letterSpacing: '-0.02em',
-                        marginBottom: 40,
+                        marginBottom: tokens.spacing.lg,
                         fontFamily: "'Montserrat', sans-serif",
                         transform: `translateY(${headlineY}px)`,
                         opacity: headlineOpacity,
-                        maxWidth: 952,
+                        textShadow: '0 2px 12px rgba(0,0,0,0.4)',
                         ...lineClamp(2),
                     }}
                 >
                     {headline}
                 </h1>
 
-                {/* Subheadline */}
+                {/* Subheadline - supporting context */}
                 <p
                     style={{
-                        fontSize: 38,
-                        color: '#d1d5db',
-                        fontWeight: 600,
-                        maxWidth: 900,
-                        lineHeight: 1.6,
+                        fontSize: tokens.typography.bodySize,
+                        color: tokens.colors.textSecondary,
+                        fontWeight: tokens.typography.weight.semibold,
+                        lineHeight: tokens.typography.lineHeight.normal,
                         margin: 0,
                         transform: `translateY(${subY}px)`,
                         opacity: subOpacity,
@@ -179,40 +186,39 @@ export default function HookA({
                 </p>
             </div>
 
-            {/* Brand handle */}
+            {/* Brand handle - bottom safe zone */}
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 48,
-                    left: 48,
+                    bottom: tokens.safeZones.bottom + tokens.spacing.sm,
+                    left: tokens.safeZones.sides,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 16,
+                    gap: tokens.spacing.sm,
                     zIndex: 20,
-                    transform: `translateX(${brandX}px)`,
                     opacity: brandOpacity,
                 }}
             >
                 <div
                     style={{
-                        width: 48,
-                        height: 48,
+                        width: 40,
+                        height: 40,
                         borderRadius: '50%',
-                        background: 'white',
+                        backgroundColor: tokens.colors.primary,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                     }}
                 >
-                    <Zap style={{ color: 'black', width: 24, height: 24 }} />
+                    <Zap style={{ color: tokens.colors.background, width: 20, height: 20 }} />
                 </div>
                 <span
                     style={{
-                        fontSize: 24,
-                        fontWeight: 700,
+                        fontSize: tokens.typography.captionSize,
+                        fontWeight: tokens.typography.weight.bold,
                         letterSpacing: '0.05em',
-                        color: 'white',
-                        maxWidth: 520,
+                        color: tokens.colors.text,
+                        maxWidth: 460,
                         ...singleLineEllipsis,
                     }}
                 >

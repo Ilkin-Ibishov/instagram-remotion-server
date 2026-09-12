@@ -1,0 +1,44 @@
+{
+  "global": {
+    "branding": {
+      "niche": "psychology-micro",
+      "handle": "@mindHacks",
+      "accentColor": "#8b5cf6",
+      "effects": ["vignette", "chromatic"]
+    }
+  },
+  "carousel": [
+    {
+      "templateId": "HOOK_A",
+      "data": {
+        "badge": "PSYCH TIP",
+        "headline": "Why We Procrastinate",
+        "subheadline": "The hidden psychology behind task avoidance"
+      }
+    },
+    {
+      "templateId": "CONTENT_GENERIC",
+      "data": {
+        "title": "Temporal Discounting",
+        "body": "Your brain values immediate rewards far more than future ones—even when the future reward is objectively better. This cognitive bias makes us choose instant gratification over long-term goals.",
+        "highlight": "Deadline pressure forces your brain to see the task as 'immediate'"
+      }
+    },
+    {
+      "templateId": "CONTENT_STAT_SNAPSHOT",
+      "data": {
+        "kicker": "Cognitive Bias",
+        "stat": "83%",
+        "context": "of people procrastinate on important tasks at least once per week",
+        "takeaway": "You're not lazy—your brain is wired for immediate rewards"
+      }
+    },
+    {
+      "templateId": "CTA_FINAL",
+      "data": {
+        "callToAction": "Want more psychology tips?",
+        "subtext": "Follow for daily micro-lessons on the mind"
+      }
+    }
+  ]
+}

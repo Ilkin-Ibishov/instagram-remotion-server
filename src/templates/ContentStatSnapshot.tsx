@@ -1,6 +1,7 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
 import { lineClamp, singleLineEllipsis } from './textOverflow';
+import { getDesignTokens, getNicheFromBranding } from '../remotion/designTokens';
 
 export default function ContentStatSnapshot({
     data,
@@ -10,21 +11,26 @@ export default function ContentStatSnapshot({
     branding: any;
 }) {
     const frame = useCurrentFrame();
+    
+    const niche = getNicheFromBranding(branding);
+    const tokens = getDesignTokens(niche);
 
     const kicker = data.kicker || 'Key Signal';
     const stat = data.stat || '0%';
     const context = data.context || '';
     const takeaway = data.takeaway || '';
 
-    const cardOpacity = interpolate(frame, [0, 20], [0.55, 1], {
+    const transitionDur = tokens.motion.transitionDuration;
+
+    const cardOpacity = interpolate(frame, [0, transitionDur * 0.8], [0.7, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const statScale = interpolate(frame, [10, 32], [0.92, 1], {
+    const statScale = interpolate(frame, [transitionDur * 0.4, transitionDur * 1.2], [0.94, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
-    const textOpacity = interpolate(frame, [0, 30], [0.45, 1], {
+    const textOpacity = interpolate(frame, [0, transitionDur], [0.6, 1], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
     });
@@ -39,26 +45,19 @@ export default function ContentStatSnapshot({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(160deg, #121212 0%, #1a1a1a 65%, #0f0f0f 100%)',
-                padding: 70,
+                background: tokens.colors.backgroundGradient,
+                padding: tokens.safeZones.sides,
             }}
         >
             <div
                 style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: `radial-gradient(circle at 15% 20%, ${branding.accentColor}44 0%, transparent 45%)`,
-                }}
-            />
-
-            <div
-                style={{
                     width: '100%',
-                    maxWidth: 910,
-                    borderRadius: 36,
-                    border: `2px solid ${branding.accentColor}`,
-                    background: 'rgba(18,18,18,0.86)',
-                    padding: '56px 64px',
+                    maxWidth: 1080 - tokens.safeZones.sides * 2,
+                    borderRadius: 24,
+                    border: `3px solid ${tokens.colors.primary}`,
+                    backgroundColor: tokens.colors.surface,
+                    backdropFilter: 'blur(8px)',
+                    padding: `${tokens.spacing.xl}px ${tokens.spacing.xl}px`,
                     opacity: cardOpacity,
                     zIndex: 10,
                 }}
@@ -66,12 +65,12 @@ export default function ContentStatSnapshot({
                 <p
                     style={{
                         margin: 0,
-                        color: '#d4d4d4',
+                        color: tokens.colors.textSecondary,
                         letterSpacing: '0.08em',
                         textTransform: 'uppercase',
-                        fontWeight: 700,
-                        fontSize: 24,
-                        ...singleLineEllipsis(780),
+                        fontWeight: tokens.typography.weight.bold,
+                        fontSize: tokens.typography.captionSize,
+                        ...singleLineEllipsis('100%'),
                     }}
                 >
                     {kicker}
@@ -79,14 +78,14 @@ export default function ContentStatSnapshot({
 
                 <h2
                     style={{
-                        margin: '20px 0 18px',
+                        margin: `${tokens.spacing.md}px 0 ${tokens.spacing.sm}px`,
                         fontFamily: "'Montserrat', sans-serif",
-                        fontSize: 150,
+                        fontSize: 130,
                         lineHeight: 1,
-                        color: branding.accentColor,
+                        color: tokens.colors.primary,
                         transform: `scale(${statScale})`,
                         transformOrigin: 'left center',
-                        fontWeight: 900,
+                        fontWeight: tokens.typography.weight.black,
                         ...singleLineEllipsis('100%'),
                     }}
                 >
@@ -96,12 +95,12 @@ export default function ContentStatSnapshot({
                 <p
                     style={{
                         margin: 0,
-                        fontSize: 40,
-                        lineHeight: 1.45,
-                        color: '#f5f5f5',
-                        fontWeight: 600,
+                        fontSize: tokens.typography.bodySize + 2,
+                        lineHeight: tokens.typography.lineHeight.normal,
+                        color: tokens.colors.text,
+                        fontWeight: tokens.typography.weight.semibold,
                         opacity: textOpacity,
-                        ...lineClamp(4),
+                        ...lineClamp(3),
                     }}
                 >
                     {context}
@@ -109,13 +108,13 @@ export default function ContentStatSnapshot({
 
                 <p
                     style={{
-                        margin: '32px 0 0',
-                        fontSize: 32,
-                        lineHeight: 1.45,
-                        color: '#d4d4d4',
-                        fontWeight: 500,
+                        margin: `${tokens.spacing.lg}px 0 0`,
+                        fontSize: tokens.typography.bodySize - 4,
+                        lineHeight: tokens.typography.lineHeight.normal,
+                        color: tokens.colors.textSecondary,
+                        fontWeight: tokens.typography.weight.medium,
                         opacity: textOpacity,
-                        ...lineClamp(4),
+                        ...lineClamp(3),
                     }}
                 >
                     {takeaway}
@@ -125,17 +124,17 @@ export default function ContentStatSnapshot({
             <div
                 style={{
                     position: 'absolute',
-                    bottom: 44,
-                    right: 48,
-                    color: '#d4d4d4',
-                    fontSize: 22,
-                    fontWeight: 700,
+                    bottom: tokens.safeZones.bottom,
+                    right: tokens.safeZones.sides,
+                    color: tokens.colors.textSecondary,
+                    fontSize: tokens.typography.captionSize - 2,
+                    fontWeight: tokens.typography.weight.bold,
                     letterSpacing: '0.05em',
-                    opacity: interpolate(frame, [0, 24], [0.3, 0.75], {
+                    opacity: interpolate(frame, [0, transitionDur], [0.4, 0.8], {
                         extrapolateLeft: 'clamp',
                         extrapolateRight: 'clamp',
                     }),
-                    ...singleLineEllipsis(360),
+                    ...singleLineEllipsis(340),
                 }}
             >
                 {branding.handle}
